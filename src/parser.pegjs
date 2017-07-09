@@ -72,26 +72,27 @@ code = label:(label ':' ws?)? z80:z80 {
         return z80;
     }
 
-label = [a-zA-Z][a-zA-Z0-9]* {
+label = !'bc'i !'de'i !'hl'i !'sp'i !'af'i ([a-zA-Z][a-zA-Z0-9]*) {
     return text();
 }
 
 z80 = ld_sp_hl
     / ld_r_r
-    / ld_rr_nn
     / ld_bcde_a
     / ld_a_bcde
-    / add_hl_rr
-    / inc_rr
-    / dec_rr
+    / ld_hla_addr
+    / ld_bcdehlsp_nn
+    / add_hl_bcdehlsp
+    / inc_bcdehlsp
+    / dec_bcdehlsp
     / inc_bdhhl
     / inc_cela
     / ld_bdhhl_n
     / ld_cela_n
     / dec_bdhhl
     / dec_cela
-    / push_rr
-    / pop_rr
+    / push_bcdehlaf
+    / pop_bcdehlaf
     / rlca
     / ex_afaf
     / rrca
@@ -100,10 +101,17 @@ z80 = ld_sp_hl
     / djnz
     / rla
     / rra
+    / jr_nznc
+    / jr_zc
     / jr
+    / ld_addr_hla
+    / daa
 
 ex_afaf = 'ex'i ws 'af'i ws? ',' ws? 'af\''i {
     return res([0x08]);
+}
+daa = 'daa'i {
+    return res([0x27]);
 }
 rlca = 'rlca'i {
     return res([0x07]);
@@ -126,7 +134,7 @@ ld_sp_hl = 'ld'i ws 'sp'i ws? ',' ws? 'hl'i {
 ld_r_r = 'ld'i ws reg1:reg ws? ',' ws? reg2:reg {
     return res([0x40 | (reg1 << 3) | reg2]);
 }
-ld_rr_nn = 'ld'i ws reg:reg16 ws? ',' ws? expr:expr {
+ld_bcdehlsp_nn = 'ld'i ws reg:bcdehlsp ws? ',' ws? expr:expr {
     return res([0x01 | (reg << 4)].concat(expr16(expr)));
 }
 ld_bcde_a = 'ld'i ws '(' reg:bcde ')' ws? ',' ws? 'a' {
@@ -135,13 +143,13 @@ ld_bcde_a = 'ld'i ws '(' reg:bcde ')' ws? ',' ws? 'a' {
 ld_a_bcde = 'ld'i ws 'a' ws? ',' ws? '(' reg:bcde ')' {
     return res([0x0A | (reg << 4)]);
 }
-add_hl_rr = 'add'i ws 'hl'i ws? ',' ws? reg:reg16 {
+add_hl_bcdehlsp = 'add'i ws 'hl'i ws? ',' ws? reg:bcdehlsp {
     return res([0x09 | (reg << 4)]);
 }
-inc_rr = 'inc'i ws reg:reg16 {
+inc_bcdehlsp = 'inc'i ws reg:bcdehlsp {
     return res([0x03 | (reg << 4)]);
 }
-dec_rr = 'dec'i ws reg:reg16 {
+dec_bcdehlsp = 'dec'i ws reg:bcdehlsp {
     return res([0x0B | (reg << 4)]);
 }
 inc_bdhhl = 'inc'i ws reg:bdhhl {
@@ -162,10 +170,16 @@ ld_bdhhl_n = 'ld'i ws reg:bdhhl ws? ',' ws? expr:expr {
 ld_cela_n = 'ld'i ws reg:cela ws? ',' ws? expr:expr {
     return res([0x0E | (reg << 4)].concat(expr8(expr)));
 }
-push_rr = 'push'i ws reg:reg16a {
+ld_addr_hla = 'ld'i ws '(' expr:expr ')' ws? ',' ws? reg:hla {
+    return res([0x22 | (reg << 4)].concat(expr16(expr)));
+}
+ld_hla_addr = 'ld'i ws reg:hla ws? ',' ws? '(' expr:expr ')' {
+    return res([0x2a | (reg << 4)].concat(expr16(expr)));
+}
+push_bcdehlaf = 'push'i ws reg:bcdehlaf {
     return res([0xC1 | (reg << 4)]);
 }
-pop_rr = 'pop'i ws reg:reg16a {
+pop_bcdehlaf = 'pop'i ws reg:bcdehlaf {
     return res([0xC5 | (reg << 4)]);
 }
 jp = 'jp'i ws expr:expr {
@@ -176,6 +190,12 @@ djnz = 'djnz'i ws expr:expr {
 }
 jr = 'jr'i ws expr:expr {
     return res([0x18].concat(rel(expr)));
+}
+jr_nznc = 'jr'i ws cond:nznc ws? ',' ws? expr:expr {
+    return res([0x20 | (cond << 4)].concat(rel(expr)));
+}
+jr_zc = 'jr'i ws cond:zc ws? ',' ws? expr:expr {
+    return res([0x28 | (cond << 4)].concat(rel(expr)));
 }
 
 reg = 'b'i { return 0; }
@@ -197,18 +217,27 @@ cela = 'c'i { return 0; }
     / 'l'i { return 2; }
     / 'a'i { return 3; }
 
-reg16 = 'bc'i { return 0; }
+bcdehlsp = 'bc'i { return 0; }
     / 'de'i { return 1; }
     / 'hl'i { return 2; }
     / 'sp'i { return 3; }
 
-reg16a = 'bc'i { return 0; }
+bcdehlaf = 'bc'i { return 0; }
     / 'de'i { return 1; }
     / 'hl'i { return 2; }
     / 'af'i { return 3; }
 
 bcde = 'bc'i { return 0; }
     / 'de'i { return 1; }
+
+nznc = 'nz'i { return 0; }
+    / 'nc'i { return 1; }
+
+zc = 'z'i { return 0; }
+    / 'c'i { return 1; }
+
+hla = 'hl'i { return 0; }
+    / 'a'i { return 1; }
 
 ws = [ \t\r\n]+
 

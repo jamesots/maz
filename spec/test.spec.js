@@ -100,7 +100,22 @@ describe('parser', function() {
         ['inc e', [0x1c]],
         ['dec e', [0x1d]],
         ['ld e,$01', [0x1e, 0x01]],
-        ['rra', [0x1f]]
+        ['rra', [0x1f]],
+        ['jr nz,$100', [0x20, {
+            relative: 256
+        }]],
+        ['ld hl,$e0f9', [0x21, 0xf9, 0xe0]],
+        ['ld ($1234),hl', [0x22, 0x34, 0x12]],
+        ['inc hl', [0x23]],
+        ['inc h', [0x24]],
+        ['dec h', [0x25]],
+        ['ld h,$9a', [0x26, 0x9a]],
+        ['daa', [0x27]],
+        ['jr z,$100', [0x28, {
+            relative: 256
+        }]],
+        ['add hl,hl', [0x29]],
+        ['ld hl,($7bca)', [0x2a, 0xca, 0x7b]]
     ]
     for (const opcode of opcodes) {
         it('should parse ' + opcode[0], function() {;
