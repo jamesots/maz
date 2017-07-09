@@ -1,9 +1,13 @@
-start = ws? statements ws?
+start = ws? stmts:statements? ws? { return stmts; }
 
-statements = statement separator statements
-    / statement
+statements = stmt:statement [ \t]* comment? separator stmts:statements {
+        return [stmt].concat(stmts);
+    }
+    / stmt:statement [ \t]* comment? {
+        return [stmt]
+    }
 
-separator = [ \t]* [;\r\n] [ \t]*
+separator = [ \t]* [\r\n] [ \t]*
 
 statement = directive
     / code
@@ -28,7 +32,12 @@ block = '.block'i
 
 endblock = '.endblock'i
 
-code = (label ':' ws?)? z80
+code = label:(label ':' ws?)? z80:z80 {
+        if (label) {
+            z80.label = label[0];
+        }
+        return z80;
+    }
 
 label = [a-zA-Z][a-zA-Z0-9]* {
     return text();
@@ -127,9 +136,23 @@ reg16a = 'bc'i { return 0; }
 
 ws = [ \t\r\n]+
 
-expr = term ([+-] term)*
+expr = t1:term ws? t2:([+-] ws? term)* {
+        console.log('>>' + JSON.stringify(t2, undefined, 2));
+        let result = t1;
+        for (const term of t2) {
+            result += ` ${term[0]} ${term[2]}`;
+        }
+        return result;
+    }
 
-term = factor ([*/] factor)*
+term = t1:factor ws? t2:([*/] ws? factor)* {
+        console.log('>>' + JSON.stringify(t2, undefined, 2));
+        let result = t1;
+        for (const term of t2) {
+            result += ` ${term[0]} ${term[2]}`;
+        }
+        return result;
+    }
 
 factor = '(' expr ')'
     / number_literal

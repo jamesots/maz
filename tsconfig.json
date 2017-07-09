@@ -6,5 +6,8 @@
         "sourceMap": false,
         "allowJs": true,
         "outDir": "build"
-    }
+    },
+    "include":[
+        "src/**/*.ts"
+    ]
 }
