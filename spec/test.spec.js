@@ -66,7 +66,13 @@ describe('parser', function() {
         ['ld bc,$12 + start', [0x01, {
             expression: '18 + start'
         }, null]],
-        ['ld bc,$1234', [0x01, 0x34, 0x12]]
+        ['ld bc,$1234', [0x01, 0x34, 0x12]],
+        ['ld (bc),a', [0x02]],
+        ['inc bc', [0x03]],
+        ['inc b', [0x04]],
+        ['dec b', [0x05]],
+        ['ld b,$12', [0x06, 0x12]],
+        ['rlca', [0x07]]
     ]
     for (const opcode of opcodes) {
         it('should parse ' + opcode[0], function() {;
