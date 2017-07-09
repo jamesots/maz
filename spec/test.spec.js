@@ -72,7 +72,35 @@ describe('parser', function() {
         ['inc b', [0x04]],
         ['dec b', [0x05]],
         ['ld b,$12', [0x06, 0x12]],
-        ['rlca', [0x07]]
+        ['rlca', [0x07]],
+        ['ex af,af\'', [0x08]],
+        ['add hl,bc', [0x09]],
+        ['ld a,(bc)', [0x0a]],
+        ['dec bc', [0x0b]],
+        ['inc c', [0x0c]],
+        ['dec c', [0x0d]],
+        ['ld c,$12', [0x0e, 0x12]],
+        ['rrca', [0x0f]],
+        ['djnz $100', [0x10, {
+            relative: 256
+        }]],
+        ['ld de,$543F', [0x11, 0x3f, 0x54]],
+        ['ld (de),a', [0x12]],
+        ['inc de', [0x13]],
+        ['inc d', [0x14]],
+        ['dec d', [0x15]],
+        ['ld d,$fe', [0x16, 0xfe]],
+        ['rla', [0x17]],
+        ['jr $100', [0x18, {
+            relative: 256
+        }]],
+        ['add hl,de', [0x19]],
+        ['ld a,(de)', [0x1a]],
+        ['dec de', [0x1b]],
+        ['inc e', [0x1c]],
+        ['dec e', [0x1d]],
+        ['ld e,$01', [0x1e, 0x01]],
+        ['rra', [0x1f]]
     ]
     for (const opcode of opcodes) {
         it('should parse ' + opcode[0], function() {;

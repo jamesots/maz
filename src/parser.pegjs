@@ -17,6 +17,12 @@
         }
     }
 
+    function rel(expr) {
+        return [{
+            relative: expr
+        }];
+    }
+
     function res(bytes) {
         return {
             text: text(),
@@ -74,6 +80,7 @@ z80 = ld_sp_hl
     / ld_r_r
     / ld_rr_nn
     / ld_bcde_a
+    / ld_a_bcde
     / add_hl_rr
     / inc_rr
     / dec_rr
@@ -86,11 +93,29 @@ z80 = ld_sp_hl
     / push_rr
     / pop_rr
     / rlca
+    / ex_afaf
+    / rrca
     / nop
     / jp
+    / djnz
+    / rla
+    / rra
+    / jr
 
+ex_afaf = 'ex'i ws 'af'i ws? ',' ws? 'af\''i {
+    return res([0x08]);
+}
 rlca = 'rlca'i {
     return res([0x07]);
+}
+rla = 'rla'i {
+    return res([0x17]);
+}
+rrca = 'rrca'i {
+    return res([0x0f]);
+}
+rra = 'rra'i {
+    return res([0x1f]);
 }
 nop = 'nop'i {
     return res([0x00]);
@@ -106,6 +131,9 @@ ld_rr_nn = 'ld'i ws reg:reg16 ws? ',' ws? expr:expr {
 }
 ld_bcde_a = 'ld'i ws '(' reg:bcde ')' ws? ',' ws? 'a' {
     return res([0x02 | (reg << 4)]);
+}
+ld_a_bcde = 'ld'i ws 'a' ws? ',' ws? '(' reg:bcde ')' {
+    return res([0x0A | (reg << 4)]);
 }
 add_hl_rr = 'add'i ws 'hl'i ws? ',' ws? reg:reg16 {
     return res([0x09 | (reg << 4)]);
@@ -131,7 +159,7 @@ dec_cela = 'dec'i ws reg:cela {
 ld_bdhhl_n = 'ld'i ws reg:bdhhl ws? ',' ws? expr:expr {
     return res([0x06 | (reg << 4)].concat(expr8(expr)));
 }
-ld_cela_n = 'inc'i ws reg:cela ws? ',' ws? expr:expr {
+ld_cela_n = 'ld'i ws reg:cela ws? ',' ws? expr:expr {
     return res([0x0E | (reg << 4)].concat(expr8(expr)));
 }
 push_rr = 'push'i ws reg:reg16a {
@@ -142,6 +170,12 @@ pop_rr = 'pop'i ws reg:reg16a {
 }
 jp = 'jp'i ws expr:expr {
     return res([0xC2, expr]);
+}
+djnz = 'djnz'i ws expr:expr {
+    return res([0x10].concat(rel(expr)));
+}
+jr = 'jr'i ws expr:expr {
+    return res([0x18].concat(rel(expr)));
 }
 
 reg = 'b'i { return 0; }
