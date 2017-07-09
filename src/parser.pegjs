@@ -109,9 +109,13 @@ z80 = ld_sp_hl
     / daa
     / scf
     / ccf
+    / halt
 
 ex_afaf = 'ex'i ws 'af'i ws? ',' ws? 'af\''i {
     return res([0x08]);
+}
+halt = 'halt'i {
+    return res([0x76]);
 }
 scf = 'scf'i {
     return res([0x37]);
@@ -143,7 +147,9 @@ nop = 'nop'i {
 ld_sp_hl = 'ld'i ws 'sp'i ws? ',' ws? 'hl'i {
     return res([0xF9]);
 }
-ld_r_r = 'ld'i ws reg1:reg ws? ',' ws? reg2:reg {
+ld_r_r = 'ld'i ws reg1:reg ws? ',' ws? reg2:reg ! {
+    return reg1 === 6 && reg2 === 6;
+    } {
     return res([0x40 | (reg1 << 3) | reg2]);
 }
 ld_bcdehlsp_nn = 'ld'i ws reg:bcdehlsp ws? ',' ws? expr:expr {
