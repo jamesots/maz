@@ -105,13 +105,25 @@ z80 = ld_sp_hl
     / jr_zc
     / jr
     / ld_addr_hla
+    / cpl
     / daa
+    / scf
+    / ccf
 
 ex_afaf = 'ex'i ws 'af'i ws? ',' ws? 'af\''i {
     return res([0x08]);
 }
+scf = 'scf'i {
+    return res([0x37]);
+}
+ccf = 'ccf'i {
+    return res([0x3f]);
+}
 daa = 'daa'i {
     return res([0x27]);
+}
+cpl = 'cpl'i {
+    return res([0x2f]);
 }
 rlca = 'rlca'i {
     return res([0x07]);
@@ -276,10 +288,10 @@ number_literal = binary_literal
 decimal_literal = [0-9][0-9_]* {
         return parseInt(text().replace(/_/g,''), 10)
     }
-hex_literal = '$' [0-9a-fA-F][0-9a-fA-F_]* {
+hex_literal = '$' [0-9a-f]i[0-9a-f_]i* {
         return parseInt(text().replace(/[_\$]/g,''), 16);
     }
-    / [0-9a-fA-F][0-9a-fA-F_]* 'h' {
+    / [0-9a-fA-F][0-9a-f_]i* 'h' {
         return parseInt(text().replace(/[_h]/g,''), 16)
     }
 binary_literal = [01][01_]* 'b' {
