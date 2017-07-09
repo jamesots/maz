@@ -1,3 +1,15 @@
+{
+    const Parser = require('expr-eval').Parser;
+
+    function expr16(expr) {
+        if (expr.expression) {
+            return [expr, null]
+        } else {
+            return [expr & 0xFF, (expr & 0xFF00) >> 8]
+        }
+    }
+}
+
 start = ws? stmts:statements? ws? { return stmts; }
 
 statements = stmt:statement [ \t]* comment? separator stmts:statements {
@@ -75,7 +87,7 @@ ld_r_r = 'ld'i ws reg1:reg ws? ',' ws? reg2:reg {
 ld_rr_nn = 'ld'i ws reg:reg16 ws? ',' ws? expr:expr {
     return {
         text: text(),
-        bytes: [0x01 | (reg << 4), expr]
+        bytes: [0x01 | (reg << 4)].concat(expr16(expr))
     }
 }
 add_hl_rr = 'add'i ws 'hl'i ws? ',' ws? reg:reg16 {
@@ -137,16 +149,21 @@ reg16a = 'bc'i { return 0; }
 ws = [ \t\r\n]+
 
 expr = t1:term ws? t2:([+-] ws? term)* {
-        console.log('>>' + JSON.stringify(t2, undefined, 2));
         let result = t1;
         for (const term of t2) {
             result += ` ${term[0]} ${term[2]}`;
         }
-        return result;
+        try {
+            const value = Parser.evaluate(new String(result));
+            return value;
+        } catch (e) {
+            return {
+                expression: result
+            }
+        }
     }
 
 term = t1:factor ws? t2:([*/] ws? factor)* {
-        console.log('>>' + JSON.stringify(t2, undefined, 2));
         let result = t1;
         for (const term of t2) {
             result += ` ${term[0]} ${term[2]}`;

@@ -62,8 +62,10 @@ describe('parser', function() {
 
     const opcodes = [
         ['nop', [0x00]],
-        ['ld bc,$12 + $34 + $2', [0x01, 0x34, 0x12]],
-        ['ld bc,$12 + start', [0x01, 0x34, 0x12]],
+        ['ld bc,$12 + $34 + $2', [0x01, 0x48, 0x00]],
+        ['ld bc,$12 + start', [0x01, {
+            expression: '18 + start'
+        }, null]],
         ['ld bc,$1234', [0x01, 0x34, 0x12]]
     ]
     for (const opcode of opcodes) {
