@@ -11,29 +11,76 @@ statement = directive
 
 directive = org
     / macro
+    / endm
+    / block
+    / endblock
     // etc
 
 comment = ';' [^\n]*
 
-org = 'org'i ws expr
+org = '.'? 'org'i ws expr
 
-macro = 'macro'i ws label
+macro = '.'? 'macro'i ws label
+
+endm = '.'? 'endm'i
+
+block = '.block'i
+
+endblock = '.endblock'i
 
 code = (label ':' ws?)? z80
 
-label = [a-zA-Z][a-zA-Z0-9]*
+label = [a-zA-Z][a-zA-Z0-9]* {
+    return text();
+}
 
-z80 = ld_r_r
+z80 = ld_sp_hl
+    / ld_r_r
+    / nop
     / jp
 
-ld_r_r = 'ld'i ws reg ws? ',' ws? reg
-jp = 'jp'i ws expr
+nop = 'nop'i {
+    return {
+        text: text(),
+        bytes: [0x00]
+    };
+}
+ld_sp_hl = 'ld'i ws 'sp'i ws? ',' ws? 'hl'i {
+    return {
+        text: text(),
+        bytes: [0xF9]
+    }
+}
+ld_r_r = 'ld'i ws reg1:reg ws? ',' ws? reg2:reg {
+    return {
+        text: text(),
+        bytes: [0b001000000 | (reg1 << 3) | reg2]
+    }
+}
+jp = 'jp'i ws expr:expr {
+    return {
+        text: text(),
+        bytes: [0xC2, expr]
+    }
+}
 
-reg = [abcdehlABCDEHL]
+reg = 'b'i { return 0; }
+    / 'c'i { return 1; }
+    / 'd'i { return 2; }
+    / 'e'i { return 3; }
+    / 'h'i { return 4; }
+    / 'l'i { return 5; }
+    / '(hl)'i { return 6; }
+    / 'a'i { return 7; }
 
 ws = [ \t\r\n]+
 
-expr = number_literal
+expr = term ([+-] term)*
+
+term = factor ([*/] factor)*
+
+factor = '(' expr ')'
+    / number_literal
     / label
 
 number_literal = decimal_literal

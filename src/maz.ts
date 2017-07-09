@@ -8,5 +8,9 @@ start:    ld a,b
     jp start
 more:
     ld b,c
+    ld a,a
+    ld (hl),d
+    ld e,(hl)
+    ld sp, hl
 `, {});
 console.log(JSON.stringify(result));
