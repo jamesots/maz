@@ -12,5 +12,12 @@ more:
     ld (hl),d
     ld e,(hl)
     ld sp, hl
+    ld bc,(123)
+    inc de
+    inc sp
+    add hl,de
+    pop af
+    push de
+    ld sp,10110b
 `, {});
-console.log(JSON.stringify(result));
+console.log(JSON.stringify(result, undefined, 2));
