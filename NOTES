@@ -1,0 +1,28 @@
+Libraries/intermediate files can be JSON
+Can read settings from a local file, a system wide file or a file specified on the command line
+Have option to change JR to JP if out of range
+Make sure error messages are actually useful
+
+Compile all the file into a list of compiled objects.
+Create a map of symbols
+Calculate symbol values
+Throw error if symbol values can't be caluclated (circular refs, etc)
+
+
+Below, 'more' cannot be calculated.
+
+start:
+    jp more
+    ds more-start
+more:
+    ret
+
+Are there any other instructions or directives which change the size of the data? Maybe only a ds directive needs to disallow forward references — so calculate its size as we go. Although a later 'equ' would be valid:
+
+start:
+    jp more
+    ds size
+more:
+    ret
+size: equ 100
+

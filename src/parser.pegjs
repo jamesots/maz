@@ -34,15 +34,28 @@
 start = ws? stmts:statements? ws? { return stmts; }
 
 statements = stmt:statement [ \t]* comment? separator stmts:statements {
+        if (Array.isArray(stmt)) {
+            return stmt.concat(stmts);
+        }
         return [stmt].concat(stmts);
     }
     / stmt:statement [ \t]* comment? {
+        if (Array.isArray(stmt)) {
+            return stmt;
+        }
         return [stmt]
     }
 
 separator = [ \t]* [\r\n] [ \t]*
 
-statement = directive
+statement = label:labeldef ws? stmt:statement {
+        if (Array.isArray(stmt)) {
+            return [label].concat(stmt);
+        }
+        return [label, stmt]
+    }
+    / labeldef
+    / directive
     / code
     / comment
 
@@ -65,18 +78,17 @@ block = '.block'i
 
 endblock = '.endblock'i
 
-code = label:(label ':' ws?)? z80:z80 {
-        if (label) {
-            z80.label = label[0];
-        }
-        return z80;
+labeldef = label:label ':' {
+    return {
+        label: label
     }
+}
 
 label = !'bc'i !'de'i !'hl'i !'sp'i !'af'i ([a-zA-Z][a-zA-Z0-9]*) {
     return text();
 }
 
-z80 = ld_sp_hl
+code = ld_sp_hl
     / ld_r_r
     / ld_bcde_a
     / ld_a_bcde

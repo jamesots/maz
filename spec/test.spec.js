@@ -18,46 +18,52 @@ describe('parser', function() {
     });
     it('should parse nop', function() {
         const result = parser.parse('nop');
-        expect(result).toEqual([{
-            text: 'nop',
-            bytes: [0]
-        }]);
+        expect(result.length).toBe(1);
+        expect(result[0].text).toEqual('nop');
+        expect(result[0].bytes).toEqual([0]);
     });
     it('should parse nop with whitespace', function() {
         const result = parser.parse('  nop   ');
-        expect(result).toEqual([{
-            text: 'nop',
-            bytes: [0]
-        }]);
+        expect(result.length).toBe(1);
+        expect(result[0].text).toEqual('nop');
+        expect(result[0].bytes).toEqual([0]);
     });
     it('should parse nop with label', function() {
         const result = parser.parse('thing:  nop   ');
-        expect(result).toEqual([{
-            text: 'nop',
-            bytes: [0],
-            label: 'thing'
-        }]);
+        expect(result.length).toBe(2);
+        expect(result[0].label).toEqual('thing');
+        expect(result[1].text).toEqual('nop');
+        expect(result[1].bytes).toEqual([0]);
+    });
+    it('should parse nop with two labels', function() {
+        const result = parser.parse(`
+        blah:
+        thing:  nop   `);
+        expect(result.length).toBe(3);
+        expect(result[0].label).toEqual('blah');
+        expect(result[1].label).toEqual('thing');
+        expect(result[2].text).toEqual('nop');
+        expect(result[2].bytes).toEqual([0]);
     });
     it('should parse nop with comment, followed by nop', function() {
         const result = parser.parse(`thing:  nop  ; lovely stuff
         nop`);
-        expect(result).toEqual([{
-            text: 'nop',
-            bytes: [0],
-            label: 'thing'
-        }, {
-            text: 'nop',
-            bytes: [0],
-        }]);
+        expect(result.length).toBe(3);
+        expect(result[0].label).toEqual('thing');
+
+        expect(result[1].text).toEqual('nop');
+        expect(result[1].bytes).toEqual([0]);
+
+        expect(result[2].text).toEqual('nop');
+        expect(result[2].bytes).toEqual([0]);
+        expect(result[2].label).toBeUndefined();
     });
     it('should parse nop with comment, followed by eof', function() {
         const result = parser.parse(`thing:  nop  ; lovely stuff`);
-        expect(result).toEqual([{
-            text: 'nop',
-            bytes: [0],
-            label: 'thing'
-        }]);
-        // console.log(JSON.stringify(result));
+        expect(result.length).toBe(2);
+        expect(result[0].label).toEqual('thing');
+        expect(result[1].text).toEqual('nop');
+        expect(result[1].bytes).toEqual([0]);
     });
 
     const opcodes = [
@@ -225,5 +231,5 @@ describe('parser', function() {
         expect(function() {
             const result = parser.parse('ld (hl),(hl)');
         }).toThrow();
-    })
+    });
 });
