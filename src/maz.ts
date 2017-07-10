@@ -25,6 +25,8 @@ function pass1(code) {
             } else {
                 console.log("Error: equ has no label");
             }
+        } else if (line.org) {
+            pc = line.org;
         } else {
             line.address = pc;
             
@@ -82,6 +84,7 @@ start:
     ld a,(end - start)
 data: nop
     defb "hello",10,"!",start,bdos
+org 40
 end:
 `;
 

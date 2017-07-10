@@ -75,7 +75,11 @@ directive = org
 
 comment = ';' [^\n]*
 
-org = '.'? 'org'i ws expr
+org = '.'? 'org'i ws expr:expr {
+    return {
+        org: expr
+    }
+}
 
 macro = '.'? 'macro'i ws label
 
