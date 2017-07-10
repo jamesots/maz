@@ -5,8 +5,8 @@ console.log("MAZ v0.1.0");
 
 function pass1(code) {
     const parsed = parser.parse(code, {});
-    const symbols = getSymbols(parsed);
     console.log(JSON.stringify(parsed));
+    const symbols = getSymbols(parsed);
     console.log(JSON.stringify(symbols));
 
     let pc = 0;
@@ -50,8 +50,10 @@ function getSymbols(parsed) {
 
 const source = `
 start:
-    ld a,(data)
+    ld a,(end - start)
 data: nop
+    db "hello",10,"!",start
+end:
 `;
 
 pass1(source);

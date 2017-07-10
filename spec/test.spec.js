@@ -232,4 +232,46 @@ describe('parser', function() {
             const result = parser.parse('ld (hl),(hl)');
         }).toThrow();
     });
+    it('should parse db string in double quotes', function() {
+        const result = parser.parse('db "hello"');
+        expect(result.length).toBe(1);
+        expect(result[0].bytes).toEqual([104, 101, 108, 108, 111]);
+    });
+    it('should parse db string in single quotes', function() {
+        const result = parser.parse('db \'hello\'');
+        expect(result.length).toBe(1);
+        expect(result[0].bytes).toEqual([104, 101, 108, 108, 111]);
+    });
+    it('should parse db number', function() {
+        const result = parser.parse('db 12');
+        expect(result.length).toBe(1);
+        expect(result[0].bytes).toEqual([12]);
+    });
+    it('should parse db multiple numbers', function() {
+        const result = parser.parse('db 12,13');
+        expect(result.length).toBe(1);
+        expect(result[0].bytes).toEqual([12, 13]);
+    });
+    it('should parse db numbers and strings', function() {
+        const result = parser.parse('db "he",108,108,"o"');
+        expect(result.length).toBe(1);
+        expect(result[0].bytes).toEqual([104, 101, 108, 108, 111]);
+    });
+    it('should parse db numbers and strings followed by something', function() {
+        const result = parser.parse(`db "he",108
+nop`);
+        expect(result.length).toBe(2);
+        expect(result[0].bytes).toEqual([104, 101, 108]);
+        expect(result[1].bytes).toEqual([0]);
+    });
+    it('should parse db expression', function() {
+        const result = parser.parse('db 5 + 6');
+        expect(result.length).toBe(1);
+        expect(result[0].bytes).toEqual([11]);
+    });
+    it('should parse db label', function() {
+        const result = parser.parse('db thing');
+        expect(result.length).toBe(1);
+        expect(result[0].bytes).toEqual([{expression: 'thing'}]);
+    });
 });

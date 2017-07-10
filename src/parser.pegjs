@@ -65,6 +65,7 @@ statement = label:labeldef ws? stmt:statement {
     / comment
 
 directive = org
+    / db
     / macro
     / endm
     / block
@@ -78,6 +79,32 @@ org = '.'? 'org'i ws expr
 macro = '.'? 'macro'i ws label
 
 endm = '.'? 'endm'i
+
+db = '.'? 'db'i ws? dbytes:dbytes {
+    return res(dbytes);
+}
+
+dbytes = db1:dbyte ws? ',' ws? db2:dbytes {
+        if (Array.isArray(db1)) {
+            return db1.concat(db2);
+        }
+        return [db1].concat(db2);
+    }
+    / dbyte
+
+dbyte = str:string {
+        let bytes = [];
+        for (let i = 0; i < str.length; i++) {
+            bytes.push(str.charCodeAt(i));
+        }
+        return bytes;
+    }
+    / expr:expr {
+        return [expr]
+    }
+
+string = '"' str:([^"]*) '"' { return str.join(''); }
+    / "'" str:([^']*) "'" { return str.join(''); }
 
 block = '.block'i
 
@@ -276,10 +303,10 @@ hla = 'hl'i { return 0; }
 
 ws = [ \t\r\n]+
 
-expr = t1:term ws? t2:([+-] ws? term)* {
+expr = t1:term t2:(ws? [+-] ws? term)* {
         let result = t1;
         for (const term of t2) {
-            result += ` ${term[0]} ${term[2]}`;
+            result += ` ${term[1]} ${term[3]}`;
         }
         try {
             const value = Parser.evaluate(new String(result));
@@ -291,10 +318,10 @@ expr = t1:term ws? t2:([+-] ws? term)* {
         }
     }
 
-term = t1:factor ws? t2:([*/] ws? factor)* {
+term = t1:factor t2:(ws? [*/] ws? factor)* {
         let result = t1;
         for (const term of t2) {
-            result += ` ${term[0]} ${term[2]}`;
+            result += ` ${term[1]} ${term[3]}`;
         }
         return result;
     }
