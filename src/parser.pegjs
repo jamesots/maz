@@ -103,8 +103,41 @@ dbyte = str:string {
         return [expr]
     }
 
-string = '"' str:([^"]*) '"' { return str.join(''); }
-    / "'" str:([^']*) "'" { return str.join(''); }
+string = '"' str:(double_string_char*) '"' { return str.join(''); }
+    / "'" str:(single_string_char*) "'" { return str.join(''); }
+
+double_string_char = !('"' / "\\" / "\n") . { return text(); }
+    / "\\" seq:escape_sequence { return seq; }
+
+single_string_char = !("'" / "\\" / "\n") . { return text(); }
+    / "\\" seq:escape_sequence { return seq; }
+
+escape_sequence = char_escape_sequence
+    / "0" ![0-9] { return "\0"; }
+    / hex_escape_sequence
+
+char_escape_sequence = single_esc_char
+    / non_escape_char
+
+single_esc_char = "'"
+    / '"'
+    / "b" { return "\b"; }
+    / "f" { return "\f"; }
+    / "n" { return "\n"; }
+    / "r" { return "\r"; }
+    / "t" { return "\t"; }
+    / "v" { return "\v"; }
+
+non_escape_char = !(escape_char / "\n") . { return text(); }
+
+escape_char = single_esc_char
+    / [0-9]
+    / "x"
+    / "u"
+
+hex_escape_sequence = "x" digits:$([0-9a-f]i [0-9a-f]i) {
+        return String.fromCharCode(parseInt(digits, 16));
+    }
 
 block = '.block'i
 

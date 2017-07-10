@@ -274,4 +274,8 @@ nop`);
         expect(result.length).toBe(1);
         expect(result[0].bytes).toEqual([{expression: 'thing'}]);
     });
+    it('should parse db complex escaping', function() {
+        const result = parser.parse('db "\\"Hey \\0\\r\\n\\x13" ');
+        expect(String.fromCharCode.apply(this, result[0].bytes)).toBe("\"Hey \0\r\n\x13");
+    });
 });
