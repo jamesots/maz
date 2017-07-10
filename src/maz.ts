@@ -13,7 +13,5 @@ function pass1(code) {
 }
 
 function getSymbols(parsed) {
-    for (const line of parsed) {
-        
-    }
+    return parsed.filter(line => line.label).map(line => line.label);
 }
