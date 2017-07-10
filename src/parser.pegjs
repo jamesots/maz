@@ -24,10 +24,15 @@
     }
 
     function res(bytes) {
-        return {
+        const result = {
             text: text(),
             bytes: bytes
         };
+        const references = bytes.filter(byte => byte && byte.expression).map(byte => byte.expression);
+        if (references.length > 0) {
+            result.references = references;
+        }
+        return result;
     }
 }
 
