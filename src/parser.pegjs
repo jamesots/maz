@@ -150,9 +150,17 @@ hex_escape_sequence = "x" digits:$([0-9a-f]i [0-9a-f]i) {
         return String.fromCharCode(parseInt(digits, 16));
     }
 
-block = '.block'i
+block = '.block'i {
+    return {
+        block: true
+    };
+}
 
-endblock = '.endblock'i
+endblock = '.endblock'i {
+    return {
+        endblock: true
+    };
+}
 
 labeldef = label:label ':' {
     return {
