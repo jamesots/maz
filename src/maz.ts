@@ -32,8 +32,21 @@ function pass1(code) {
             pc += line.bytes.length;
         }
     }
+
+    for (const symbol in symbols) {
+        if (symbols[symbol].expression) {
+            symbols[symbol] = Parser.evaluate(symbols[symbol].expression, symbols);
+        }
+    }
+
     console.log(JSON.stringify(parsed));
     console.log(JSON.stringify(symbols));
+
+    for (const symbol in symbols) {
+        if (symbols[symbol].expression) {
+            console.log(`${symbol} cannot be calculated`);
+        }
+    }
 
     for (const line of parsed) {
         if (line.references) {
@@ -63,6 +76,8 @@ function getSymbols(parsed) {
 const source = `
 thing:
 bdos: equ 5
+blob: equ glop
+glop: equ bdos
 start:
     ld a,(end - start)
 data: nop
