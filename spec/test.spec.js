@@ -1,42 +1,52 @@
 const parser = require('../src/parser');
-
+const Tracer = require('pegjs-backtrace');
 
 describe('parser', function() {
+    function parse(text) {
+        const tracer = new Tracer(text);
+        try {
+            return parser.parse(text, { trace: true, tracer: tracer });
+        } catch (e) {
+            console.log(tracer.getBacktraceString());
+            throw e;
+        }
+    }
+    
     function testOpcode(opcode, bytes) {
-        const result = parser.parse(opcode);
+        const result = parse(opcode);
         expect(result[0].bytes).toEqual(bytes);
     }
 
     it('should parse empty file', function() {
-        const result = parser.parse(``)
+        const result = parse(``)
         expect(result).toBeNull();
     });
     it('should parse whitespace only', function() {
-        const result = parser.parse(`      
+        const result = parse(`      
         `)
         expect(result).toBeNull();
     });
     it('should parse nop', function() {
-        const result = parser.parse('nop');
+        const result = parse('nop');
         expect(result.length).toBe(1);
         expect(result[0].text).toEqual('nop');
         expect(result[0].bytes).toEqual([0]);
     });
     it('should parse nop with whitespace', function() {
-        const result = parser.parse('  nop   ');
+        const result = parse('  nop   ');
         expect(result.length).toBe(1);
         expect(result[0].text).toEqual('nop');
         expect(result[0].bytes).toEqual([0]);
     });
     it('should parse nop with label', function() {
-        const result = parser.parse('thing:  nop   ');
+        const result = parse('thing:  nop   ');
         expect(result.length).toBe(2);
         expect(result[0].label).toEqual('thing');
         expect(result[1].text).toEqual('nop');
         expect(result[1].bytes).toEqual([0]);
     });
     it('should parse nop with two labels', function() {
-        const result = parser.parse(`
+        const result = parse(`
         blah:
         thing:  nop   `);
         expect(result.length).toBe(3);
@@ -46,7 +56,7 @@ describe('parser', function() {
         expect(result[2].bytes).toEqual([0]);
     });
     it('should parse nop with comment, followed by nop', function() {
-        const result = parser.parse(`thing:  nop  ; lovely stuff
+        const result = parse(`thing:  nop  ; lovely stuff
         nop`);
         expect(result.length).toBe(3);
         expect(result[0].label).toEqual('thing');
@@ -59,7 +69,7 @@ describe('parser', function() {
         expect(result[2].label).toBeUndefined();
     });
     it('should parse nop with comment, followed by eof', function() {
-        const result = parser.parse(`thing:  nop  ; lovely stuff`);
+        const result = parse(`thing:  nop  ; lovely stuff`);
         expect(result.length).toBe(2);
         expect(result[0].label).toEqual('thing');
         expect(result[1].text).toEqual('nop');
@@ -222,64 +232,64 @@ describe('parser', function() {
     ]
     for (const opcode of opcodes) {
         it('should parse ' + opcode[0], function() {;
-            const result = parser.parse(opcode[0]);
+            const result = parse(opcode[0]);
             expect(result[0].bytes).toEqual(opcode[1]);
         });
     }
 
     it('should not parse ld (hl),(hl)', function() {
         expect(function() {
-            const result = parser.parse('ld (hl),(hl)');
+            const result = parser.parse('ld (hl),(hl)', {trace: false, tracer: null});
         }).toThrow();
     });
     it('should parse db string in double quotes', function() {
-        const result = parser.parse('db "hello"');
+        const result = parse('db "hello"');
         expect(result.length).toBe(1);
         expect(result[0].bytes).toEqual([104, 101, 108, 108, 111]);
     });
     it('should parse db string in single quotes', function() {
-        const result = parser.parse('db \'hello\'');
+        const result = parse('db \'hello\'');
         expect(result.length).toBe(1);
         expect(result[0].bytes).toEqual([104, 101, 108, 108, 111]);
     });
     it('should parse db number', function() {
-        const result = parser.parse('db 12');
+        const result = parse('db 12');
         expect(result.length).toBe(1);
         expect(result[0].bytes).toEqual([12]);
     });
     it('should parse db multiple numbers', function() {
-        const result = parser.parse('db 12,13');
+        const result = parse('db 12,13');
         expect(result.length).toBe(1);
         expect(result[0].bytes).toEqual([12, 13]);
     });
     it('should parse db numbers and strings', function() {
-        const result = parser.parse('db "he",108,108,"o"');
+        const result = parse('db "he",108,108,"o"');
         expect(result.length).toBe(1);
         expect(result[0].bytes).toEqual([104, 101, 108, 108, 111]);
     });
     it('should parse db numbers and strings followed by something', function() {
-        const result = parser.parse(`db "he",108
+        const result = parse(`db "he",108
 nop`);
         expect(result.length).toBe(2);
         expect(result[0].bytes).toEqual([104, 101, 108]);
         expect(result[1].bytes).toEqual([0]);
     });
     it('should parse db expression', function() {
-        const result = parser.parse('db 5 + 6');
+        const result = parse('db 5 + 6');
         expect(result.length).toBe(1);
         expect(result[0].bytes).toEqual([11]);
     });
     it('should parse db label', function() {
-        const result = parser.parse('db thing');
+        const result = parse('db thing');
         expect(result.length).toBe(1);
         expect(result[0].bytes).toEqual([{expression: 'thing'}]);
     });
     it('should parse db complex escaping', function() {
-        const result = parser.parse('db "\\"Hey \\0\\r\\n\\x13" ');
+        const result = parse('db "\\"Hey \\0\\r\\n\\x13" ');
         expect(String.fromCharCode.apply(this, result[0].bytes)).toBe("\"Hey \0\r\n\x13");
     });
     it('should parse equ', function() {
-        const result = parser.parse('thing: equ 6');
+        const result = parse('thing: equ 6');
         expect(result.length).toBe(2);
         expect(result[0].label).toEqual('thing');
         expect(result[1].equ).toEqual(6);
