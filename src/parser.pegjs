@@ -66,6 +66,7 @@ statement = label:labeldef ws? stmt:statement {
 
 directive = org
     / db
+    / equ
     / macro
     / endm
     / block
@@ -80,7 +81,13 @@ macro = '.'? 'macro'i ws label
 
 endm = '.'? 'endm'i
 
-db = '.'? 'db'i ws? dbytes:dbytes {
+equ = '.'? 'equ'i ws expr:expr {
+    return {
+        equ: expr
+    }
+}
+
+db = '.'? ('db'i / 'defb'i) ws? dbytes:dbytes {
     return res(dbytes);
 }
 

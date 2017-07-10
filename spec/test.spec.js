@@ -278,4 +278,11 @@ nop`);
         const result = parser.parse('db "\\"Hey \\0\\r\\n\\x13" ');
         expect(String.fromCharCode.apply(this, result[0].bytes)).toBe("\"Hey \0\r\n\x13");
     });
+    it('should parse equ', function() {
+        const result = parser.parse('thing: equ 6');
+        expect(result.length).toBe(2);
+        expect(result[0].label).toEqual('thing');
+        expect(result[1].equ).toEqual(6);
+        // console.log(JSON.stringify(result));
+    });
 });

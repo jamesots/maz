@@ -10,15 +10,28 @@ function pass1(code) {
     console.log(JSON.stringify(symbols));
 
     let pc = 0;
+    let lastLabel = null;
     for (const line of parsed) {
         if (line.label) {
+            lastLabel = line.label;
             symbols[line.label] = pc;
+            continue;
+        }
+        if (line.equ) {
+            if (lastLabel === null) {
+                console.log("Error: equ has no label");
+            } else {
+                symbols[lastLabel] = line.equ;
+            }
+            // if multiple labels, earlier labels will get pc
+            // - might be nicer if multiple labels get same equ value
         } else {
             line.address = pc;
             
             // need special case for org, phase, ds, ...?
             pc += line.bytes.length;
         }
+        lastLabel = null;
     }
     console.log(JSON.stringify(parsed));
     console.log(JSON.stringify(symbols));
@@ -49,10 +62,11 @@ function getSymbols(parsed) {
 }
 
 const source = `
+bdos: equ 5
 start:
     ld a,(end - start)
 data: nop
-    db "hello",10,"!",start
+    defb "hello",10,"!",start,bdos
 end:
 `;
 
