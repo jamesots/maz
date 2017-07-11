@@ -10,6 +10,8 @@ function pass1(code) {
     console.log(JSON.stringify(symbols));
 
     let pc = 0;
+    let nextBlock = 0;
+    let blocks = [];
     for (let i = 0; i < parsed.length; i++) {
         const line = parsed[i];
         if (line.label) {
@@ -27,6 +29,11 @@ function pass1(code) {
             }
         } else if (line.org) {
             pc = line.org;
+        } else if (line.block) {
+            blocks.push(nextBlock);
+            nextBlock++;
+        } else if (line.endblock) {
+            blocks.pop();
         } else {
             line.address = pc;
             
@@ -35,9 +42,37 @@ function pass1(code) {
         }
     }
 
+    console.log(JSON.stringify(symbols));
+
     for (const symbol in symbols) {
         if (symbols[symbol].expression) {
-            symbols[symbol] = Parser.evaluate(symbols[symbol].expression, symbols);
+            console.log(`symbol ${symbol}: ${symbols[symbol].expression}`);
+            const expr = Parser.parse(symbols[symbol].expression);
+            const variables = expr.variables();
+            const subVars = {};
+            for (const variable of variables) {
+                console.log(`var ${variable}`);
+                const match = /%([0-9]+)_(.*)/.exec(symbol);
+                if (match) {
+                    let depth = parseInt(match[1], 10);
+                    while (depth >= 0) {
+                        console.log(`depth ${depth}`);
+                        const depthVar = `%${depth}_${variable}`;
+                        if (symbols[depthVar] !== undefined) {
+                            subVars[variable] = symbols[depthVar];
+                            break;
+                        }
+                        depth--
+                    }
+                    if (depth < 0) {
+                        subVars[variable] = symbols[variable];
+                    }
+                } else {
+                    subVars[variable] = symbols[variable];
+                }
+            }
+            console.log(`subVars: ${JSON.stringify(subVars)}`);
+            symbols[symbol] = Parser.evaluate(symbols[symbol].expression, subVars);
         }
     }
 
@@ -69,8 +104,23 @@ function pass1(code) {
 
 function getSymbols(parsed) {
     const symbols = {};
-    for (const line of parsed.filter(line => line.label)) {
-        symbols[line.label] = null;
+    let nextBlock = 0;
+    let blocks = [];
+    for (let i = 0; i < parsed.length; i++) {
+        const line = parsed[i];
+        if (line.label) {
+            if (blocks.length > 0) {
+                symbols['%' + blocks[blocks.length - 1] + '_' + line.label] = null;
+                line.label = '%' + blocks[blocks.length - 1] + '_' + line.label;
+            } else {
+                symbols[line.label] = null;
+            }
+        } else if (line.block) {
+            blocks.push(nextBlock);
+            nextBlock++;
+        } else if (line.endblock) {
+            blocks.pop();
+        }
     }
     return symbols;
 }
@@ -80,6 +130,15 @@ thing:
 bdos: equ 5
 blob: equ glop
 glop: equ bdos
+.block
+    a: equ 2
+.block
+    bdos: equ 6
+    blah: equ bdos
+    b: equ a
+.endblock
+    bdos: equ 7
+.endblock
 start:
     ld a,(end - start)
 data: nop
