@@ -110,4 +110,41 @@ describe('maz', function() {
         expect(ast[10].prefix).toBe('%3_%2_');
         expect(ast[12].prefix).toBe('%2_');
     });
+    it('should assign PC', function() {
+        const ast = [
+            {label: 'one'},
+            {bytes: [0,0,0]},
+            {label: 'two'},
+            {label: 'three'}
+        ];
+        const symbols = {
+            one: null,
+            two: null,
+            three: null
+        }
+        maz.assignPCandEQU(ast, symbols);
+        expect(symbols.one).toBe(0);
+        expect(symbols.two).toBe(3);
+        expect(symbols.three).toBe(3);
+    });
+    it('should assign EQU', function() {
+        const ast = [
+            {label: 'one'},
+            {label: 'two'},
+            {equ: 5},
+            {label: 'three'},
+            {equ: {
+                expr: 'one'
+            }}
+        ];
+        const symbols = {
+            one: null,
+            two: null,
+            three: null
+        }
+        maz.assignPCandEQU(ast, symbols);
+        expect(symbols.one).toBe(5);
+        expect(symbols.two).toBe(5);
+        expect(symbols.three).toEqual({expr:'one'});
+    });
 });
