@@ -147,4 +147,17 @@ describe('maz', function() {
         expect(symbols.two).toBe(5);
         expect(symbols.three).toEqual({expr:'one'});
     });
+    it('should evaluate symbols', function() {
+        const symbols = {
+            one: 1,
+            two: {expression: 'one'},
+            three: {expression: 'two'}
+        };
+        maz.evaluateSymbols(symbols);
+        expect(symbols).toEqual({
+            one: 1,
+            two: 1,
+            three: 1
+        })
+    })
 });
