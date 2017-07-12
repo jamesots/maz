@@ -206,6 +206,14 @@ code = ld_sp_hl
     / scf
     / ccf
     / halt
+    / add_a_reg
+    / adc_a_reg
+    / sub_a_reg
+    / sbc_a_reg
+    / and_a_reg
+    / xor_a_reg
+    / or_a_reg
+    / cp_a_reg
 
 ex_afaf = 'ex'i ws 'af'i ws? ',' ws? 'af\''i {
     return res([0x08]);
@@ -243,6 +251,45 @@ nop = 'nop'i {
 ld_sp_hl = 'ld'i ws 'sp'i ws? ',' ws? 'hl'i {
     return res([0xF9]);
 }
+add_a_reg = 'add'i ws 'a'i ws? ',' ws? reg:reg {
+    return res([0x80 | reg]);
+}
+adc_a_reg = 'adc'i ws 'a'i ws? ',' ws? reg:reg {
+    return res([0x88 | reg]);
+}
+sub_a_reg = 'sub'i ws 'a'i ws? ',' ws? reg:reg {
+        return res([0x90 | reg]);
+    }
+    / 'sub'i ws reg:reg {
+        return res([0x90 | reg]);
+    }
+sbc_a_reg = 'sbc'i ws 'a'i ws? ',' ws? reg:reg {
+    return res([0x98 | reg]);
+}
+and_a_reg = 'and'i ws 'a'i ws? ',' ws? reg:reg {
+        return res([0xa0 | reg]);
+    }
+    / 'and'i ws reg:reg {
+        return res([0xa0 | reg]);
+    }
+xor_a_reg = 'xor'i ws 'a'i ws? ',' ws? reg:reg {
+        return res([0xa8 | reg]);
+    }
+    / 'xor'i ws reg:reg {
+        return res([0xa8 | reg]);
+    }
+or_a_reg = 'or'i ws 'a'i ws? ',' ws? reg:reg {
+        return res([0xb0 | reg]);
+    }
+    / 'or'i ws reg:reg {
+        return res([0xb0 | reg]);
+    }
+cp_a_reg = 'cp'i ws 'a'i ws? ',' ws? reg:reg {
+        return res([0xb8 | reg]);
+    }
+    / 'cp'i ws reg:reg {
+        return res([0xb8 | reg]);
+    }
 ld_r_r = 'ld'i ws reg1:reg ws? ',' ws? reg2:reg ! {
     return reg1 === 6 && reg2 === 6;
     } {
