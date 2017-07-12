@@ -150,8 +150,8 @@ describe('maz', function() {
     it('should evaluate symbols', function() {
         const symbols = {
             one: 1,
-            two: {expression: 'one'},
-            three: {expression: 'two'}
+            two: {expression: 'three'},
+            three: {expression: 'one'}
         };
         maz.evaluateSymbols(symbols);
         expect(symbols).toEqual({
@@ -159,5 +159,15 @@ describe('maz', function() {
             two: 1,
             three: 1
         })
-    })
+    });
+    it('should evaluate symbols and detect circular references', function() {
+        const symbols = {
+            one: 1,
+            two: {expression: 'three'},
+            three: {expression: 'two'}
+        };
+        expect(function() {
+             maz.evaluateSymbols(symbols);
+        }).toThrow();
+    });
 });
