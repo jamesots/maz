@@ -94,19 +94,53 @@ export function assignPCandEQU(ast, symbols) {
     }
 }
 
-function evaluateSymbol(symbol, symbols, evaluated) {
-    const expr = Parser.parse(symbols[symbol].expression);
-    const variables = expr.variables();
+export function evaluateSymbol(symbol, symbols, evaluated) {
     if (evaluated.indexOf(symbol) !== -1) {
         throw "Circular symbol dependency";
     }
     evaluated.push(symbol);
+    const expr = Parser.parse(symbols[symbol].expression);
+    const variables = expr.variables();
+    const subVars = {}; // substitute variables
+    const prefix = getWholePrefix(symbol);
     for (const variable of variables) {
-        if (symbols[variable].expression) {
-            evaluateSymbol(variable, symbols, evaluated);
+        const subVar = findVariable(symbols, prefix, variable);
+
+        if (symbols[subVar].expression) {
+            evaluateSymbol(subVar, symbols, evaluated);
         }
+        subVars[variable] = symbols[subVar];
     }
-    symbols[symbol] = expr.evaluate(symbols);
+    symbols[symbol] = expr.evaluate(subVars);
+}
+
+export function findVariable(symbols, prefix, variable) {
+    while (true) {
+        const subVar = symbols[prefix + variable];
+        if (subVar !== undefined) {
+            return prefix + variable;
+        }
+        if (prefix === '') {
+            break;
+        }
+        prefix = getReducedPrefix(prefix);
+    }
+}
+
+export function getReducedPrefix(prefix) {
+    const match = /%[0-9]+_(.*)/.exec(prefix);
+    if (match) {
+        return match[1];
+    }
+    return '';
+}
+
+export function getWholePrefix(symbol) {
+    const match = /((%[0-9]+_)+)(.*)/.exec(symbol);
+    if (match) {
+        return match[1];
+    }
+    return '';
 }
 
 export function evaluateSymbols(symbols) {
@@ -118,34 +152,6 @@ export function evaluateSymbols(symbols) {
             }
             evaluateSymbol(symbol, symbols, evaluated);
         }
-        //     console.log(`symbol ${symbol}: ${symbols[symbol].expression}`);
-        //     const expr = Parser.parse(symbols[symbol].expression);
-        //     const variables = expr.variables();
-        //     const subVars = {};
-        //     for (const variable of variables) {
-        //         console.log(`var ${variable}`);
-        //         const match = /%([0-9]+)_(.*)/.exec(symbol);
-        //         if (match) {
-        //             let depth = parseInt(match[1], 10);
-        //             while (depth >= 0) {
-        //                 console.log(`depth ${depth}`);
-        //                 const depthVar = `%${depth}_${variable}`;
-        //                 if (symbols[depthVar] !== undefined) {
-        //                     subVars[variable] = symbols[depthVar];
-        //                     break;
-        //                 }
-        //                 depth--
-        //             }
-        //             if (depth < 0) {
-        //                 subVars[variable] = symbols[variable];
-        //             }
-        //         } else {
-        //             subVars[variable] = symbols[variable];
-        //         }
-        //     }
-        //     console.log(`subVars: ${JSON.stringify(subVars)}`);
-        //     symbols[symbol] = Parser.evaluate(symbols[symbol].expression, subVars);
-        // }
     }
 }
 

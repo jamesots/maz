@@ -170,4 +170,59 @@ describe('maz', function() {
              maz.evaluateSymbols(symbols);
         }).toThrow();
     });
+    it('should evaluate symbols with scope', function() {
+        const symbols = {
+            '%1_two': {expression: 'three'},
+            three: 3,
+            '%1_three': 4,
+            '%2_%1_three': 5,
+            '%2_%1_bob': {expression: 'three + two'}
+        };
+        maz.evaluateSymbols(symbols);
+        expect(symbols).toEqual({
+            '%1_two': 4,
+            three: 3,
+            '%1_three': 4,
+            '%2_%1_three': 5,
+            '%2_%1_bob': 9
+        });
+    });
+    it('should get whole prefix', function() {
+        expect(maz.getWholePrefix('%2_%3_%4_bob')).toBe('%2_%3_%4_');
+    });
+    it('should get reduced prefix', function() {
+        expect(maz.getReducedPrefix('%2_%3_%4_')).toBe('%3_%4_');
+    });
+    it('should find variable', function() {
+        const symbols = {
+            '%2_%1_%0_a': 0,
+            '%2_%1_%0_b': 1,
+            '%1_%0_c': 2,
+            '%0_d': 4,
+            'e': 8,
+            'd': 16,
+            'c': 32,
+            '%0_c': 64,
+            'b': 128,
+            '%0_b': 256,
+            '%1_%0_b': 512
+        }
+        expect(maz.findVariable(symbols, '%2_%1_%0_', 'a')).toBe('%2_%1_%0_a');
+        expect(maz.findVariable(symbols, '%2_%1_%0_', 'b')).toBe('%2_%1_%0_b');
+        expect(maz.findVariable(symbols, '%2_%1_%0_', 'c')).toBe('%1_%0_c');
+        expect(maz.findVariable(symbols, '%2_%1_%0_', 'd')).toBe('%0_d');
+        expect(maz.findVariable(symbols, '%2_%1_%0_', 'e')).toBe('e');
+
+        expect(maz.findVariable(symbols, '%1_%0_', 'b')).toBe('%1_%0_b');
+        expect(maz.findVariable(symbols, '%1_%0_', 'c')).toBe('%1_%0_c');
+        expect(maz.findVariable(symbols, '%1_%0_', 'd')).toBe('%0_d');
+        expect(maz.findVariable(symbols, '%1_%0_', 'e')).toBe('e');
+
+        expect(maz.findVariable(symbols, '%0_', 'c')).toBe('%0_c');
+        expect(maz.findVariable(symbols, '%0_', 'd')).toBe('%0_d');
+        expect(maz.findVariable(symbols, '%0_', 'e')).toBe('e');
+
+        expect(maz.findVariable(symbols, '', 'd')).toBe('d');
+        expect(maz.findVariable(symbols, '', 'e')).toBe('e');
+    });
 });
