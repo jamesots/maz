@@ -4,46 +4,97 @@ import { Parser } from 'expr-eval';
 console.log("MAZ v0.1.0");
 
 function pass1(code) {
-    const parsed = parser.parse(code, {});
-    console.log(JSON.stringify(parsed));
-    const symbols = getSymbols(parsed);
+    const ast = parser.parse(code, {});
+    console.log(JSON.stringify(ast));
+    const symbols = getSymbols(ast);
     console.log(JSON.stringify(symbols));
 
-    let pc = 0;
+    assignPCandEQU(ast, symbols);
+
+    console.log(JSON.stringify(symbols));
+
+    evaluateSymbols(symbols);
+
+    console.log(JSON.stringify(ast));
+    console.log(JSON.stringify(symbols, undefined, 2));
+
+    for (const symbol in symbols) {
+        if (symbols[symbol].expression) {
+            console.log(`${symbol} cannot be calculated`);
+        }
+    }
+
+    updateBytes(ast, symbols);
+
+    console.log(JSON.stringify(ast));
+}
+
+/**
+ * Gets a map of symbols, and updates the parsed objects
+ * so the block and endblock objects have prefixes
+ */
+export function getSymbols(ast) {
+    const symbols = {};
     let nextBlock = 0;
     let blocks = [];
-    for (let i = 0; i < parsed.length; i++) {
-        const line = parsed[i];
-        if (line.label) {
-            symbols[line.label] = pc;
+    for (let i = 0; i < ast.length; i++) {
+        const el = ast[i];
+        if (el.label) {
+            if (blocks.length > 0) {
+                symbols[labelName(blocks, el.label)] = null;
+                el.label = labelName(blocks, el.label);
+            } else {
+                symbols[el.label] = null;
+            }
+        } else if (el.block) {
+            blocks.push(nextBlock);
+            el.prefix = labelPrefix(blocks);
+            nextBlock++;
+        } else if (el.endblock) {
+            el.prefix = labelPrefix(blocks);
+            blocks.pop();
+        }
+    }
+    if (blocks.length !== 0) {
+        throw "Mismatch between .block and .endblock statements";
+    }
+    return symbols;
+}
+
+export function assignPCandEQU(ast, symbols) {
+    let pc = 0;
+    let blocks = [];
+    for (let i = 0; i < ast.length; i++) {
+        const el = ast[i];
+        if (el.label) {
+            symbols[el.label] = pc;
             continue;
-        } else if (line.equ) {
-            if (i > 0 && parsed[i - 1].label) {
+        } else if (el.equ) {
+            if (i > 0 && ast[i - 1].label) {
                 let ii = i - 1;
-                while (parsed[ii] && parsed[ii].label) {
-                    symbols[parsed[ii].label] = line.equ;
+                while (ast[ii] && ast[ii].label) {
+                    symbols[ast[ii].label] = el.equ;
                     ii--;
                 }
             } else {
                 console.log("Error: equ has no label");
             }
-        } else if (line.org) {
-            pc = line.org;
-        } else if (line.block) {
-            blocks.push(nextBlock);
-            nextBlock++;
-        } else if (line.endblock) {
+        } else if (el.org) {
+            pc = el.org;
+        } else if (el.block) {
+            blocks.push(el.prefix);
+        } else if (el.endblock) {
             blocks.pop();
         } else {
-            line.address = pc;
+            el.address = pc;
             
-            // need special case for org, phase, ds, ...?
-            pc += line.bytes.length;
+            // need special case for phase, ds, ...?
+            pc += el.bytes.length;
         }
     }
+}
 
-    console.log(JSON.stringify(symbols));
-
+export function evaluateSymbols(symbols) {
     for (const symbol in symbols) {
         if (symbols[symbol].expression) {
             console.log(`symbol ${symbol}: ${symbols[symbol].expression}`);
@@ -75,54 +126,35 @@ function pass1(code) {
             symbols[symbol] = Parser.evaluate(symbols[symbol].expression, subVars);
         }
     }
+}
 
-    console.log(JSON.stringify(parsed));
-    console.log(JSON.stringify(symbols));
-
-    for (const symbol in symbols) {
-        if (symbols[symbol].expression) {
-            console.log(`${symbol} cannot be calculated`);
-        }
-    }
-
-    for (const line of parsed) {
-        if (line.references) {
-            for (let i = 0; i < line.bytes.length; i++) {
-                const byte = line.bytes[i];
+export function updateBytes(ast, symbols) {
+    for (const el of ast) {
+        if (el.references) {
+            for (let i = 0; i < el.bytes.length; i++) {
+                const byte = el.bytes[i];
                 if (byte && byte.expression) {
                     const value = Parser.evaluate(byte.expression, symbols);
-                    line.bytes[i] = value & 0xFF;
-                    if (line.bytes[i + 1] === null) {
-                        line.bytes[i + 1] = (value & 0xFF00) >> 8;
+                    el.bytes[i] = value & 0xFF;
+                    if (el.bytes[i + 1] === null) {
+                        el.bytes[i + 1] = (value & 0xFF00) >> 8;
                     }
                 }
             }
         }
     }    
-    console.log(JSON.stringify(parsed));
 }
 
-function getSymbols(parsed) {
-    const symbols = {};
-    let nextBlock = 0;
-    let blocks = [];
-    for (let i = 0; i < parsed.length; i++) {
-        const line = parsed[i];
-        if (line.label) {
-            if (blocks.length > 0) {
-                symbols['%' + blocks[blocks.length - 1] + '_' + line.label] = null;
-                line.label = '%' + blocks[blocks.length - 1] + '_' + line.label;
-            } else {
-                symbols[line.label] = null;
-            }
-        } else if (line.block) {
-            blocks.push(nextBlock);
-            nextBlock++;
-        } else if (line.endblock) {
-            blocks.pop();
-        }
+function labelPrefix(blocks: string[]) {
+    let result = '';
+    for (let i = 0; i < blocks.length; i++) {
+        result = `%${blocks[i]}_${result}`;
     }
-    return symbols;
+    return result;
+}
+
+function labelName(blocks: string[], label) {
+    return labelPrefix(blocks) + label;
 }
 
 const source = `
@@ -144,7 +176,11 @@ start:
 data: nop
     defb "hello",10,"!",start,bdos
 org 40
+.block
+    bdos: equ 8
+    b: equ a
+.endblock
 end:
 `;
 
-pass1(source);
+// pass1(source);

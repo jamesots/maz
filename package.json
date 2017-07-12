@@ -6,6 +6,7 @@
   "scripts": {
     "pegjs": "pegjs --trace -o src/parser.js src/parser.pegjs",
     "tsc": "tsc",
+    "tsc-watch": "tsc --watch",
     "test": "jasmine",
     "xtest": "jasmine-ts 'spec/**/*.spec.ts'",
     "start": "ts-node src/maz.ts"
