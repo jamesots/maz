@@ -193,7 +193,12 @@ code = ld_sp_hl
     / ex_afaf
     / rrca
     / nop
+    / jp_nzncpop_nn
+    / jp_zcpem_nn
     / jp
+    / call_nzncpop_nn
+    / call_zcpem_nn
+    / call_nn
     / djnz
     / rla
     / rra
@@ -207,19 +212,40 @@ code = ld_sp_hl
     / ccf
     / halt
     / add_a_reg
+    / add_a_n
     / adc_a_reg
+    / adc_a_n
     / sub_a_reg
+    / sub_a_n
+    / sub_reg
+    / sub_n
     / sbc_a_reg
+    / sbc_a_n
     / and_a_reg
     / xor_a_reg
     / or_a_reg
     / cp_a_reg
+    / ret_nzncpop
+    / rst_rst0
+    / rst_rst8
+    / ret_zcpem
+    / ret
+    / out_n_a
+    / in_a_n
+    / exx
+    / pfix
 
 ex_afaf = 'ex'i ws 'af'i ws? ',' ws? 'af\''i {
     return res([0x08]);
 }
 halt = 'halt'i {
     return res([0x76]);
+}
+pfix = 'pfix'i {
+    return res([0xdd]);
+}
+exx = 'exx'i {
+    return res([0xd9]);
 }
 scf = 'scf'i {
     return res([0x37]);
@@ -251,6 +277,27 @@ nop = 'nop'i {
 ld_sp_hl = 'ld'i ws 'sp'i ws? ',' ws? 'hl'i {
     return res([0xF9]);
 }
+out_n_a = 'out'i ws '(' ws? expr:expr ws? ')' ws? ',' ws? 'a' {
+    return res([0xd3].concat(expr8(expr)));
+}
+in_a_n = 'in'i ws 'a' ws? ',' ws? '(' ws? expr:expr ws? ')' {
+    return res([0xdb].concat(expr8(expr)));
+}
+add_a_n = 'add'i ws 'a'i ws? ',' ws? expr:expr {
+    return res([0xc6].concat(expr8(expr)));
+}
+adc_a_n = 'adc'i ws 'a'i ws? ',' ws? expr:expr {
+    return res([0xce].concat(expr8(expr)));
+}
+sub_a_n = 'sub'i ws 'a'i ws? ',' ws? expr:expr {
+    return res([0xd6].concat(expr8(expr)));
+}
+sub_n = 'sub'i ws expr:expr {
+    return res([0xd6].concat(expr8(expr)));
+}
+sbc_a_n = 'sbc'i ws 'a'i ws? ',' ws? expr:expr {
+    return res([0xde].concat(expr8(expr)));
+}
 add_a_reg = 'add'i ws 'a'i ws? ',' ws? reg:reg {
     return res([0x80 | reg]);
 }
@@ -260,7 +307,7 @@ adc_a_reg = 'adc'i ws 'a'i ws? ',' ws? reg:reg {
 sub_a_reg = 'sub'i ws 'a'i ws? ',' ws? reg:reg {
         return res([0x90 | reg]);
     }
-    / 'sub'i ws reg:reg {
+sub_reg = 'sub'i ws reg:reg {
         return res([0x90 | reg]);
     }
 sbc_a_reg = 'sbc'i ws 'a'i ws? ',' ws? reg:reg {
@@ -290,6 +337,30 @@ cp_a_reg = 'cp'i ws 'a'i ws? ',' ws? reg:reg {
     / 'cp'i ws reg:reg {
         return res([0xb8 | reg]);
     }
+ret_nzncpop = 'ret'i ws cond:nzncpop {
+    return res([0xc0 | (cond << 4)]);
+}
+jp_nzncpop_nn = 'jp'i ws cond:nzncpop ws? ',' ws? expr:expr {
+    return res([0xc2 | (cond << 4)].concat(expr16(expr)));
+}
+call_nzncpop_nn = 'call'i ws cond:nzncpop ws? ',' ws? expr:expr {
+    return res([0xc4 | (cond << 4)].concat(expr16(expr)));
+}
+jp_zcpem_nn = 'jp'i ws cond:zcpem ws? ',' ws? expr:expr {
+    return res([0xca | (cond << 4)].concat(expr16(expr)));
+}
+call_zcpem_nn = 'call'i ws cond:zcpem ws? ',' ws? expr:expr {
+    return res([0xcc | (cond << 4)].concat(expr16(expr)));
+}
+call_nn = 'call'i ws expr:expr {
+    return res([0xcd].concat(expr16(expr)));
+}
+ret_zcpem = 'ret'i ws cond:zcpem {
+    return res([0xc8 | (cond << 4)]);
+}
+ret = 'ret'i {
+    return res([0xc9]);
+}
 ld_r_r = 'ld'i ws reg1:reg ws? ',' ws? reg2:reg ! {
     return reg1 === 6 && reg2 === 6;
     } {
@@ -338,13 +409,13 @@ ld_hla_addr = 'ld'i ws reg:hla ws? ',' ws? '(' expr:expr ')' {
     return res([0x2a | (reg << 4)].concat(expr16(expr)));
 }
 push_bcdehlaf = 'push'i ws reg:bcdehlaf {
-    return res([0xC1 | (reg << 4)]);
-}
-pop_bcdehlaf = 'pop'i ws reg:bcdehlaf {
     return res([0xC5 | (reg << 4)]);
 }
+pop_bcdehlaf = 'pop'i ws reg:bcdehlaf {
+    return res([0xC1 | (reg << 4)]);
+}
 jp = 'jp'i ws expr:expr {
-    return res([0xC2, expr]);
+    return res([0xC3].concat(expr16(expr)));
 }
 djnz = 'djnz'i ws expr:expr {
     return res([0x10].concat(rel(expr)));
@@ -357,6 +428,12 @@ jr_nznc = 'jr'i ws cond:nznc ws? ',' ws? expr:expr {
 }
 jr_zc = 'jr'i ws cond:zc ws? ',' ws? expr:expr {
     return res([0x28 | (cond << 4)].concat(rel(expr)));
+}
+rst_rst0 = 'rst'i ws rst:rst0 {
+    return res([0xc7 | rst << 4]);
+}
+rst_rst8 = 'rst'i ws rst:rst8 {
+    return res([0xcf | rst << 4]);
 }
 
 reg = 'b'i { return 0; }
@@ -397,8 +474,36 @@ nznc = 'nz'i { return 0; }
 zc = 'z'i { return 0; }
     / 'c'i { return 1; }
 
+nzncpop = 'nz'i { return 0; }
+    / 'nc'i { return 1; }
+    / 'po'i { return 2; }
+    / 'p'i { return 3; }
+
+zcpem = 'z'i { return 0; }
+    / 'c'i { return 1; }
+    / 'pe'i { return 2; }
+    / 'm'i { return 3; }
+
 hla = 'hl'i { return 0; }
     / 'a'i { return 1; }
+
+rst0 = '00h'i { return 0; }
+    / '$00' { return 0; }
+    / '10h'i { return 1; }
+    / '$10' { return 1; }
+    / '20h'i { return 2; }
+    / '$20' { return 2; }
+    / '30h'i { return 3; }
+    / '$30' { return 3; }
+
+rst8 = '08h'i { return 0; }
+    / '$08' { return 0; }
+    / '18h'i { return 1; }
+    / '$18' { return 1; }
+    / '28h'i { return 2; }
+    / '$28' { return 2; }
+    / '38h'i { return 3; }
+    / '$38' { return 3; }
 
 ws = [ \t\r\n]+
 
