@@ -3,20 +3,12 @@ import { Parser } from 'expr-eval';
 
 console.log("MAZ v0.1.0");
 
-function pass1(code) {
+function compile(code) {
     const ast = parser.parse(code, {});
-    console.log(JSON.stringify(ast));
     const symbols = getSymbols(ast);
-    console.log(JSON.stringify(symbols));
 
     assignPCandEQU(ast, symbols);
-
-    console.log(JSON.stringify(symbols));
-
     evaluateSymbols(symbols);
-
-    console.log(JSON.stringify(ast));
-    console.log(JSON.stringify(symbols, undefined, 2));
 
     for (const symbol in symbols) {
         if (symbols[symbol].expression) {
@@ -25,8 +17,7 @@ function pass1(code) {
     }
 
     updateBytes(ast, symbols);
-
-    console.log(JSON.stringify(ast));
+    return [ast, symbols];
 }
 
 /**
@@ -59,6 +50,18 @@ export function getSymbols(ast) {
         throw "Mismatch between .block and .endblock statements";
     }
     return symbols;
+}
+
+function labelPrefix(blocks: string[]) {
+    let result = '';
+    for (let i = 0; i < blocks.length; i++) {
+        result = `%${blocks[i]}_${result}`;
+    }
+    return result;
+}
+
+function labelName(blocks: string[], label) {
+    return labelPrefix(blocks) + label;
 }
 
 export function assignPCandEQU(ast, symbols) {
@@ -106,6 +109,9 @@ export function evaluateSymbol(symbol, symbols, evaluated) {
     for (const variable of variables) {
         const subVar = findVariable(symbols, prefix, variable);
 
+        if (symbols[subVar] === undefined) {
+            throw 'Symbol not found: ' + variable;
+        }
         if (symbols[subVar].expression) {
             evaluateSymbol(subVar, symbols, evaluated);
         }
@@ -146,6 +152,7 @@ export function getWholePrefix(symbol) {
 export function evaluateSymbols(symbols) {
     const evaluated = [];
     for (const symbol in symbols) {
+        // console.log('evaluate ' + symbol);
         if (symbols[symbol].expression) {
             if (evaluated.indexOf(symbol) !== -1) {
                 continue;
@@ -172,16 +179,14 @@ export function updateBytes(ast, symbols) {
     }    
 }
 
-function labelPrefix(blocks: string[]) {
-    let result = '';
-    for (let i = 0; i < blocks.length; i++) {
-        result = `%${blocks[i]}_${result}`;
+export function getBytes(ast) {
+    let bytes = [];
+    for (const el of ast) {
+        if (el.bytes) {
+            bytes = bytes.concat(el.bytes);
+        }
     }
-    return result;
-}
-
-function labelName(blocks: string[], label) {
-    return labelPrefix(blocks) + label;
+    return bytes;
 }
 
 const source = `
@@ -189,6 +194,7 @@ thing:
 bdos: equ 5
 blob: equ glop
 glop: equ bdos
+a: equ 100
 .block
     a: equ 2
 .block
@@ -210,4 +216,7 @@ org 40
 end:
 `;
 
-// pass1(source);
+let [ast, symbols] = compile(source);
+console.log(JSON.stringify(ast, undefined, 2));
+console.log(JSON.stringify(symbols, undefined, 2));
+console.log(JSON.stringify(getBytes(ast), undefined, 2));
