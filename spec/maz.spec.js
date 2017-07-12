@@ -225,4 +225,18 @@ describe('maz', function() {
         expect(maz.findVariable(symbols, '', 'd')).toBe('d');
         expect(maz.findVariable(symbols, '', 'e')).toBe('e');
     });
+    it('should update bytes', function() {
+        const ast = [
+            { references: ['three'], bytes: [0, {expression: 'three'}]},
+            { references: ['three'], bytes: [0, {expression: 'three'}, null]}
+        ];
+        const symbols = {
+            three: 0x1234
+        }
+        maz.updateBytes(ast, symbols);
+        expect(ast).toEqual([
+            { references: ['three'], bytes: [0, 0x34]},
+            { references: ['three'], bytes: [0, 0x34, 0x12]}
+        ])
+    });
 });
