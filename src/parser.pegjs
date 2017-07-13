@@ -172,11 +172,32 @@ label = !'bc'i !'de'i !'hl'i !'sp'i !'af'i ([a-zA-Z][a-zA-Z0-9]*) {
     return text();
 }
 
-code = ld_sp_hl
+code = ldir
+    / ldi
+    / cpir
+    / cpi
+    / inir
+    / ini
+    / otir
+    / outi
+    / lddr
+    / ldd
+    / cpdr
+    / cpd
+    / indr
+    / ind
+    / otdr
+    / outd
+    / ld_sp_hl
+    / ld_i_a
+    / ld_a_i
+    / ld_r_a
+    / ld_a_r
     / ld_r_r
     / ld_bcde_a
     / ld_a_bcde
     / ld_hla_addr
+    / ld_bcdesp_nn
     / ld_bcdehlsp_nn
     / add_hl_bcdehlsp
     / inc_bcdehlsp
@@ -192,6 +213,8 @@ code = ld_sp_hl
     / pop_bcdehlaf
     / rlca
     / ex_afaf
+    / rld
+    / rrd
     / rrca
     / nop
     / jp_hl
@@ -244,15 +267,16 @@ code = ld_sp_hl
     / rst_rst0
     / rst_rst8
     / retn
+    / reti
     / ret_zcpem
     / ret_nzncpop
     / ret
+    / out_c_cela
     / out_n_a
     / out_c_bdh
-    / out_c_cela
+    / in_cela_c
     / in_a_n
     / in_bdh_c
-    / in_cela_c
     / exx
     / pfix
     / pfiy
@@ -262,7 +286,8 @@ code = ld_sp_hl
     / ei
     / neg
     / im_0
-    / ld_i_a
+    / im_1
+    / im_2
 
 ex_afaf = 'ex'i ws 'af'i ws? ',' ws? 'af\''i {
     return res([0x08]);
@@ -275,6 +300,60 @@ ex_de_hl = 'ex'i ws 'de'i ws? ',' ws? 'hl'i {
 }
 im_0 = 'im'i ws '0' {
     return res([0xed, 0x46]);
+}
+im_1 = 'im'i ws '1' {
+    return res([0xed, 0x56]);
+}
+im_2 = 'im'i ws '2' {
+    return res([0xed, 0x5e]);
+}
+ldir = 'ldir'i {
+    return res([0xed, 0xb0]);
+}
+ldi = 'ldi'i {
+    return res([0xed, 0xa0]);
+}
+cpir = 'cpir'i {
+    return res([0xed, 0xb1]);
+}
+cpi = 'cpi'i {
+    return res([0xed, 0xa1]);
+}
+inir = 'inir'i {
+    return res([0xed, 0xb2]);
+}
+ini = 'ini'i {
+    return res([0xed, 0xa2]);
+}
+otir = 'otir'i {
+    return res([0xed, 0xb3]);
+}
+outi = 'outi'i {
+    return res([0xed, 0xa3]);
+}
+lddr = 'lddr'i {
+    return res([0xed, 0xb8]);
+}
+ldd = 'ldd'i {
+    return res([0xed, 0xa8]);
+}
+cpdr = 'cpdr'i {
+    return res([0xed, 0xb9]);
+}
+cpd = 'cpd'i {
+    return res([0xed, 0xa9]);
+}
+indr = 'indr'i {
+    return res([0xed, 0xba]);
+}
+ind = 'ind'i {
+    return res([0xed, 0xaa]);
+}
+otdr = 'otdr'i {
+    return res([0xed, 0xbb]);
+}
+outd = 'outd'i {
+    return res([0xed, 0xab]);
 }
 halt = 'halt'i {
     return res([0x76]);
@@ -297,6 +376,9 @@ neg = 'neg'i {
 retn = 'retn'i {
     return res([0xed, 0x45]);
 }
+reti = 'reti'i {
+    return res([0xed, 0x4d]);
+}
 exx = 'exx'i {
     return res([0xd9]);
 }
@@ -318,6 +400,12 @@ rlca = 'rlca'i {
 rla = 'rla'i {
     return res([0x17]);
 }
+rld = 'rld'i {
+    return res([0xed, 0x6f]);
+}
+rrd = 'rrd'i {
+    return res([0xed, 0x67]);
+}
 rrca = 'rrca'i {
     return res([0x0f]);
 }
@@ -332,6 +420,9 @@ ld_sp_hl = 'ld'i ws 'sp'i ws? ',' ws? 'hl'i {
 }
 ld_i_a = 'ld'i ws 'i'i ws? ',' ws? 'a'i {
     return res([0xed, 0x47]);
+}
+ld_a_i = 'ld'i ws 'a'i ws? ',' ws? 'i'i {
+    return res([0xed, 0x57]);
 }
 jp_hl = 'jp'i ws '(' ws? 'hl'i ws? ')' {
     return res([0xe9]);
@@ -462,6 +553,12 @@ ret_zcpem = 'ret'i ws cond:zcpem {
 ret = 'ret'i {
     return res([0xc9]);
 }
+ld_r_a = 'ld'i ws 'r'i ws? ',' ws? 'a' {
+    return res([0xed, 0x4f]);
+}
+ld_a_r = 'ld'i ws 'a'i ws? ',' ws? 'r' {
+    return res([0xed, 0x5f]);
+}
 ld_r_r = 'ld'i ws reg1:reg ws? ',' ws? reg2:reg ! {
     return reg1 === 6 && reg2 === 6;
     } {
@@ -472,6 +569,9 @@ ld_bcdehlsp_nn = 'ld'i ws reg:bcdehlsp ws? ',' ws? expr:expr {
 }
 ld_nn_bcdesp = 'ld'i ws '(' expr:expr ')' ws? ',' ws? reg:bcdesp {
     return res([0xed, 0x43 | (reg << 4)].concat(expr16(expr)));
+}
+ld_bcdesp_nn = 'ld'i ws reg:bcdesp ws? ',' ws? '(' expr:expr ')' {
+    return res([0xed, 0x4b | (reg << 4)].concat(expr16(expr)));
 }
 ld_bcde_a = 'ld'i ws '(' reg:bcde ')' ws? ',' ws? 'a' {
     return res([0x02 | (reg << 4)]);
