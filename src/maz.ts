@@ -64,6 +64,13 @@ function labelName(blocks: string[], label) {
     return labelPrefix(blocks) + label;
 }
 
+/**
+ * Assign correct value to labels, based on PC. Starts at
+ * 0, increments by bytes in ast or set by org.
+ * Assign correct value to equs, although it does not
+ * evaluate expressions, it simply put the expression into
+ * the symbol
+ */
 export function assignPCandEQU(ast, symbols) {
     let pc = 0;
     let blocks = [];
