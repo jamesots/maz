@@ -212,10 +212,12 @@ code = ldir
     / push_bcdehlaf
     / pop_bcdehlaf
     / rlca
+    / rlc_reg
     / ex_afaf
     / rld
     / rrd
     / rrca
+    / rrc_reg
     / nop
     / jp_hl
     / jp_zcpem_nn
@@ -227,6 +229,12 @@ code = ldir
     / djnz
     / rla
     / rra
+    / rl_reg
+    / rr_reg
+    / sla_reg
+    / sra_reg
+    / sll_reg
+    / srl_reg
     / jr_nznc
     / jr_zc
     / jr
@@ -288,7 +296,52 @@ code = ldir
     / im_0
     / im_1
     / im_2
+    / bit_n_reg
+    / res_n_reg
+    / set_n_reg
 
+rlc_reg = 'rlc'i ws reg:reg {
+    return res([0xcb, 0x00 + reg]);
+}
+rrc_reg = 'rrc'i ws reg:reg {
+    return res([0xcb, 0x08 + reg]);
+}
+rl_reg = 'rl'i ws reg:reg {
+    return res([0xcb, 0x10 + reg]);
+}
+rr_reg = 'rr'i ws reg:reg {
+    return res([0xcb, 0x18 + reg]);
+}
+sla_reg = 'sla'i ws reg:reg {
+    return res([0xcb, 0x20 + reg]);
+}
+sra_reg = 'sra'i ws reg:reg {
+    return res([0xcb, 0x28 + reg]);
+}
+sll_reg = 'sll'i ws reg:reg {
+    return res([0xcb, 0x30 + reg]);
+}
+srl_reg = 'srl'i ws reg:reg {
+    return res([0xcb, 0x38 + reg]);
+}
+bit_n_reg = 'bit'i ws n:n0246 ws? ',' ws? reg:reg {
+        return res([0xcb, 0x40 + reg + (n << 4)]);
+    }
+    / 'bit'i ws n:n1357 ws? ',' ws? reg:reg {
+        return res([0xcb, 0x48 + reg + (n << 4)]);
+    }
+res_n_reg = 'res'i ws n:n0246 ws? ',' ws? reg:reg {
+        return res([0xcb, 0x80 + reg + (n << 4)]);
+    }
+    / 'res'i ws n:n1357 ws? ',' ws? reg:reg {
+        return res([0xcb, 0x88 + reg + (n << 4)]);
+    }
+set_n_reg = 'set'i ws n:n0246 ws? ',' ws? reg:reg {
+        return res([0xcb, 0xc0 + reg + (n << 4)]);
+    }
+    / 'set'i ws n:n1357 ws? ',' ws? reg:reg {
+        return res([0xcb, 0xc8 + reg + (n << 4)]);
+    }
 ex_afaf = 'ex'i ws 'af'i ws? ',' ws? 'af\''i {
     return res([0x08]);
 }
@@ -716,6 +769,16 @@ rst8 = '08h'i { return 0; }
     / '$28' { return 2; }
     / '38h'i { return 3; }
     / '$38' { return 3; }
+
+n0246 = '0' { return 0; }
+    / '2' { return 1; }
+    / '4' { return 2; }
+    / '6' { return 3; }
+
+n1357 = '1' { return 0; }
+    / '3' { return 1; }
+    / '5' { return 2; }
+    / '7' { return 3; }
 
 ws = [ \t\r\n]+
 
