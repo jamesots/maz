@@ -77,6 +77,8 @@ describe('parser', function() {
     });
 
     const opcodes = [
+        // prefixless instructions
+
         ['nop', [0x00]],
         ['ld bc,$12 + $34 + $2', [0x01, 0x48, 0x00]],
         ['ld bc,$12 + start', [0x01, {
@@ -435,6 +437,8 @@ describe('parser', function() {
         ['rst 38h', [0xff]],
         ['rst $38', [0xff]],
 
+        // extended instructions (ed)
+
         ['in b,(c)', [0xed, 0x40]],
         ['out (c),b', [0xed, 0x41]],
         ['sbc hl,bc', [0xed, 0x42]],
@@ -496,6 +500,8 @@ describe('parser', function() {
         ['cpdr', [0xed, 0xb9]],
         ['indr', [0xed, 0xba]],
         ['otdr', [0xed, 0xbb]],
+
+        // bit instructions (cb)
 
         ['rlc b', [0xcb, 0x00]],
         ['rlc c', [0xcb, 0x01]],
@@ -986,6 +992,8 @@ describe('parser', function() {
         ['set 5,(iy+$12)', [0xfd, 0xcb, 0xee, 0x12]],
         ['set 6,(iy+$12)', [0xfd, 0xcb, 0xf6, 0x12]],
         ['set 7,(iy+$12)', [0xfd, 0xcb, 0xfe, 0x12]],
+
+        // ix instructions
     ]
     for (const opcode of opcodes) {
         it('should parse ' + opcode[0], function() {;
