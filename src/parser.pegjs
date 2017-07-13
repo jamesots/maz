@@ -189,6 +189,7 @@ code = ldir
     / otdr
     / outd
     / ld_cea_ixyhl
+    / ld_sp_ixy
     / ld_sp_hl
     / ld_i_a
     / ld_a_i
@@ -231,12 +232,15 @@ code = ldir
     / dec_ixyl
     / dec_ixy
     / dec_ixyaddr
+    / pop_ixy
+    / push_ixy
     / push_bcdehlaf
     / pop_bcdehlaf
     / rlca
     / rlc_reg
     / rlc_ixy_reg
     / rlc_ixy
+    / ex_sp_ixy
     / ex_afaf
     / rld
     / rrd
@@ -245,6 +249,7 @@ code = ldir
     / rrc_ixy_reg
     / rrc_ixy
     / nop
+    / jp_ixy
     / jp_hl
     / jp_zcpem_nn
     / jp_nzncpop_nn
@@ -282,30 +287,46 @@ code = ldir
     / scf
     / ccf
     / halt
+    / add_a_ixyhl
+    / add_a_ixy
     / add_a_reg
     / add_a_n
+    / adc_a_ixyhl
+    / adc_a_ixy
     / adc_a_reg
     / adc_a_n
     / adc_hl_bcdehlsp
+    / sub_a_ixyhl
+    / sub_a_ixy
     / sub_a_reg
     / sub_a_n
     / sub_reg
     / sub_n
+    / sbc_a_ixyhl
+    / sbc_a_ixy
     / sbc_a_reg
     / sbc_a_n
     / sbc_hl_bcdehlsp
+    / and_a_ixyhl
+    / and_a_ixy
     / and_a_reg
     / and_a_n
     / and_reg
     / and_n
+    / xor_a_ixyhl
+    / xor_a_ixy
     / xor_a_reg
     / xor_a_n
     / xor_reg
     / xor_n
+    / or_a_ixyhl
+    / or_a_ixy
     / or_a_reg
     / or_a_n
     / or_reg
     / or_n
+    / cp_a_ixyhl
+    / cp_a_ixy
     / cp_a_reg
     / cp_a_n
     / cp_reg
@@ -341,6 +362,15 @@ code = ldir
     / set_n_reg
     / set_n_ixy
 
+push_ixy = 'push'i ws xy:ixiy {
+    return res([xy, 0xe5]);
+}
+pop_ixy = 'pop'i ws xy:ixiy {
+    return res([xy, 0xe1]);
+}
+ex_sp_ixy = 'ex'i ws '(' ws? 'sp'i ws? ')' ws? ',' xy:ixiy {
+    return res([xy, 0xe3]);
+}
 ld_ix_ix = 'ld'i ws 'ix'i ws? ',' ws? 'ix'i {
     return res([0xdd, 0x29]);
 }
@@ -352,6 +382,54 @@ ld_ixyaddr_n = 'ld'i ws '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' ws? ',' ws? n:
 }
 ld_ixy_nn = 'ld'i ws xy:ixiy ws? ',' ws? expr:expr {
     return res([xy, 0x21].concat(expr16(expr)));
+}
+add_a_ixyhl = 'add'i ws 'a' ws? ',' ws? xy:ixyhl {
+    return res([xy[0], 0x84 + xy[1]]);
+}
+add_a_ixy = 'add'i ws 'a' ws? ',' ws? '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
+    return res([xy, 0x86].concat(expr8(expr)));
+}
+adc_a_ixyhl = 'adc'i ws 'a' ws? ',' ws? xy:ixyhl {
+    return res([xy[0], 0x8c + xy[1]]);
+}
+adc_a_ixy = 'adc'i ws 'a' ws? ',' ws? '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
+    return res([xy, 0x8e].concat(expr8(expr)));
+}
+sub_a_ixyhl = 'sub'i ws 'a' ws? ',' ws? xy:ixyhl {
+    return res([xy[0], 0x94 + xy[1]]);
+}
+sub_a_ixy = 'sub'i ws 'a' ws? ',' ws? '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
+    return res([xy, 0x96].concat(expr8(expr)));
+}
+sbc_a_ixyhl = 'sbc'i ws 'a' ws? ',' ws? xy:ixyhl {
+    return res([xy[0], 0x9c + xy[1]]);
+}
+sbc_a_ixy = 'sbc'i ws 'a' ws? ',' ws? '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
+    return res([xy, 0x9e].concat(expr8(expr)));
+}
+and_a_ixyhl = 'and'i ws 'a' ws? ',' ws? xy:ixyhl {
+    return res([xy[0], 0xa4 + xy[1]]);
+}
+and_a_ixy = 'and'i ws 'a' ws? ',' ws? '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
+    return res([xy, 0xa6].concat(expr8(expr)));
+}
+xor_a_ixyhl = 'xor'i ws 'a' ws? ',' ws? xy:ixyhl {
+    return res([xy[0], 0xac + xy[1]]);
+}
+xor_a_ixy = 'xor'i ws 'a' ws? ',' ws? '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
+    return res([xy, 0xae].concat(expr8(expr)));
+}
+or_a_ixyhl = 'or'i ws 'a' ws? ',' ws? xy:ixyhl {
+    return res([xy[0], 0xb4 + xy[1]]);
+}
+or_a_ixy = 'or'i ws 'a' ws? ',' ws? '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
+    return res([xy, 0xb6].concat(expr8(expr)));
+}
+cp_a_ixyhl = 'cp'i ws 'a' ws? ',' ws? xy:ixyhl {
+    return res([xy[0], 0xbc + xy[1]]);
+}
+cp_a_ixy = 'cp'i ws 'a' ws? ',' ws? '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
+    return res([xy, 0xbe].concat(expr8(expr)));
 }
 ld_bd_ixyhl = 'ld'i ws reg:bd ws? ',' ws? xy:ixyhl {
     return res([xy[0], 0x44 + xy[1] + (reg << 4)]);
@@ -638,6 +716,9 @@ rra = 'rra'i {
 nop = 'nop'i {
     return res([0x00]);
 }
+ld_sp_ixy = 'ld'i ws 'sp'i ws? ',' ws? xy:ixiy {
+    return res([xy, 0xf9]);
+}
 ld_sp_hl = 'ld'i ws 'sp'i ws? ',' ws? 'hl'i {
     return res([0xf9]);
 }
@@ -646,6 +727,9 @@ ld_i_a = 'ld'i ws 'i'i ws? ',' ws? 'a'i {
 }
 ld_a_i = 'ld'i ws 'a'i ws? ',' ws? 'i'i {
     return res([0xed, 0x57]);
+}
+jp_ixy = 'jp'i ws '(' ws? xy:ixiy ws? ')' {
+    return res([xy, 0xe9]);
 }
 jp_hl = 'jp'i ws '(' ws? 'hl'i ws? ')' {
     return res([0xe9]);
