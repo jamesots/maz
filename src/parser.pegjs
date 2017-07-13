@@ -207,6 +207,7 @@ code = ldir
     / ld_ixyaddr_bcdehla
     / ld_ixyaddr_n
     / ld_ix_ix
+    / ld_iy_iy
     / ld_ixyhl_bcdehla
     / ld_ixyh_n
     / ld_ixyl_n
@@ -373,6 +374,9 @@ ex_sp_ixy = 'ex'i ws '(' ws? 'sp'i ws? ')' ws? ',' xy:ixiy {
 }
 ld_ix_ix = 'ld'i ws 'ix'i ws? ',' ws? 'ix'i {
     return res([0xdd, 0x29]);
+}
+ld_iy_iy = 'ld'i ws 'iy'i ws? ',' ws? 'iy'i {
+    return res([0xfd, 0x29]);
 }
 ld_ixy_addr = 'ld'i ws xy:ixiy ws? ',' ws? '(' ws? expr:expr ws? ')' {
     return res([xy, 0x2a].concat(expr16(expr)));
