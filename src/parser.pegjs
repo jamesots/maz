@@ -231,7 +231,13 @@ code = ld_sp_hl
     / xor_reg
     / xor_n
     / or_a_reg
+    / or_a_n
+    / or_reg
+    / or_n
     / cp_a_reg
+    / cp_a_n
+    / cp_reg
+    / cp_n
     / rst_rst0
     / rst_rst8
     / ret_zcpem
@@ -241,8 +247,11 @@ code = ld_sp_hl
     / in_a_n
     / exx
     / pfix
+    / pfiy
     / ex_sp_hl
     / ex_de_hl
+    / di
+    / ei
 
 ex_afaf = 'ex'i ws 'af'i ws? ',' ws? 'af\''i {
     return res([0x08]);
@@ -258,6 +267,15 @@ halt = 'halt'i {
 }
 pfix = 'pfix'i {
     return res([0xdd]);
+}
+pfiy = 'pfiy'i {
+    return res([0xfd]);
+}
+di = 'di'i {
+    return res([0xf3]);
+}
+ei = 'ei'i {
+    return res([0xfb]);
 }
 exx = 'exx'i {
     return res([0xd9]);
@@ -319,6 +337,18 @@ and_a_n = 'and'i ws 'a'i ws? ',' ws? expr:expr {
 and_n = 'and'i ws expr:expr {
     return res([0xe6].concat(expr8(expr)));
 }
+cp_a_n = 'cp'i ws 'a'i ws? ',' ws? expr:expr {
+    return res([0xfe].concat(expr8(expr)));
+}
+cp_n = 'cp'i ws expr:expr {
+    return res([0xfe].concat(expr8(expr)));
+}
+or_a_n = 'or'i ws 'a'i ws? ',' ws? expr:expr {
+    return res([0xf6].concat(expr8(expr)));
+}
+or_n = 'or'i ws expr:expr {
+    return res([0xf6].concat(expr8(expr)));
+}
 xor_a_n = 'xor'i ws 'a'i ws? ',' ws? expr:expr {
     return res([0xee].concat(expr8(expr)));
 }
@@ -358,13 +388,13 @@ xor_reg = 'xor'i ws reg:reg {
 or_a_reg = 'or'i ws 'a'i ws? ',' ws? reg:reg {
         return res([0xb0 | reg]);
     }
-    / 'or'i ws reg:reg {
+or_reg = 'or'i ws reg:reg {
         return res([0xb0 | reg]);
     }
 cp_a_reg = 'cp'i ws 'a'i ws? ',' ws? reg:reg {
         return res([0xb8 | reg]);
     }
-    / 'cp'i ws reg:reg {
+cp_reg = 'cp'i ws reg:reg {
         return res([0xb8 | reg]);
     }
 ret_nzncpop = 'ret'i ws cond:nzncpop {

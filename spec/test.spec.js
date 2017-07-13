@@ -412,6 +412,28 @@ describe('parser', function() {
         ['xor $12', [0xee, 0x12]],
         ['rst 28h', [0xef]],
         ['rst $28', [0xef]],
+
+        ['ret p', [0xf0]],
+        ['pop af', [0xf1]],
+        ['jp p,$1234', [0xf2, 0x34, 0x12]],
+        ['di', [0xf3]],
+        ['call p,$1234', [0xf4, 0x34, 0x12]],
+        ['push af', [0xf5]],
+        ['or a,$12', [0xf6, 0x12]],
+        ['or $12', [0xf6, 0x12]],
+        ['rst 30h', [0xf7]],
+        ['rst $30', [0xf7]],
+
+        ['ret m', [0xf8]],
+        ['ld sp,hl', [0xf9]],
+        ['jp m,$1234', [0xfa, 0x34, 0x12]],
+        ['ei', [0xfb]],
+        ['call m,$1234', [0xfc, 0x34, 0x12]],
+        ['pfiy', [0xfd]],
+        ['cp a,$12', [0xfe, 0x12]],
+        ['cp $12', [0xfe, 0x12]],
+        ['rst 38h', [0xff]],
+        ['rst $38', [0xff]],
     ]
     for (const opcode of opcodes) {
         it('should parse ' + opcode[0], function() {;
