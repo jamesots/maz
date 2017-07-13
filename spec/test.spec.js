@@ -391,6 +391,27 @@ describe('parser', function() {
         ['sbc a,$12', [0xde, 0x12]],
         ['rst 18h', [0xdf]],
         ['rst $18', [0xdf]],
+
+        ['ret po', [0xe0]],
+        ['pop hl', [0xe1]],
+        ['jp po,$1234', [0xe2, 0x34, 0x12]],
+        ['ex (sp),hl', [0xe3]],
+        ['call po,$1234', [0xe4, 0x34, 0x12]],
+        ['push hl', [0xe5]],
+        ['and a,$12', [0xe6, 0x12]],
+        ['and $12', [0xe6, 0x12]],
+        ['rst 20h', [0xe7]],
+        ['rst $20', [0xe7]],
+
+        ['ret pe', [0xe8]],
+        ['jp (hl)', [0xe9]],
+        ['jp pe,$1234', [0xea, 0x34, 0x12]],
+        ['ex de,hl', [0xeb]],
+        ['call pe,$1234', [0xec, 0x34, 0x12]],
+        ['xor a,$12', [0xee, 0x12]],
+        ['xor $12', [0xee, 0x12]],
+        ['rst 28h', [0xef]],
+        ['rst $28', [0xef]],
     ]
     for (const opcode of opcodes) {
         it('should parse ' + opcode[0], function() {;
