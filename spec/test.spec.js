@@ -441,6 +441,11 @@ describe('parser', function() {
         ['ld ($1234),bc', [0xed, 0x43, 0x34, 0x12]],
         ['neg', [0xed, 0x44]],
         ['retn', [0xed, 0x45]],
+        ['im 0', [0xed, 0x46]],
+        ['ld i,a', [0xed, 0x47]],
+        ['in c,(c)', [0xed, 0x48]],
+        ['out (c),c', [0xed, 0x49]],
+        ['adc hl,bc', [0xed, 0x4a]],
     ]
     for (const opcode of opcodes) {
         it('should parse ' + opcode[0], function() {;

@@ -217,6 +217,7 @@ code = ld_sp_hl
     / add_a_n
     / adc_a_reg
     / adc_a_n
+    / adc_hl_bcdehlsp
     / sub_a_reg
     / sub_a_n
     / sub_reg
@@ -248,8 +249,10 @@ code = ld_sp_hl
     / ret
     / out_n_a
     / out_c_bdh
+    / out_c_cela
     / in_a_n
     / in_bdh_c
+    / in_cela_c
     / exx
     / pfix
     / pfiy
@@ -258,6 +261,8 @@ code = ld_sp_hl
     / di
     / ei
     / neg
+    / im_0
+    / ld_i_a
 
 ex_afaf = 'ex'i ws 'af'i ws? ',' ws? 'af\''i {
     return res([0x08]);
@@ -267,6 +272,9 @@ ex_sp_hl = 'ex'i ws '(' ws? 'sp'i ws? ')' ws? ',' ws? 'hl'i {
 }
 ex_de_hl = 'ex'i ws 'de'i ws? ',' ws? 'hl'i {
     return res([0xeb]);
+}
+im_0 = 'im'i ws '0' {
+    return res([0xed, 0x46]);
 }
 halt = 'halt'i {
     return res([0x76]);
@@ -322,6 +330,9 @@ nop = 'nop'i {
 ld_sp_hl = 'ld'i ws 'sp'i ws? ',' ws? 'hl'i {
     return res([0xf9]);
 }
+ld_i_a = 'ld'i ws 'i'i ws? ',' ws? 'a'i {
+    return res([0xed, 0x47]);
+}
 jp_hl = 'jp'i ws '(' ws? 'hl'i ws? ')' {
     return res([0xe9]);
 }
@@ -331,17 +342,26 @@ out_n_a = 'out'i ws '(' ws? expr:expr ws? ')' ws? ',' ws? 'a' {
 out_c_bdh = 'out'i ws '(' ws? 'c' ws? ')' ws? ',' ws? reg:bdh {
     return res([0xed, 0x41 | (reg << 4)]);
 }
+out_c_cela = 'out'i ws '(' ws? 'c' ws? ')' ws? ',' ws? reg:cela {
+    return res([0xed, 0x49 | (reg << 4)]);
+}
 in_a_n = 'in'i ws 'a' ws? ',' ws? '(' ws? expr:expr ws? ')' {
     return res([0xdb].concat(expr8(expr)));
 }
 in_bdh_c = 'in'i ws reg:bdh ws? ',' ws? '(' ws? 'c' ws? ')' {
     return res([0xed, 0x40 | (reg << 4)]);
 }
+in_cela_c = 'in'i ws reg:cela ws? ',' ws? '(' ws? 'c'i ws? ')' {
+    return res([0xed, 0x48 | (reg << 4)]);
+}
 add_a_n = 'add'i ws 'a'i ws? ',' ws? expr:expr {
     return res([0xc6].concat(expr8(expr)));
 }
 adc_a_n = 'adc'i ws 'a'i ws? ',' ws? expr:expr {
     return res([0xce].concat(expr8(expr)));
+}
+adc_hl_bcdehlsp = 'adc'i ws 'hl'i ws? ',' ws? reg:bcdehlsp {
+    return res([0xed, 0x4a | (reg << 4)]);
 }
 sub_a_n = 'sub'i ws 'a'i ws? ',' ws? expr:expr {
     return res([0xd6].concat(expr8(expr)));
