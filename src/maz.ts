@@ -2,6 +2,9 @@ import * as compiler from './compiler';
 import * as commandLineArgs from 'command-line-args';
 import * as commandLineUsage from 'command-line-usage';
 import * as fs from 'fs';
+import * as sourceMapSupport from 'source-map-support';
+
+sourceMapSupport.install();
 
 const optionDefinitions = [
     { name: 'src', alias: 's', type: String, multiple: false, defaultOption: true },
@@ -32,7 +35,7 @@ console.log("MAZ v0.1.0");
 const source = fs.readFileSync(options.src).toString();
 
 try {
-    let [ast, symbols] = compiler.compile(source);
+    let [ast, symbols] = compiler.compile(source, {trace: false});
     console.log(JSON.stringify(ast, undefined, 2));
     console.log(JSON.stringify(symbols, undefined, 2));
     const bytes = compiler.getBytes(ast);

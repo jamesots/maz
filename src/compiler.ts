@@ -1,21 +1,39 @@
 import * as parser from './parser';
 import { Parser } from 'expr-eval';
+import * as Tracer from 'pegjs-backtrace';
 
-export function compile(code) {
-    const ast = parser.parse(code, {});
-    const symbols = getSymbols(ast);
+export function compile(code, options) {
+    const parserOptions = {} as any;
+    const tracer = new Tracer(code, {
+        showTrace: true,
+        showFullPath: true
+    });
+    if (options.trace) {
+        parserOptions.tracer = tracer;
+    }
+    try {
+        const ast = parser.parse(code, parserOptions);
+        // console.log(JSON.stringify(ast, undefined, 2));
+        const symbols = getSymbols(ast);
 
-    assignPCandEQU(ast, symbols);
-    evaluateSymbols(symbols);
+        assignPCandEQU(ast, symbols);
+        evaluateSymbols(symbols);
 
-    for (const symbol in symbols) {
-        if (symbols[symbol].expression) {
-            console.log(`${symbol} cannot be calculated`);
+        for (const symbol in symbols) {
+            if (symbols[symbol].expression) {
+                console.log(`${symbol} cannot be calculated`);
+            }
+        }
+
+        updateBytes(ast, symbols);
+        return [ast, symbols];
+    } catch (e) {
+        if (options.trace) {
+            // console.log(tracer.getBacktraceString());
+        } else {
+            throw e;
         }
     }
-
-    updateBytes(ast, symbols);
-    return [ast, symbols];
 }
 
 /**
