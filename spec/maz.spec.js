@@ -1,4 +1,4 @@
-const maz = require('../build/maz');
+const maz = require('../build/compiler');
 
 describe('maz', function() {
     it('should get symbols', function() {

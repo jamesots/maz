@@ -4,12 +4,12 @@
   "description": "Macro Assembler for Z80",
   "main": "maz.js",
   "scripts": {
-    "pegjs": "pegjs --trace -o src/parser.js src/parser.pegjs",
+    "pegjs": "pegjs --optimize speed --trace -o build/parser.js src/parser.pegjs",
     "tsc": "tsc",
     "tsc-watch": "tsc --watch",
     "test": "jasmine",
     "xtest": "jasmine-ts 'spec/**/*.spec.ts'",
-    "start": "ts-node src/maz.ts"
+    "start": "node build/maz.js"
   },
   "author": "James Ots <code@jamesots.com>",
   "license": "MIT",

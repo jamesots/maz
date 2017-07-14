@@ -1,4 +1,4 @@
-const parser = require('../src/parser');
+const parser = require('../build/parser');
 const Tracer = require('pegjs-backtrace');
 
 describe('parser', function() {
