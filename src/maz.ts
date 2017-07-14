@@ -1,35 +1,24 @@
 import * as compiler from './compiler';
+import * as commandLineArgs from 'command-line-args';
+import * as fs from 'fs';
+
+const optionDefinitions = [
+    { name: 'src', type: String, multiple: false, defaultOption: true },
+    { name: 'out', type: String, multiple: false }
+];
+const options = commandLineArgs(optionDefinitions);
 
 console.log("MAZ v0.1.0");
 
-const source = `
-thing:
-bdos: equ 5
-blob: equ glop
-glop: equ bdos
-a: equ 100
-.block
-    a: equ 2
-.block
-    bdos: equ 6
-    blah: equ bdos
-    b: equ a
-.endblock
-    bdos: equ 7
-.endblock
-start:
-    ld a,(end - start)
-data: nop
-    defb "hello",10,"!",start,bdos
-org 40
-.block
-    bdos: equ 8
-    b: equ a
-.endblock
-end:
-`;
+console.log(JSON.stringify(options));
+
+const source = fs.readFileSync(options.src).toString();
 
 let [ast, symbols] = compiler.compile(source);
 console.log(JSON.stringify(ast, undefined, 2));
 console.log(JSON.stringify(symbols, undefined, 2));
-console.log(JSON.stringify(compiler.getBytes(ast), undefined, 2));
+const bytes = compiler.getBytes(ast);
+console.log(JSON.stringify(bytes, undefined, 2));
+
+fs.writeFileSync(options.out, Buffer.from(bytes));
+
