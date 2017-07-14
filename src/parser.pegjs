@@ -38,7 +38,7 @@
 
 start = ws? stmts:statements? ws? { return stmts; }
 
-statements = stmt:statement [ \t]* comment? separator stmts:statements {
+statements = stmt:statement [ \t]* comment? separator+ stmts:statements {
         if (Array.isArray(stmt)) {
             return stmt.concat(stmts);
         }
@@ -168,7 +168,7 @@ labeldef = label:label ':' {
     }
 }
 
-label = !'bc'i !'de'i !'hl'i !'sp'i !'af'i ([a-zA-Z][a-zA-Z0-9]*) {
+label = !'bc'i !'de'i !'hl'i !'sp'i !'af'i ([a-zA-Z][a-zA-Z0-9_]*) {
     return text();
 }
 
