@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "Macro Assembler for Z80",
   "main": "maz.js",
+  "private": true,
   "scripts": {
     "pegjs": "pegjs --optimize speed --trace -o build/parser.js src/parser.pegjs",
     "tsc": "tsc",
@@ -26,6 +27,7 @@
     "typescript": "2.3.1"
   },
   "dependencies": {
+    "command-line-args": "^4.0.6",
     "expr-eval": "^1.0.1"
   }
 }
