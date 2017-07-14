@@ -38,29 +38,30 @@
 
 start = ws? stmts:statements? ws? { return stmts; }
 
-statements = stmt:statement [ \t]* comment? separator+ stmts:statements {
-        if (Array.isArray(stmt)) {
-            return stmt.concat(stmts);
+statements = stmt:statement [ \t]* comment? separator+ stmts:statements? {
+        if (!Array.isArray(stmt)) {
+            stmt = [stmt];
         }
-        return [stmt].concat(stmts);
-    }
-    / stmt:statement [ \t]* comment? {
-        if (Array.isArray(stmt)) {
-            return stmt;
+        if (stmts) {
+            stmt = stmt.concat(stmts);
         }
-        return [stmt]
+        return stmt;
     }
 
 separator = [ \t]* [\r\n] [ \t]*
 
-statement = label:labeldef ws? stmt:statement {
+statement = labelled_statement
+    / labeldef
+    / unlabelled_statement
+
+labelled_statement = label:labeldef ws? stmt:unlabelled_statement {
         if (Array.isArray(stmt)) {
             return [label].concat(stmt);
         }
         return [label, stmt]
     }
-    / labeldef
-    / directive
+
+unlabelled_statement = directive
     / code
     / comment
 
@@ -168,9 +169,12 @@ labeldef = label:label ':' {
     }
 }
 
-label = !'bc'i !'de'i !'hl'i !'sp'i !'af'i ([a-zA-Z][a-zA-Z0-9_]*) {
-    return text();
-}
+label = text1:[a-zA-Z] text2:[a-zA-Z0-9_]* !{
+        const text = text1 + text2.join('');
+        return (text === 'bc' || text === 'de' || text === 'hl' || text === 'sp');
+    } {
+        return text();
+    }
 
 code = ldir
     / ldi
