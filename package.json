@@ -5,7 +5,7 @@
   "main": "maz.js",
   "private": true,
   "scripts": {
-    "pegjs": "pegjs --optimize speed --trace -o build/parser.js src/parser.pegjs",
+    "pegjs": "pegjs --optimize speed -o build/parser.js src/parser.pegjs",
     "tsc": "tsc",
     "tsc-watch": "tsc --watch",
     "test": "jasmine",
@@ -22,7 +22,6 @@
     "jasmine": "^2.6.0",
     "jasmine-ts": "0.1.2",
     "pegjs": "^0.10.0",
-    "pegjs-backtrace": "^0.1.1",
     "ts-node": "^3.0.4",
     "typescript": "2.3.1"
   },
