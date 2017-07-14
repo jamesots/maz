@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "command-line-args": "^4.0.6",
+    "command-line-usage": "^4.0.0",
     "expr-eval": "^1.0.1"
   }
 }

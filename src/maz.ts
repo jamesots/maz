@@ -3,8 +3,9 @@ import * as commandLineArgs from 'command-line-args';
 import * as fs from 'fs';
 
 const optionDefinitions = [
-    { name: 'src', type: String, multiple: false, defaultOption: true },
-    { name: 'out', type: String, multiple: false }
+    { name: 'src', alias: 's', type: String, multiple: false, defaultOption: true },
+    { name: 'out', alias: 'o', type: String, multiple: false },
+    { name: 'help', alias: 'h' }
 ];
 const options = commandLineArgs(optionDefinitions);
 
