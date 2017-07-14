@@ -38,12 +38,12 @@
 
 start = ws? stmts:statements? ws? { return stmts; }
 
-statements = stmt:statement [ \t]* comment? separator+ stmts:statements? {
+statements = stmt:statement [ \t]* comment? stmts:(separator+ statements?)? {
         if (!Array.isArray(stmt)) {
             stmt = [stmt];
         }
-        if (stmts) {
-            stmt = stmt.concat(stmts);
+        if (stmts && stmts[1]) {
+            stmt = stmt.concat(stmts[1]);
         }
         return stmt;
     }
