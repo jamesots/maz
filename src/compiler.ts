@@ -14,9 +14,11 @@ export function compile(code, options) {
     try {
         const ast = parser.parse(code, parserOptions);
         console.log(JSON.stringify(ast, undefined, 2));
-        const [symbols, macros] = getSymbols(ast);
+        
+        const macros = getMacros(ast);
+        expandMacros(ast, macros);
+        const symbols = getSymbols(ast);
 
-        expandMacros(ast, symbols, macros);
         console.log(JSON.stringify(ast, undefined, 2));
 
         assignPCandEQU(ast, symbols);
@@ -39,15 +41,45 @@ export function compile(code, options) {
     }
 }
 
+export function getMacros(ast) {
+    const macros = {};
+    let macro = undefined;
+    let macroName = undefined;
+    for (let i = 0; i < ast.length; i++) {
+        const el = ast[i];
+        if (el.macrodef) {
+            if (macro) {
+                throw "Cannot nest macros";
+            }
+            macroName = el.macrodef;
+            macro = {
+                ast: [],
+                args: el.args || []
+            };
+        } else if (el.endmacro) {
+            if (!macro) {
+                throw "Not in a macro";
+            }
+            macros[macroName] = macro;
+            macro = undefined;
+            macroName = undefined;
+        }
+        if (macro && !el.macrodef && !el.endmacro) {
+            macro.ast.push(el);
+        }
+    }
+    if (macro) {
+        throw "Macro doesn't finish";
+    }
+    return macros;
+}
+
 /**
  * Gets a map of symbols, and updates the parsed objects
  * so the block and endblock objects have prefixes
  */
 export function getSymbols(ast) {
     const symbols = {};
-    const macros = {};
-    let macro = undefined;
-    let macroName = undefined;
     let nextBlock = 0;
     let blocks = [];
     for (let i = 0; i < ast.length; i++) {
@@ -66,45 +98,12 @@ export function getSymbols(ast) {
         } else if (el.endblock) {
             el.prefix = labelPrefix(blocks);
             blocks.pop();
-        } else if (el.macrodef) {
-            if (macro) {
-                throw "Cannot nest macros";
-            }
-            if (blocks.length !== 0) {
-                throw "Macros must be at top level";
-            }
-            blocks.push(nextBlock);
-            el.prefix = labelPrefix(blocks);
-            nextBlock++;
-            macroName = el.macrodef;
-            macro = {
-                ast: [],
-                args: el.args || []
-            };
-        } else if (el.endmacro) {
-            if (!macro) {
-                throw "Not in a macro";
-            }
-            el.prefix = labelPrefix(blocks);
-            blocks.pop();
-            if (blocks.length !== 0) {
-                throw "Macros must be at top level";
-            }
-            macros[macroName] = macro;
-            macro = undefined;
-            macroName = undefined;
-        }
-        if (macro && !el.macrodef && !el.endmacro) {
-            macro.ast.push(el);
         }
     }
     if (blocks.length !== 0) {
         throw "Mismatch between .block and .endblock statements";
     }
-    if (macro) {
-        throw "Macro doesn't finish";
-    }
-    return [symbols, macros];
+    return symbols;
 }
 
 function labelPrefix(blocks: string[]) {
@@ -119,7 +118,7 @@ function labelName(blocks: string[], label) {
     return labelPrefix(blocks) + label;
 }
 
-export function expandMacros(ast, symbols, macros) {
+export function expandMacros(ast, macros) {
     for (let i = 0; i < ast.length; i++) {
         const el = ast[i];
         if (el.macrocall) {

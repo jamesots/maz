@@ -1,0 +1,4 @@
+ft245: equ 8
+ft245_status: equ 9
+bell: equ 6
+spi_data: equ 10

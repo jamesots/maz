@@ -26,3 +26,78 @@ more:
     ret
 size: equ 100
 
+----------------------
+How compilation works
+
+1. parse
+2. getSymbols
+3. expandMacros
+4. assignPCandEQU
+5. evaluateSymbols
+6. updateBytes
+
+1. parse
+
+This uses the pegjs grammar to produce an abstract syntax tree.
+(It's not a tree).
+There are several types of objects which are created, which can
+be detected by seeing if each of the following attributes is
+truthy on the object:
+* label
+    The value of 'label' is the name of the label
+* block
+    The start of a block. No other attributes to start with.
+    Later, prefix is added.
+* endblock
+    The endof a block. No other attributes to start with.
+    Later, prefix is added. (Is it needed?)
+* macrodef
+    The value of 'macrodef' is the name of the macro.
+    Also has args, which is an array of strings.
+* endmacro
+    The end of a macro definition. Is also added later to mark
+    the end of an expanded macro.
+* macrocall
+    The value of 'macrocall' is the name of the macro to call.
+    Has params, which is an array of parameter values, which
+    may be number, strings, or expressions.
+* equ
+    The value of 'equ' is a number or an expression. The value
+    is assigned to all immediately preceding labels (later).
+* bytes (an instruction)
+    A Z80 instruction has a bytes array, which contains the
+    bytes to store in memory. If there are expressions to evaluate,
+    they are in place of a byte. If it's an 8 bit value it takes
+    up a single space, if it's a 16 bit value it is followed by 
+    a null. e.g. [1, 2, {expression: 'a + b'}, null]
+
+2. getSymbols
+
+This gets a map of symbols and macros, and updates the ast so that
+block, endblock, macrodef and endmacro elements have prefix
+attributes, and updates label names to have appropriate prefixes.
+
+If a label is inside a block then it is assigned a prefix. The
+first block gets the prefix '%0_', so a variable in that block
+might be '%0_one'. If there is a nested block, it gets the prefix
+'%1_%0_'. The block numbers keep increasing, so another subsequent
+nested block at the same level might be '%2_%0_', and a later
+top level block would then be '%3_'. This is so that block scoped
+variables will have unique names.
+
+TODO:
+A macro's args are effectively local equs, so they should create
+symbol table entries with the macro's prefix, at the time that the 
+macro is expanded. Does this mean that the macro should be expanded
+before we get symbols? I think so.
+
+3. expandMacros
+
+Wherever a macrocall element is found, the expanded attribute is
+added to it, and the macro's ast content is inserted after the
+macrocall. The endmacro element is added after this.
+
+TODO:
+Should we add a block and endblock entry here, and a bunch of equs,
+so that the rest of the code works the same? It wouldn't be so neat
+though.
