@@ -1,13 +1,13 @@
 const maz = require('../build/compiler');
 
-describe('maz', function() {
+fdescribe('maz', function() {
     it('should get symbols', function() {
         const ast = [
             {label: 'one'},
             {label: 'two'},
         ];
         const symbols = maz.getSymbols(ast);
-        expect(symbols).toEqual({
+        expect(symbols[0]).toEqual({
             one: null,
             two: null
         });
@@ -21,7 +21,7 @@ describe('maz', function() {
             {label: 'two'},
         ];
         const symbols = maz.getSymbols(ast);
-        expect(symbols).toEqual({
+        expect(symbols[0]).toEqual({
             one: null,
             '%0_one': null,
             two: null
@@ -41,7 +41,7 @@ describe('maz', function() {
             {label: 'two'},
         ];
         const symbols = maz.getSymbols(ast);
-        expect(symbols).toEqual({
+        expect(symbols[0]).toEqual({
             one: null,
             '%0_one': null,
             '%1_one': null,
@@ -64,7 +64,7 @@ describe('maz', function() {
             {label: 'two'},
         ];
         const symbols = maz.getSymbols(ast);
-        expect(symbols).toEqual({
+        expect(symbols[0]).toEqual({
             one: null,
             '%0_one': null,
             '%1_%0_one': null,
@@ -93,7 +93,7 @@ describe('maz', function() {
             {label: 'two'},
         ];
         const symbols = maz.getSymbols(ast);
-        expect(symbols).toEqual({
+        expect(symbols[0]).toEqual({
             one: null,
             '%0_one': null,
             '%1_%0_one': null,
@@ -238,5 +238,152 @@ describe('maz', function() {
             { references: ['three'], bytes: [0, 0x34]},
             { references: ['three'], bytes: [0, 0x34, 0x12]}
         ])
+    });
+    it('should find macros', function() {
+        const ast = [
+            { macrodef: 'thing' },
+            { endmacro: true }
+        ];
+        const [symbols, macros] = maz.getSymbols(ast);
+        expect(macros).toEqual({
+            thing: {
+                args: [],
+                ast: []
+            }
+        })
+    });
+    it('should find macros with content', function() {
+        const ast = [
+            { macrodef: 'thing' },
+            { bytes: [1, 2, 3] },
+            { endmacro: true }
+        ];
+        const [symbols, macros] = maz.getSymbols(ast);
+        expect(macros).toEqual({
+            thing: {
+                args: [],
+                ast: [
+                    { bytes: [1, 2, 3] },
+                ]
+            }
+        })
+    });
+    it('should find macros with args', function() {
+        const ast = [
+            { macrodef: 'thing', args: ['a', 'b'] },
+            { bytes: [1, 2, 3] },
+            { endmacro: true }
+        ];
+        const [symbols, macros] = maz.getSymbols(ast);
+        expect(macros).toEqual({
+            thing: {
+                args: ['a', 'b'],
+                ast: [{ bytes: [1, 2, 3] }],
+            }
+        })
+    });
+    it('should not like nested macros', function() {
+        const ast = [
+            { macrodef: 'thing1' },
+            { macrodef: 'thing2' },
+            { endmacro: true },
+            { endmacro: true }
+        ];
+        expect(function() {
+            maz.getSymbols(ast);
+        }).toThrow();
+    });
+    it('should not like macros in blocks', function() {
+        const ast = [
+            { block: true },
+            { macrodef: 'thing2' },
+            { endmacro: true },
+            { endblock: true }
+        ];
+        expect(function() {
+            maz.getSymbols(ast);
+        }).toThrow();
+    });
+    it('should not like macros only starting in blocks', function() {
+        const ast = [
+            { block: true },
+            { macrodef: 'thing2' },
+            { endblock: true },
+            { endmacro: true },
+        ];
+        expect(function() {
+            maz.getSymbols(ast);
+        }).toThrow();
+    });
+    it('should not like macros only ending in blocks', function() {
+        const ast = [
+            { macrodef: 'thing2' },
+            { block: true },
+            { endmacro: true },
+            { endblock: true }
+        ];
+        expect(function() {
+            maz.getSymbols(ast);
+        }).toThrow();
+    });
+    it('should not like macros which don\'t end', function() {
+        const ast = [
+            { macrodef: 'thing2' },
+        ];
+        expect(function() {
+            maz.getSymbols(ast);
+        }).toThrow();
+    });
+    it('should not like macros which don\'t start', function() {
+        const ast = [
+            { endmacro: true },
+        ];
+        expect(function() {
+            maz.getSymbols(ast);
+        }).toThrow();
+    });
+    it('should expand macros', function() {
+        const ast = [
+            { macrodef: 'thing' },
+            { bytes: [1, 2, 3] },
+            { endmacro: true },
+            { bytes: [0] },
+            { macrocall: 'thing' },
+            { bytes: [4] }
+        ];
+        const [symbols, macros] = maz.getSymbols(ast);
+        maz.expandMacros(ast, symbols, macros);
+        expect(ast).toEqual([
+            { macrodef: 'thing', prefix: '%0_' },
+            { bytes: [1, 2, 3] },
+            { endmacro: true, prefix: '%0_' },
+            { bytes: [0] },
+            { macrocall: 'thing', expanded: true },
+            { bytes: [1, 2, 3] },
+            { endmacro: true },
+            { bytes: [4] }
+        ]);
+    });
+    it('should expand macros with params', function() {
+        const ast = [
+            { macrodef: 'thing', args: ['a', 'b'] },
+            { bytes: [1, 2, 3, {expression: 'a + b'}] },
+            { endmacro: true },
+            { bytes: [0] },
+            { macrocall: 'thing', params: [1,'hello'] },
+            { bytes: [4] }
+        ];
+        const [symbols, macros] = maz.getSymbols(ast);
+        maz.expandMacros(ast, symbols, macros);
+        expect(ast).toEqual([
+            { macrodef: 'thing', args: ['a', 'b'], prefix: '%0_' },
+            { bytes: [1, 2, 3] },
+            { endmacro: true, prefix: '%0_' },
+            { bytes: [0] },
+            { macrocall: 'thing', params: [1,'hello'], expanded: true },
+            { bytes: [1, 2, 3, {expression: 'a + b'}] },
+            { endmacro: true },
+            { bytes: [4] }
+        ]);
     });
 });

@@ -103,7 +103,11 @@ labellist = label:label list:(ws? ',' ws? labellist)? {
     return label;
 }
 
-endm = '.'? 'endm'i
+endm = '.'? 'endm'i {
+    return {
+        endmacro: true
+    }
+}
 
 macrocall = label:label args:(ws args)? {
     const result = {

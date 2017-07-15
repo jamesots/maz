@@ -14,7 +14,7 @@ export function compile(code, options) {
     try {
         const ast = parser.parse(code, parserOptions);
         // console.log(JSON.stringify(ast, undefined, 2));
-        const symbols = getSymbols(ast);
+        const [symbols, macros] = getSymbols(ast);
 
         assignPCandEQU(ast, symbols);
         evaluateSymbols(symbols);
@@ -42,6 +42,9 @@ export function compile(code, options) {
  */
 export function getSymbols(ast) {
     const symbols = {};
+    const macros = {};
+    let macro = undefined;
+    let macroName = undefined;
     let nextBlock = 0;
     let blocks = [];
     for (let i = 0; i < ast.length; i++) {
@@ -60,12 +63,45 @@ export function getSymbols(ast) {
         } else if (el.endblock) {
             el.prefix = labelPrefix(blocks);
             blocks.pop();
+        } else if (el.macrodef) {
+            if (macro) {
+                throw "Cannot nest macros";
+            }
+            if (blocks.length !== 0) {
+                throw "Macros must be at top level";
+            }
+            blocks.push(nextBlock);
+            el.prefix = labelPrefix(blocks);
+            nextBlock++;
+            macroName = el.macrodef;
+            macro = {
+                ast: [],
+                args: el.args || []
+            };
+        } else if (el.endmacro) {
+            if (!macro) {
+                throw "Not in a macro";
+            }
+            el.prefix = labelPrefix(blocks);
+            blocks.pop();
+            if (blocks.length !== 0) {
+                throw "Macros must be at top level";
+            }
+            macros[macroName] = macro;
+            macro = undefined;
+            macroName = undefined;
+        }
+        if (macro && !el.macrodef && !el.endmacro) {
+            macro.ast.push(el);
         }
     }
     if (blocks.length !== 0) {
         throw "Mismatch between .block and .endblock statements";
     }
-    return symbols;
+    if (macro) {
+        throw "Macro doesn't finish";
+    }
+    return [symbols, macros];
 }
 
 function labelPrefix(blocks: string[]) {
@@ -80,6 +116,22 @@ function labelName(blocks: string[], label) {
     return labelPrefix(blocks) + label;
 }
 
+export function expandMacros(ast, symbols, macros) {
+    for (let i = 0; i < ast.length; i++) {
+        const el = ast[i];
+        if (el.macrocall) {
+            const macro = macros[el.macrocall];
+            if (!macro) {
+                throw "Macro not found";
+            }
+            el.expanded = true;
+            ast.splice(i + 1, 0, ...macro.ast);
+            ast.splice(i + 1 + macro.ast.length, 0, { endmacro: true });
+            i += macro.ast.length + 1;
+        }
+    }
+}
+
 /**
  * Assign correct value to labels, based on PC. Starts at
  * 0, increments by bytes in ast or set by org.
@@ -89,7 +141,6 @@ function labelName(blocks: string[], label) {
  */
 export function assignPCandEQU(ast, symbols) {
     let pc = 0;
-    let blocks = [];
     for (let i = 0; i < ast.length; i++) {
         const el = ast[i];
         if (el.label) {
@@ -107,10 +158,6 @@ export function assignPCandEQU(ast, symbols) {
             }
         } else if (el.org) {
             pc = el.org;
-        } else if (el.block) {
-            blocks.push(el.prefix);
-        } else if (el.endblock) {
-            blocks.pop();
         } else {
             el.address = pc;
             
