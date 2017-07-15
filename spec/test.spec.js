@@ -1246,4 +1246,17 @@ nop`);
         expect(result[1].equ).toEqual(6);
         // console.log(JSON.stringify(result));
     });
+    it('should parse macrocall', function() {
+        const result = parse('thing');
+        expect(result[0]).toEqual({
+            macrocall: 'thing'
+        });
+    });
+    it('should parse macrocall with args', function() {
+        const result = parse('thing 1, 2,3');
+        expect(result[0]).toEqual({
+            macrocall: 'thing',
+            args: [1,2,3]
+        });
+    });
 });

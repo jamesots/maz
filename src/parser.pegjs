@@ -87,9 +87,25 @@ macro = '.'? 'macro'i ws label
 
 endm = '.'? 'endm'i
 
-macrocall = label (ws exprlist)?
+macrocall = label:label list:(ws exprlist)? {
+    const result = {
+        macrocall: label
+    }
+    if (list) {
+        result.args = list[1];
+    }
+    return result;
+}
 
-exprlist = expr ws? ',' exprlist
+exprlist = expr:expr list:(ws? ',' ws? exprlist)? {
+    if (!Array.isArray(expr)) {
+        expr = [expr];
+    }
+    if (list) {
+        return expr.concat(list[3]);
+    }
+    return expr;
+}
 
 equ = '.'? 'equ'i ws expr:expr {
     return {
