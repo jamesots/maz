@@ -142,7 +142,7 @@ export function expandMacros(ast, macros) {
         if (el.macrocall) {
             const macro = macros[el.macrocall];
             if (!macro) {
-                throw "Macro not found";
+                throw "Macro not found: " + el.macrocall;
             }
             el.params = JSON.parse(JSON.stringify(macro.params));
             el.expanded = true;
