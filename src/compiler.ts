@@ -282,6 +282,7 @@ export function updateBytes(ast, symbols) {
             for (let i = 0; i < el.bytes.length; i++) {
                 const byte = el.bytes[i];
                 if (byte && byte.expression) {
+                    console.log('>> ' + byte.expression);
                     const expr = Parser.parse(byte.expression);
                     const variables = expr.variables();
 
@@ -298,12 +299,22 @@ export function updateBytes(ast, symbols) {
                             // evaluateSymbol(subVar, symbols, evaluated);
                         }
                         subVars[variable] = symbols[subVar];
+                        console.log('>>>> ' + symbols[subVar]);
                     }
 
-                    const value = expr.evaluate(subVars);
-                    el.bytes[i] = value & 0xFF;
-                    if (el.bytes[i + 1] === null) {
-                        el.bytes[i + 1] = (value & 0xFF00) >> 8;
+                    const value = expr.evaluate(subVars) as any;
+                    console.log('>>>>>> ' + value);
+                    if (typeof value === 'string') {
+                        let bytes = [];
+                        for (let i = 0; i < value.length; i++) {
+                            bytes.push(value.charCodeAt(i));
+                        }
+                        el.bytes.splice(i, 1, ...bytes);
+                    } else {
+                        el.bytes[i] = value & 0xFF;
+                        if (el.bytes[i + 1] === null) {
+                            el.bytes[i + 1] = (value & 0xFF00) >> 8;
+                        }
                     }
                 }
             }
