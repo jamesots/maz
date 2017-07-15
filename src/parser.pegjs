@@ -83,16 +83,34 @@ org = '.'? 'org'i ws expr:expr {
     }
 }
 
-macro = '.'? 'macro'i ws label
+macro = '.'? 'macro'i ws label:label params:(ws? labellist)? {
+    const result = {
+        macrodef: label
+    }
+    if (params) {
+        result.params = params[1];
+    }
+    return result;
+}
+
+labellist = label:label list:(ws? ',' ws? labellist)? {
+    if (!Array.isArray(label)) {
+        label = [label];
+    }
+    if (list) {
+        return label.concat(list[3]);
+    }
+    return label;
+}
 
 endm = '.'? 'endm'i
 
-macrocall = label:label list:(ws exprlist)? {
+macrocall = label:label args:(ws args)? {
     const result = {
         macrocall: label
     }
-    if (list) {
-        result.args = list[1];
+    if (args) {
+        result.args = args[1];
     }
     return result;
 }
@@ -106,6 +124,19 @@ exprlist = expr:expr list:(ws? ',' ws? exprlist)? {
     }
     return expr;
 }
+
+args = arg1:arg arg2:(ws? ',' ws? args)? {
+    if (!Array.isArray(arg1)) {
+        arg1 = [arg1];
+    }
+    if (arg2) {
+        arg1 = arg1.concat(arg2[3]);
+    }
+    return arg1;
+}
+
+arg = string
+    / expr
 
 equ = '.'? 'equ'i ws expr:expr {
     return {

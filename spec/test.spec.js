@@ -1259,4 +1259,24 @@ nop`);
             args: [1,2,3]
         });
     });
+    it('should parse macrocall with args', function() {
+        const result = parse('thing 1, a, "hello"');
+        expect(result[0]).toEqual({
+            macrocall: 'thing',
+            args: [1,{expression:'a'},'hello']
+        });
+    });
+    it('should parse macrodef', function() {
+        const result = parse('macro thing');
+        expect(result[0]).toEqual({
+            macrodef: 'thing'
+        });
+    });
+    it('should parse macrodef with params', function() {
+        const result = parse('macro thing a, b, c');
+        expect(result[0]).toEqual({
+            macrodef: 'thing',
+            params: ['a', 'b', 'c']
+        });
+    });
 });
