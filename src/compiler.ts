@@ -13,8 +13,11 @@ export function compile(code, options) {
     }
     try {
         const ast = parser.parse(code, parserOptions);
-        // console.log(JSON.stringify(ast, undefined, 2));
+        console.log(JSON.stringify(ast, undefined, 2));
         const [symbols, macros] = getSymbols(ast);
+
+        expandMacros(ast, symbols, macros);
+        console.log(JSON.stringify(ast, undefined, 2));
 
         assignPCandEQU(ast, symbols);
         evaluateSymbols(symbols);
@@ -158,7 +161,7 @@ export function assignPCandEQU(ast, symbols) {
             }
         } else if (el.org) {
             pc = el.org;
-        } else {
+        } else if (el.bytes) {
             el.address = pc;
             
             // need special case for phase, ds, ...?
@@ -233,12 +236,37 @@ export function evaluateSymbols(symbols) {
 }
 
 export function updateBytes(ast, symbols) {
+    const prefixes = [];
     for (const el of ast) {
+        if (el.block || el.macrocall) {
+            prefixes.push(el.prefix);
+        }
+        if (el.endblock || el.endmacro) {
+            prefixes.pop();
+        }
         if (el.references) {
             for (let i = 0; i < el.bytes.length; i++) {
                 const byte = el.bytes[i];
                 if (byte && byte.expression) {
-                    const value = Parser.evaluate(byte.expression, symbols);
+                    const expr = Parser.parse(byte.expression);
+                    const variables = expr.variables();
+
+                    const subVars = {}; // substitute variables
+                    const prefix = prefixes[prefixes.length - 1] || '';
+                    for (const variable of variables) {
+                        const subVar = findVariable(symbols, prefix, variable);
+
+                        if (symbols[subVar] === undefined) {
+                            throw 'Symbol not found: ' + variable;
+                        }
+                        if (symbols[subVar].expression) {
+                            throw 'Symbol not evaluated: ' + variable
+                            // evaluateSymbol(subVar, symbols, evaluated);
+                        }
+                        subVars[variable] = symbols[subVar];
+                    }
+
+                    const value = expr.evaluate(subVars);
                     el.bytes[i] = value & 0xFF;
                     if (el.bytes[i + 1] === null) {
                         el.bytes[i + 1] = (value & 0xFF00) >> 8;

@@ -239,6 +239,33 @@ fdescribe('maz', function() {
             { references: ['three'], bytes: [0, 0x34, 0x12]}
         ])
     });
+    it('should update bytes with scope', function() {
+        const ast = [
+            { label: 'one' },
+            { equ: 1 },
+            { block: true, prefix: '%0_'},
+            { label: '%0_one' },
+            { equ: 2 },
+            { bytes: [ {expression: 'one'}], references: ['one']},
+            { endblock: true, prefix: '%0_'},
+            { bytes: [ {expression: 'one'}], references: ['one']}
+        ];
+        const symbols = {
+            one: 1,
+            '%0_one': 2
+        }
+        maz.updateBytes(ast, symbols);
+        expect(ast).toEqual([
+            { label: 'one' },
+            { equ: 1 },
+            { block: true, prefix: '%0_'},
+            { label: '%0_one' },
+            { equ: 2 },
+            { bytes: [ 2 ], references: ['one']},
+            { endblock: true, prefix: '%0_'},
+            { bytes: [ 1 ], references: ['one']}
+        ])
+    });
     it('should find macros', function() {
         const ast = [
             { macrodef: 'thing' },
@@ -377,7 +404,7 @@ fdescribe('maz', function() {
         maz.expandMacros(ast, symbols, macros);
         expect(ast).toEqual([
             { macrodef: 'thing', args: ['a', 'b'], prefix: '%0_' },
-            { bytes: [1, 2, 3] },
+            { bytes: [1, 2, 3, {expression: 'a + b'}] },
             { endmacro: true, prefix: '%0_' },
             { bytes: [0] },
             { macrocall: 'thing', params: [1,'hello'], expanded: true },
