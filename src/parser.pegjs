@@ -36,7 +36,7 @@
     }
 }
 
-start = ws? stmts:statements? ws? { return stmts; }
+start = wsnl? stmts:statements? wsnl? { return stmts; }
 
 statements = stmt:statement [ \t]* comment? stmts:(separator+ statements?)? {
         if (!Array.isArray(stmt)) {
@@ -63,6 +63,7 @@ labelled_statement = label:labeldef ws? stmt:unlabelled_statement {
 
 unlabelled_statement = directive
     / code
+    / macrocall
     / comment
 
 directive = org
@@ -85,6 +86,10 @@ org = '.'? 'org'i ws expr:expr {
 macro = '.'? 'macro'i ws label
 
 endm = '.'? 'endm'i
+
+macrocall = label (ws exprlist)?
+
+exprlist = expr ws? ',' exprlist
 
 equ = '.'? 'equ'i ws expr:expr {
     return {
@@ -1074,7 +1079,8 @@ ixyhl = 'ixh'i { return [0xdd, 0]; }
     / 'iyh'i { return [0xfd, 0]; }
     / 'iyl'i { return [0xfd, 1]; }
 
-ws = [ \t\r\n]+
+ws = [ \t]+
+wsnl = [ \t\r\n]+
 
 expr = t1:term t2:(ws? [+-] ws? term)* {
         let result = t1;
