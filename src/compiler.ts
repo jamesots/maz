@@ -162,8 +162,17 @@ export function expandMacros(ast, macros) {
  */
 export function assignPCandEQU(ast, symbols) {
     let pc = 0;
+    let inMacro = false;
     for (let i = 0; i < ast.length; i++) {
         const el = ast[i];
+        if (el.macrodef) {
+            inMacro = true;
+        } else if (el.endmacro) {
+            inMacro = false;
+        }
+        if (inMacro) {
+            continue;
+        }
         if (el.label) {
             symbols[el.label] = pc;
             continue;
@@ -304,8 +313,14 @@ export function updateBytes(ast, symbols) {
 
 export function getBytes(ast) {
     let bytes = [];
+    let inMacro = false;
     for (const el of ast) {
-        if (el.bytes) {
+        if (el.macrodef) {
+            inMacro = true;
+        } else if (el.endmacro) {
+            inMacro = false;
+        }
+        if (el.bytes && !inMacro) {
             bytes = bytes.concat(el.bytes);
         }
     }

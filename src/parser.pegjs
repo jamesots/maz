@@ -75,7 +75,11 @@ directive = org
     / endblock
     // etc
 
-comment = ';' [^\n]*
+comment = ';' comment:([^\n]*) {
+    return {
+        comment: comment.join('')
+    };
+}
 
 org = '.'? 'org'i ws expr:expr {
     return {
