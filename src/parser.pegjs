@@ -23,10 +23,18 @@
         }];
     }
 
+    function loc() {
+        return {
+            line: location().start.line,
+            column: location().start.column
+        };
+    }
+
     function res(bytes) {
         const result = {
             text: text(),
-            bytes: bytes
+            bytes: bytes,
+            location: loc()
         };
         const references = bytes.filter(byte => byte && byte.expression).map(byte => byte.expression);
         if (references.length > 0) {
@@ -77,19 +85,22 @@ directive = org
 
 comment = ';' comment:([^\n]*) {
     return {
-        comment: comment.join('')
+        comment: comment.join(''),
+        location: loc()
     };
 }
 
 org = '.'? 'org'i ws expr:expr {
     return {
-        org: expr
+        org: expr,
+        location: loc()
     }
 }
 
 macro = '.'? 'macro'i ws label:label params:(ws? labellist)? {
     const result = {
-        macrodef: label
+        macrodef: label,
+        location: loc()
     }
     if (params) {
         result.params = params[1];
@@ -109,13 +120,15 @@ labellist = label:label list:(ws? ',' ws? labellist)? {
 
 endm = '.'? 'endm'i {
     return {
-        endmacro: true
+        endmacro: true,
+        location: loc()
     }
 }
 
 macrocall = label:label args:(ws args)? {
     const result = {
-        macrocall: label
+        macrocall: label,
+        location: loc()
     }
     if (args) {
         result.args = args[1];
@@ -148,7 +161,8 @@ arg = string
 
 equ = '.'? 'equ'i ws expr:expr {
     return {
-        equ: expr
+        equ: expr,
+        location: loc()
     }
 }
 
@@ -213,19 +227,22 @@ hex_escape_sequence = "x" digits:$([0-9a-f]i [0-9a-f]i) {
 
 block = '.block'i {
     return {
-        block: true
+        block: true,
+        location: loc()
     };
 }
 
 endblock = '.endblock'i {
     return {
-        endblock: true
+        endblock: true,
+        location: loc()
     };
 }
 
 labeldef = label:label ':' {
     return {
-        label: label
+        label: label,
+        location: loc()
     }
 }
 

@@ -49,7 +49,7 @@ export function getMacros(ast) {
         const el = ast[i];
         if (el.macrodef) {
             if (macro) {
-                throw "Cannot nest macros";
+                throw "Cannot nest macros " + location(el);
             }
             macroName = el.macrodef;
             macro = {
@@ -58,7 +58,7 @@ export function getMacros(ast) {
             };
         } else if (el.endmacro) {
             if (!macro) {
-                throw "Not in a macro";
+                throw "Not in a macro " + location(el);
             }
             macros[macroName] = macro;
             macro = undefined;
@@ -136,13 +136,17 @@ function labelName(blocks: string[], label) {
     return labelPrefix(blocks) + label;
 }
 
+function location(el) {
+    return `(${el.location.line}:${el.location.column})`;
+}
+
 export function expandMacros(ast, macros) {
     for (let i = 0; i < ast.length; i++) {
         const el = ast[i];
         if (el.macrocall) {
             const macro = macros[el.macrocall];
             if (!macro) {
-                throw "Macro not found: " + el.macrocall;
+                throw "Unknown instruction/macro: " + el.macrocall + " " + location(el);
             }
             el.params = JSON.parse(JSON.stringify(macro.params));
             el.expanded = true;
@@ -184,7 +188,7 @@ export function assignPCandEQU(ast, symbols) {
                     ii--;
                 }
             } else {
-                console.log("Error: equ has no label");
+                console.log("Error: equ has no label " + location(el));
             }
         } else if (el.org) {
             pc = el.org;
@@ -250,10 +254,10 @@ export function getWholePrefix(symbol) {
 }
 
 export function evaluateSymbols(symbols) {
-    console.log('eval symbols ' + JSON.stringify(symbols, undefined, 2));
+    // console.log('eval symbols ' + JSON.stringify(symbols, undefined, 2));
     const evaluated = [];
     for (const symbol in symbols) {
-        console.log('evaluate ' + symbol);
+        // console.log('evaluate ' + symbol);
         if (symbols[symbol].expression) {
             if (evaluated.indexOf(symbol) !== -1) {
                 continue;
@@ -282,7 +286,6 @@ export function updateBytes(ast, symbols) {
             for (let i = 0; i < el.bytes.length; i++) {
                 const byte = el.bytes[i];
                 if (byte && byte.expression) {
-                    console.log('>> ' + byte.expression);
                     const expr = Parser.parse(byte.expression);
                     const variables = expr.variables();
 
@@ -292,18 +295,16 @@ export function updateBytes(ast, symbols) {
                         const subVar = findVariable(symbols, prefix, variable);
 
                         if (symbols[subVar] === undefined) {
-                            throw 'Symbol cannot be found: ' + variable;
+                            throw 'Symbol cannot be found: ' + variable + " " + location(el);
                         }
                         if (symbols[subVar].expression) {
-                            throw 'Symbol not evaluated: ' + variable
+                            throw 'Symbol not evaluated: ' + variable + " " + location(el);
                             // evaluateSymbol(subVar, symbols, evaluated);
                         }
                         subVars[variable] = symbols[subVar];
-                        console.log('>>>> ' + symbols[subVar]);
                     }
 
                     const value = expr.evaluate(subVars) as any;
-                    console.log('>>>>>> ' + value);
                     if (typeof value === 'string') {
                         let bytes = [];
                         for (let i = 0; i < value.length; i++) {
