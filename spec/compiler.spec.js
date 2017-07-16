@@ -393,8 +393,8 @@ fdescribe('maz', function() {
         ];
         const symbols = maz.getSymbols(ast);
         expect(symbols).toEqual({
-            '%0_a': null,
-            '%0_b': null
+            '%0_a': 1,
+            '%0_b': 'hello'
         });
     })
 });
