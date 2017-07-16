@@ -1,6 +1,6 @@
 const maz = require('../build/compiler');
 
-fdescribe('maz', function() {
+describe('maz', function() {
     it('should get symbols', function() {
         const ast = [
             {label: 'one'},
