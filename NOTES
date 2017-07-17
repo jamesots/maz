@@ -30,11 +30,12 @@ size: equ 100
 How compilation works
 
 1. parse
-2. getSymbols
+2. getMacros
 3. expandMacros
-4. assignPCandEQU
-5. evaluateSymbols
-6. updateBytes
+4. getSymbols
+5. assignPCandEQU
+6. evaluateSymbols
+7. updateBytes
 
 1. parse
 
@@ -71,25 +72,10 @@ truthy on the object:
     up a single space, if it's a 16 bit value it is followed by 
     a null. e.g. [1, 2, {expression: 'a + b'}, null]
 
-2. getSymbols
+2. getMacros
 
-This gets a map of symbols and macros, and updates the ast so that
-block, endblock, macrodef and endmacro elements have prefix
-attributes, and updates label names to have appropriate prefixes.
-
-If a label is inside a block then it is assigned a prefix. The
-first block gets the prefix '%0_', so a variable in that block
-might be '%0_one'. If there is a nested block, it gets the prefix
-'%1_%0_'. The block numbers keep increasing, so another subsequent
-nested block at the same level might be '%2_%0_', and a later
-top level block would then be '%3_'. This is so that block scoped
-variables will have unique names.
-
-TODO:
-A macro's args are effectively local equs, so they should create
-symbol table entries with the macro's prefix, at the time that the 
-macro is expanded. Does this mean that the macro should be expanded
-before we get symbols? I think so.
+Macros are found in the ast and a map from macro name to the
+ast for the macro is returned.
 
 3. expandMacros
 
@@ -97,7 +83,19 @@ Wherever a macrocall element is found, the expanded attribute is
 added to it, and the macro's ast content is inserted after the
 macrocall. The endmacro element is added after this.
 
-TODO:
-Should we add a block and endblock entry here, and a bunch of equs,
-so that the rest of the code works the same? It wouldn't be so neat
-though.
+4. getSymbols
+
+This gets a map of symbols, and updates the ast so that
+block, endblock, macrodef and endmacro elements have prefix
+attributes, and updates label names to have appropriate prefixes.
+
+If a label is inside a block or macro then it is assigned a prefix. The
+first block gets the prefix '%0_', so a variable in that block
+might be '%0_one'. If there is a nested block, it gets the prefix
+'%1_%0_'. The block numbers keep increasing, so another subsequent
+nested block at the same level might be '%2_%0_', and a later
+top level block would then be '%3_'. This is so that block scoped
+variables will have unique names.
+
+The parameters to a macro are added a symbols with the macro's prefix,
+and their values are also initialized.
