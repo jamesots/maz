@@ -14,6 +14,49 @@
         return term;
     }
 
+    function plusMinus(t1, t2, operator) {
+        if (operator === '+') {
+            return t1 + t2;
+        }
+        return t1 - t2;
+    }
+
+    function shift(t1, t2, operator) {
+        if (operator === '<<') {
+            return t1 << t2;
+        }
+        return t1 >> t2;
+    }
+
+    function isString(term) {
+        return typeof term === 'string' && term.length !== 1;
+    }
+
+    function toNumber(term) {
+        if (typeof term === 'string' && term.length === 1) {
+            return term.charCodeAt(0);
+        }
+        if (typeof term === 'number') {
+            return term;
+        }
+        throw `Cannot cast "${term}" to a number`;
+    }
+
+    function timesDivideMod(t1, t2, operator) {
+        if (operator === '*') {
+            if (isString(t1)) {
+                return t1.repeat(toNumber(t2));
+            }
+            if (isString(t2)) {
+                return t2.repeat(toNumber(t1));
+            }
+            return toNumber(t1) * toNumber(t2);
+        } else if (operator === '/') {
+            return toNumber(t1) / toNumber(t2);
+        }
+        return toNumber(t1) % toNumber(t2);
+    }
+
     function expr16(expr) {
         if (expr.expression) {
             return [expr, null]
@@ -51,64 +94,48 @@ label = text1:[a-zA-Z] text2:[a-zA-Z0-9_]* !{
 ws = [ \t]+
 wsnl = [ \t\r\n]+
 
-expr = t1:term t2:(ws? [+-] ws? term)* {
+expr = shift
+
+shift = t1:plusminus t2:(ws? ('<<'/'>>') ws? plusminus)* {
         let result = lookupVar(t1);
         for (const group of t2) {
+            const operator = group[1];
             const term = lookupVar(group[3]);
-            if (typeof term === 'number') {
-                if (typeof result === 'number') {
-                    result += term;
-                } else {
-                    if (result.length === 1) {
-                        result = result.charCodeAt(0) + term;
-                    } else {
-                        throw `Cannot add number (${result}) and string (${term})`;
-                    }
-                }
+            if (isString(term) || isString(result)) {
+                throw `Cannot shift strings (${result}, ${term})`;
+            }
+            
+            result = shift(toNumber(result), toNumber(term), operator);
+        }
+        return result;
+    }
+
+plusminus = t1:term t2:(ws? [+-] ws? term)* {
+        let result = lookupVar(t1);
+        for (const group of t2) {
+            const operator = group[1];
+            const term = lookupVar(group[3]);
+            if (isString(term) && isString(result) && operator == '+') {
+                result = result + term;
             } else {
-                if (typeof result === 'string') {
-                    result += term;
-                } else {
-                    if (term.length === 1) {
-                        result += term.charCodeAt(0);
-                    } else {
-                        throw `Cannot add string (${result}) and number (${term})`;
-                    }
-                }
+                result = plusMinus(toNumber(result), toNumber(term), operator);
             }
         }
         return result;
     }
 
-term = t1:factor t2:(ws? [*/] ws? factor)* {
+term = t1:factor t2:(ws? [*/%] ws? factor)* {
         let result = t1;
         for (const group of t2) {
+            const operator = group[1];
             const term = lookupVar(group[3]);
-            if (typeof term === 'number') {
-                if (typeof result === 'number') {
-                    result *= term;
-                } else {
-                    if (result.length === 1) {
-                        result = result.charCodeAt(0) * term;
-                    } else {
-                        result = result.repeat(term);
-                    }
-                }
-            } else {
-                if (typeof result === 'string') {
-                    if (result.length === 1 && term.length === 1) {
-                        result = term.charCodeAt(0) * result.charCodeAt(0);
-                    } else {
-                        throw `Cannot multiple two strings (${result}, ${term})`;
-                    }
-                } else {
-                    if (term.length === 1) {
-                        result = term.charCodeAt(0) * result;
-                    } else {
-                        result = term.repeat(result);
-                    }
-                }
+            if (isString(term) && isString(result) && operator === '*') {
+                throw `Cannot multiply two strings (${result}, ${term})`;
             }
+            if ((isString(term) || isString(result)) && operator !== '*') {
+                throw `Cannot ${operator} strings (${result}, ${term})`;
+            }
+            result = timesDivideMod(result, term, operator);
         }
         return result;
     }

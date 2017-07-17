@@ -11,6 +11,11 @@ fdescribe('expr', function() {
         expect(result).toBe(128);
     });
 
+    it('should subtract numbers', function() {
+        const result = expr.parse(`123 - 5`);
+        expect(result).toBe(118);
+    });
+
     it('should add multiple numbers', function() {
         const result = expr.parse(`123 + 5 + 12`);
         expect(result).toBe(140);
@@ -123,5 +128,20 @@ fdescribe('expr', function() {
             str: 'BOB'
         }});
         expect(result).toBe('BOB'.repeat(65 + 2));
+    });
+
+    it('should shift numbers left', function() {
+        const result = expr.parse(`1 << 2`);
+        expect(result).toBe(4);
+    });
+
+    it('should shift numbers right', function() {
+        const result = expr.parse(`8 >> 2`);
+        expect(result).toBe(2);
+    });
+
+    it('should shift numbers right, test precedence', function() {
+        const result = expr.parse(`6 + 2 >> 2`);
+        expect(result).toBe(2);
     });
 });
