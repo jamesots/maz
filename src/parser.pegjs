@@ -1192,12 +1192,12 @@ decimal_literal = [0-9][0-9_]* {
 hex_literal = '$' [0-9a-f]i[0-9a-f_]i* {
         return parseInt(text().replace(/[_\$]/g,''), 16);
     }
-    / [0-9a-fA-F][0-9a-f_]i* 'h' ![a-z0-9_]i {
+    / [0-9a-f][0-9a-f_]i* 'h' {
         return parseInt(text().replace(/[_h]/g,''), 16)
     }
-binary_literal = [01][01_]* 'b' ![a-z0-9_]i {
+binary_literal = [01][01_]* 'b' {
         return parseInt(text().replace(/[_b]/g,''), 2)
     }
-octal_literal = [0-7][0-7_]* 'o' ![a-z0-9_]i {
+octal_literal = [0-7][0-7_]* 'o' {
         return parseInt(text().replace(/[_o]/g,''), 8)
     }

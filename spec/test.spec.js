@@ -1,7 +1,7 @@
 const parser = require('../build/parser');
 const Tracer = require('pegjs-backtrace');
 
-fdescribe('parser', function() {
+describe('parser', function() {
     function parse(text) {
         const tracer = new Tracer(text);
         try {

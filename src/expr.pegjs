@@ -135,7 +135,7 @@ decimal_literal = [0-9][0-9_]* {
 hex_literal = '$' [0-9a-f]i[0-9a-f_]i* {
         return parseInt(text().replace(/[_\$]/g,''), 16);
     }
-    / [0-9a-fA-F][0-9a-f_]i* 'h' {
+    / [0-9][0-9a-f_]i* 'h' {
         return parseInt(text().replace(/[_h]/g,''), 16)
     }
 binary_literal = [01][01_]* 'b' {

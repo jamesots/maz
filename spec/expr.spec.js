@@ -116,7 +116,7 @@ fdescribe('expr', function() {
         expect(result).toBe(125);
     });
 
-    fit('should use variables', function() {
+    it('should use variables', function() {
         const result = expr.parse(`(num + chr) * str`, {variables: {
             num: 2,
             chr: 'A',
