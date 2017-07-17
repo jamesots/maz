@@ -23,10 +23,18 @@
         }];
     }
 
+    function loc() {
+        return {
+            line: location().start.line,
+            column: location().start.column
+        };
+    }
+
     function res(bytes) {
         const result = {
             text: text(),
-            bytes: bytes
+            bytes: bytes,
+            location: loc()
         };
         const references = bytes.filter(byte => byte && byte.expression).map(byte => byte.expression);
         if (references.length > 0) {
@@ -75,17 +83,24 @@ directive = org
     / endblock
     // etc
 
-comment = ';' [^\n]*
+comment = ';' comment:([^\n]*) {
+    return {
+        comment: comment.join(''),
+        location: loc()
+    };
+}
 
 org = '.'? 'org'i ws expr:expr {
     return {
-        org: expr
+        org: expr,
+        location: loc()
     }
 }
 
 macro = '.'? 'macro'i ws label:label params:(ws? labellist)? {
     const result = {
-        macrodef: label
+        macrodef: label,
+        location: loc()
     }
     if (params) {
         result.params = params[1];
@@ -105,13 +120,15 @@ labellist = label:label list:(ws? ',' ws? labellist)? {
 
 endm = '.'? 'endm'i {
     return {
-        endmacro: true
+        endmacro: true,
+        location: loc()
     }
 }
 
 macrocall = label:label args:(ws args)? {
     const result = {
-        macrocall: label
+        macrocall: label,
+        location: loc()
     }
     if (args) {
         result.args = args[1];
@@ -144,7 +161,8 @@ arg = string
 
 equ = '.'? 'equ'i ws expr:expr {
     return {
-        equ: expr
+        equ: expr,
+        location: loc()
     }
 }
 
@@ -209,23 +227,26 @@ hex_escape_sequence = "x" digits:$([0-9a-f]i [0-9a-f]i) {
 
 block = '.block'i {
     return {
-        block: true
+        block: true,
+        location: loc()
     };
 }
 
 endblock = '.endblock'i {
     return {
-        endblock: true
+        endblock: true,
+        location: loc()
     };
 }
 
 labeldef = label:label ':' {
     return {
-        label: label
+        label: label,
+        location: loc()
     }
 }
 
-label = text1:[a-zA-Z] text2:[a-zA-Z0-9_]* !{
+label = text1:[a-zA-Z_] text2:[a-zA-Z0-9_]* !{
         const text = text1 + text2.join('');
         return (text === 'bc' || text === 'de' || text === 'hl' || text === 'sp');
     } {
@@ -861,43 +882,43 @@ sbc_a_n = 'sbc'i ws 'a'i ws? ',' ws? expr:expr {
 sbc_hl_bcdehlsp = 'sbc'i ws 'hl'i ws? ',' ws? reg:bcdehlsp {
     return res([0xed, 0x42 | (reg << 4)])
 }
-add_a_reg = 'add'i ws 'a'i ws? ',' ws? reg:reg {
+add_a_reg = 'add'i ws 'a'i ws? ',' ws? reg:reg ![a-z0-9_]i {
     return res([0x80 | reg]);
 }
-adc_a_reg = 'adc'i ws 'a'i ws? ',' ws? reg:reg {
+adc_a_reg = 'adc'i ws 'a'i ws? ',' ws? reg:reg ![a-z0-9_]i {
     return res([0x88 | reg]);
 }
-sub_a_reg = 'sub'i ws 'a'i ws? ',' ws? reg:reg {
+sub_a_reg = 'sub'i ws 'a'i ws? ',' ws? reg:reg ![a-z0-9_]i {
         return res([0x90 | reg]);
     }
-sub_reg = 'sub'i ws reg:reg {
+sub_reg = 'sub'i ws reg:reg ![a-z0-9_]i {
         return res([0x90 | reg]);
     }
-sbc_a_reg = 'sbc'i ws 'a'i ws? ',' ws? reg:reg {
+sbc_a_reg = 'sbc'i ws 'a'i ws? ',' ws? reg:reg ![a-z0-9_]i {
     return res([0x98 | reg]);
 }
-and_a_reg = 'and'i ws 'a'i ws? ',' ws? reg:reg {
+and_a_reg = 'and'i ws 'a'i ws? ',' ws? reg:reg ![a-z0-9_]i {
         return res([0xa0 | reg]);
     }
-and_reg = 'and'i ws reg:reg {
+and_reg = 'and'i ws reg:reg ![a-z0-9_]i {
         return res([0xa0 | reg]);
     }
-xor_a_reg = 'xor'i ws 'a'i ws? ',' ws? reg:reg {
+xor_a_reg = 'xor'i ws 'a'i ws? ',' ws? reg:reg ![a-z0-9_]i {
         return res([0xa8 | reg]);
     }
-xor_reg = 'xor'i ws reg:reg {
+xor_reg = 'xor'i ws reg:reg ![a-z0-9_]i {
         return res([0xa8 | reg]);
     }
-or_a_reg = 'or'i ws 'a'i ws? ',' ws? reg:reg {
+or_a_reg = 'or'i ws 'a'i ws? ',' ws? reg:reg ![a-z0-9_]i {
         return res([0xb0 | reg]);
     }
-or_reg = 'or'i ws reg:reg {
+or_reg = 'or'i ws reg:reg ![a-z0-9_]i {
         return res([0xb0 | reg]);
     }
-cp_a_reg = 'cp'i ws 'a'i ws? ',' ws? reg:reg {
+cp_a_reg = 'cp'i ws 'a'i ws? ',' ws? reg:reg ![a-z0-9_]i {
         return res([0xb8 | reg]);
     }
-cp_reg = 'cp'i ws reg:reg {
+cp_reg = 'cp'i ws reg:reg  ![a-z0-9_]i ![a-z0-9_]i {
         return res([0xb8 | reg]);
     }
 ret_nzncpop = 'ret'i ws cond:nzncpop {
@@ -930,7 +951,7 @@ ld_r_a = 'ld'i ws 'r'i ws? ',' ws? 'a' {
 ld_a_r = 'ld'i ws 'a'i ws? ',' ws? 'r' {
     return res([0xed, 0x5f]);
 }
-ld_r_r = 'ld'i ws reg1:reg ws? ',' ws? reg2:reg ! {
+ld_r_r = 'ld'i ws reg1:reg ws? ',' ws? reg2:reg ![a-z0-9_]i ! {
     return reg1 === 6 && reg2 === 6;
     } {
     return res([0x40 | (reg1 << 3) | reg2]);
@@ -1171,12 +1192,12 @@ decimal_literal = [0-9][0-9_]* {
 hex_literal = '$' [0-9a-f]i[0-9a-f_]i* {
         return parseInt(text().replace(/[_\$]/g,''), 16);
     }
-    / [0-9a-fA-F][0-9a-f_]i* 'h' {
+    / [0-9a-fA-F][0-9a-f_]i* 'h' ![a-z0-9_]i {
         return parseInt(text().replace(/[_h]/g,''), 16)
     }
-binary_literal = [01][01_]* 'b' {
+binary_literal = [01][01_]* 'b' ![a-z0-9_]i {
         return parseInt(text().replace(/[_b]/g,''), 2)
     }
-octal_literal = [0-7][0-7_]* 'o' {
+octal_literal = [0-7][0-7_]* 'o' ![a-z0-9_]i {
         return parseInt(text().replace(/[_o]/g,''), 8)
     }

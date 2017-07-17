@@ -49,16 +49,16 @@ export function getMacros(ast) {
         const el = ast[i];
         if (el.macrodef) {
             if (macro) {
-                throw "Cannot nest macros";
+                throw "Cannot nest macros " + location(el);
             }
             macroName = el.macrodef;
             macro = {
                 ast: [],
-                args: el.args || []
+                params: el.params || []
             };
         } else if (el.endmacro) {
             if (!macro) {
-                throw "Not in a macro";
+                throw "Not in a macro " + location(el);
             }
             macros[macroName] = macro;
             macro = undefined;
@@ -82,9 +82,10 @@ export function getSymbols(ast) {
     const symbols = {};
     let nextBlock = 0;
     let blocks = [];
+    let inMacro = false;
     for (let i = 0; i < ast.length; i++) {
         const el = ast[i];
-        if (el.label) {
+        if (el.label && !inMacro) {
             if (blocks.length > 0) {
                 symbols[labelName(blocks, el.label)] = null;
                 el.label = labelName(blocks, el.label);
@@ -95,9 +96,26 @@ export function getSymbols(ast) {
             blocks.push(nextBlock);
             el.prefix = labelPrefix(blocks);
             nextBlock++;
-        } else if (el.endblock) {
+        } else if (el.endblock || el.endmacrocall) {
             el.prefix = labelPrefix(blocks);
             blocks.pop();
+        } else if (el.macrocall) {
+            blocks.push(nextBlock);
+            el.prefix = labelPrefix(blocks);
+            nextBlock++;
+            for (let j = 0; j < el.params.length; j++) {
+                const param = el.params[j];
+                if (blocks.length > 0) {
+                    symbols[labelName(blocks, param)] = el.args[j];
+                    el.params[j] = labelName(blocks, param);
+                } else {
+                    symbols[param] = null;
+                }
+            }
+        } else if (el.macrodef) {
+            inMacro = true;
+        } else if (el.endmacro) {
+            inMacro = false;
         }
     }
     if (blocks.length !== 0) {
@@ -118,17 +136,22 @@ function labelName(blocks: string[], label) {
     return labelPrefix(blocks) + label;
 }
 
+function location(el) {
+    return `(${el.location.line}:${el.location.column})`;
+}
+
 export function expandMacros(ast, macros) {
     for (let i = 0; i < ast.length; i++) {
         const el = ast[i];
         if (el.macrocall) {
             const macro = macros[el.macrocall];
             if (!macro) {
-                throw "Macro not found";
+                throw "Unknown instruction/macro: " + el.macrocall + " " + location(el);
             }
+            el.params = JSON.parse(JSON.stringify(macro.params));
             el.expanded = true;
             ast.splice(i + 1, 0, ...macro.ast);
-            ast.splice(i + 1 + macro.ast.length, 0, { endmacro: true });
+            ast.splice(i + 1 + macro.ast.length, 0, { endmacrocall: true });
             i += macro.ast.length + 1;
         }
     }
@@ -143,8 +166,17 @@ export function expandMacros(ast, macros) {
  */
 export function assignPCandEQU(ast, symbols) {
     let pc = 0;
+    let inMacro = false;
     for (let i = 0; i < ast.length; i++) {
         const el = ast[i];
+        if (el.macrodef) {
+            inMacro = true;
+        } else if (el.endmacro) {
+            inMacro = false;
+        }
+        if (inMacro) {
+            continue;
+        }
         if (el.label) {
             symbols[el.label] = pc;
             continue;
@@ -156,7 +188,7 @@ export function assignPCandEQU(ast, symbols) {
                     ii--;
                 }
             } else {
-                console.log("Error: equ has no label");
+                console.log("Error: equ has no label " + location(el));
             }
         } else if (el.org) {
             pc = el.org;
@@ -222,6 +254,7 @@ export function getWholePrefix(symbol) {
 }
 
 export function evaluateSymbols(symbols) {
+    // console.log('eval symbols ' + JSON.stringify(symbols, undefined, 2));
     const evaluated = [];
     for (const symbol in symbols) {
         // console.log('evaluate ' + symbol);
@@ -236,14 +269,20 @@ export function evaluateSymbols(symbols) {
 
 export function updateBytes(ast, symbols) {
     const prefixes = [];
+    let inMacro = false;
     for (const el of ast) {
         if (el.block || el.macrocall) {
             prefixes.push(el.prefix);
         }
-        if (el.endblock || el.endmacro) {
+        if (el.endblock || el.endmacrocall) {
             prefixes.pop();
         }
-        if (el.references) {
+        if (el.macrodef) {
+            inMacro = true;
+        } else if (el.endmacro) {
+            inMacro = false;
+        }
+        if (el.references && !inMacro) {
             for (let i = 0; i < el.bytes.length; i++) {
                 const byte = el.bytes[i];
                 if (byte && byte.expression) {
@@ -256,19 +295,27 @@ export function updateBytes(ast, symbols) {
                         const subVar = findVariable(symbols, prefix, variable);
 
                         if (symbols[subVar] === undefined) {
-                            throw 'Symbol not found: ' + variable;
+                            throw 'Symbol cannot be found: ' + variable + " " + location(el);
                         }
                         if (symbols[subVar].expression) {
-                            throw 'Symbol not evaluated: ' + variable
+                            throw 'Symbol not evaluated: ' + variable + " " + location(el);
                             // evaluateSymbol(subVar, symbols, evaluated);
                         }
                         subVars[variable] = symbols[subVar];
                     }
 
-                    const value = expr.evaluate(subVars);
-                    el.bytes[i] = value & 0xFF;
-                    if (el.bytes[i + 1] === null) {
-                        el.bytes[i + 1] = (value & 0xFF00) >> 8;
+                    const value = expr.evaluate(subVars) as any;
+                    if (typeof value === 'string') {
+                        let bytes = [];
+                        for (let i = 0; i < value.length; i++) {
+                            bytes.push(value.charCodeAt(i));
+                        }
+                        el.bytes.splice(i, 1, ...bytes);
+                    } else {
+                        el.bytes[i] = value & 0xFF;
+                        if (el.bytes[i + 1] === null) {
+                            el.bytes[i + 1] = (value & 0xFF00) >> 8;
+                        }
                     }
                 }
             }
@@ -278,8 +325,14 @@ export function updateBytes(ast, symbols) {
 
 export function getBytes(ast) {
     let bytes = [];
+    let inMacro = false;
     for (const el of ast) {
-        if (el.bytes) {
+        if (el.macrodef) {
+            inMacro = true;
+        } else if (el.endmacro) {
+            inMacro = false;
+        }
+        if (el.bytes && !inMacro) {
             bytes = bytes.concat(el.bytes);
         }
     }

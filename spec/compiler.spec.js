@@ -274,7 +274,7 @@ describe('maz', function() {
         const macros = maz.getMacros(ast);
         expect(macros).toEqual({
             thing: {
-                args: [],
+                params: [],
                 ast: []
             }
         })
@@ -288,7 +288,7 @@ describe('maz', function() {
         const macros = maz.getMacros(ast);
         expect(macros).toEqual({
             thing: {
-                args: [],
+                params: [],
                 ast: [
                     { bytes: [1, 2, 3] },
                 ]
@@ -297,14 +297,14 @@ describe('maz', function() {
     });
     it('should find macros with args', function() {
         const ast = [
-            { macrodef: 'thing', args: ['a', 'b'] },
+            { macrodef: 'thing', params: ['a', 'b'] },
             { bytes: [1, 2, 3] },
             { endmacro: true }
         ];
         const macros = maz.getMacros(ast);
         expect(macros).toEqual({
             thing: {
-                args: ['a', 'b'],
+                params: ['a', 'b'],
                 ast: [{ bytes: [1, 2, 3] }],
             }
         })
@@ -352,32 +352,49 @@ describe('maz', function() {
             { bytes: [1, 2, 3] },
             { endmacro: true },
             { bytes: [0] },
-            { macrocall: 'thing', expanded: true },
+            { macrocall: 'thing', params: [], expanded: true },
             { bytes: [1, 2, 3] },
-            { endmacro: true },
+            { endmacrocall: true },
             { bytes: [4] }
         ]);
     });
     it('should expand macros with params', function() {
         const ast = [
-            { macrodef: 'thing', args: ['a', 'b'] },
+            { macrodef: 'thing', params: ['a', 'b'] },
             { bytes: [1, 2, 3, {expression: 'a + b'}] },
             { endmacro: true },
             { bytes: [0] },
-            { macrocall: 'thing', params: [1,'hello'] },
+            { macrocall: 'thing', args: [1,'hello'] },
             { bytes: [4] }
         ];
         const macros = maz.getMacros(ast);
         maz.expandMacros(ast, macros);
         expect(ast).toEqual([
-            { macrodef: 'thing', args: ['a', 'b'] },
+            { macrodef: 'thing', params: ['a', 'b'] },
             { bytes: [1, 2, 3, {expression: 'a + b'}] },
             { endmacro: true},
             { bytes: [0] },
-            { macrocall: 'thing', params: [1,'hello'], expanded: true },
+            { macrocall: 'thing', params: ['a', 'b'], args: [1,'hello'], expanded: true },
             { bytes: [1, 2, 3, {expression: 'a + b'}] },
-            { endmacro: true },
+            { endmacrocall: true },
             { bytes: [4] }
         ]);
     });
+    it('should get symbols from expanded macros', function() {
+        const ast = [
+            { macrodef: 'thing', params: ['a', 'b'] },
+            { bytes: [1, 2, 3, {expression: 'a + b'}] },
+            { endmacro: true},
+            { bytes: [0] },
+            { macrocall: 'thing', params: ['a', 'b'], args: [1,'hello'], expanded: true },
+            { bytes: [1, 2, 3, {expression: 'a + b'}] },
+            { endmacrocall: true },
+            { bytes: [4] }
+        ];
+        const symbols = maz.getSymbols(ast);
+        expect(symbols).toEqual({
+            '%0_a': 1,
+            '%0_b': 'hello'
+        });
+    })
 });

@@ -1,0 +1,1702 @@
+ft245: equ 8
+ft245_status: equ 9
+bell: equ 6
+spi_data: equ 10
+spi_status: equ 11
+
+chr_cr: equ 13
+chr_bs: equ 8
+chr_lf: equ 10
+chr_up: equ 3
+
+bell_on: equ $ff
+bell_off: equ 0
+
+comma: equ $2c ; ',' causes problems in asm80 parser
+semicolon: equ $3b ; ';' causes problems in asm80 parser
+
+.macro spi_set_cs val
+    ld a,val
+    out (spi_status),a   ; set cs to 0
+.endm
+
+start:
+    ld sp,$6000                 ; set SP to 6000
+    xor a                       ; put bank 0 at $4000
+    out (1),a                   ; and copy the ROM there
+    ld hl,$0000
+    ld de,$4000
+    ld bc,$4000
+    ldir
+    xor a                       ; then switch everything to RAM
+    out (0),a
+    inc a
+    out (1),a
+    inc a
+    out (2),a
+    inc a
+    out (3),a    
+    ld hl,boot_msg              ; write message
+    call write_line
+    call clear_input_buffer
+loop:
+    ld a, '!'
+    call write_char
+    call read_line
+    ld hl,line
+    call lookup_command
+    push hl     ; swap hl and de
+    push de
+    pop hl
+    pop de
+    call call_hl
+end_loop:
+    jp loop
+
+call_hl:
+    jp (hl)
+
+boot_msg: db 'Z80 Monitor\n', 0
+
+; wait for output buffer to be not-full and write char in A to it
+write_char:
+.block
+    push af
+write_char1:
+    in a,(ft245_status)
+    bit 1,a
+    jp nz,write_char1
+    pop af
+    out (ft245),a
+    ret
+.endblock
+
+; HL = address of null terminates string to display
+; returns with HL pointing at the null terminator
+write_line:
+    ld a,(hl)
+    cp 0
+    ret z
+    call write_char
+    inc hl
+    jp write_line
+
+read_line:
+.block
+    ld b,$ff                   ; b is max line length
+    ld hl,line                  ; hl is where the line will be stored
+read_line_char:
+    call read_char
+    cp chr_up
+    jp nz,check_lf
+    ld a,$ff
+    cp b
+    jp nz,read_line_char
+    push hl
+    call write_line
+    pop de
+    push hl
+    or a
+    sbc hl,de
+    ld a,$ff
+    sub l
+    ld b,a
+    pop hl
+    jp read_line_char
+check_lf:
+    cp chr_lf
+    jp z,got_eol
+    cp chr_cr                   
+    jp nz,check_bs              ; if key wasn't return or lf, check if it was backspace
+got_eol:
+    call write_char             ; echo the return just typed
+    ld (hl),0                   ; store a terminating zero
+    ret
+check_bs:
+    cp chr_bs
+    jp z,got_backspace          ; if they pressed backspace go and handle it
+    push af                     ; save a
+    xor a ; ld a,0
+    cp b                        ; if b is 0, the line buffer is full...
+    jp z,read_line_sound_bell   ; so sound the bell
+    pop af                      ; restore a
+    call write_char             ; echo the typed character
+    dec b                       ; decrement the remaining bytes available in buffer
+    ld (hl),a                   ; store the typed character
+    inc hl
+    jp read_line_char           ; read another character
+got_backspace:
+    ld a,0ffh                   ; see if line buffer is empty...
+    cp b
+    jp z,read_line_sound_bell   ; ...and sound bell if it is
+    ld a,chr_bs
+    call write_char             ; echo the backspace
+    inc b                       ; increment the remaining bytes available in buffer
+    dec hl                      ; move line storage pointer back one
+    jp read_line_char           ; read another character
+read_line_sound_bell:
+    call sound_bell
+    jp read_line_char
+.endblock
+
+sound_bell:
+    push bc                     ; set up loop variables
+    ld bc,$0010
+    ld a,bell_on
+    out (bell),a                ; turn the bell on
+sound_bell1:
+    djnz sound_bell1            ; do the b loop
+    dec c
+    jp nz,sound_bell1           ; do the c loop
+    ld a,bell_off
+    out (bell),a                ; turn the bell off
+    pop bc
+    ret
+
+clear_input_buffer:
+    in a,(ft245_status)
+    bit 0,a
+    ret nz
+    in a,(ft245)
+    jp clear_input_buffer
+
+; wait for a character to be available, and return it in A
+read_char:
+    ; don't really need to wait for char, but it's kind of
+    ; nice for this to be non-blocking
+    in a,(ft245_status)
+    bit 0,a
+    jp nz,read_char
+    in a,(ft245)
+    ret
+
+; pass in HL = address of the string to look up
+; return DE = address of command to jump to
+;        HL = address of next byte after matched string
+lookup_command:
+.block
+    ld de,commands              ; load the start of the command table
+compare_next_word:
+    push hl                     ; store the address of the line we are matching
+compare_next_letter:
+    ld a,(de)                   ; get next letter
+    ld b,a
+    ld a,(hl)
+    call to_upper
+    cp b                        ; compare it with letter in command table
+    jp nz,different
+    inc de                      ; if they matched, move onto the next letter
+    inc hl
+    jp compare_next_letter
+different:                      ; letters weren't the same, but after each command string
+    bit 7,b                     ; there's a jump address with the high order bit set.
+    jp z,find_jump              ; if it's not set, look for the next command
+    ld a,' '                    ; now check we've found the end of the string
+    cp (hl)                     ; look for a space first
+    jp z,load_addr
+    xor a ; ld a,0              ; then look for a null
+    cp (hl)
+    jp nz,found_jump            ; if the word wasn't found, skip to the next command
+load_addr:
+    pop bc
+    push hl
+    ld h,d                      ; load the address - MSB first
+    ld l,e
+    ld d,(hl)
+    inc hl
+    ld e,(hl)
+    res 7,d                     ; reset the high order byte
+    pop hl                      ; clear up the stack
+    ret                         ; return with the command's jump address in de
+find_jump:
+    inc de                      ; skip through this command until we find the terminating
+    ld a,(de)                   ; jump address
+    bit 7,a
+    jp z,find_jump
+found_jump:
+    inc de                      ; skip over the jump address
+    inc de
+    ld a,(de)                   ; check if next word is another jump
+    bit 7,a                     ; if it is, we're at the end of the jump table
+    jp nz,load_addr             ; load that address and use it.
+    pop hl                      ; otherwise restore the original string's address
+    jp compare_next_word        ; and try again
+.endblock
+
+; takes a byte in A and, if it's a-z, returns it in upper case
+to_upper:
+    cp 'a'
+    ret c
+    ; cp 'z' + 1
+    ret nc
+    ; sub 'a' - 'A'
+    ret
+
+rtc_ctrl_a: equ $2f
+rtc_second: equ $20
+rtc_minute: equ $21
+rtc_hour: equ $22
+rtc_day: equ $23
+rtc_date: equ $24
+rtc_month: equ $25
+rtc_year: equ $26
+rtc_century: equ $27
+
+; A = 2 digit number in BCD
+; returns HL = address of place to store number
+bcd_to_num:
+    push af
+    and 0f0h
+    srl a
+    srl a
+    srl a
+    srl a
+    add a,030h
+    ld (hl),a
+    inc hl
+    pop af
+    and 00fh
+    add a,030h
+    ld (hl),a
+    ret
+
+; HL = address of 2 digit number string
+; returns A = BCD number
+;         E = 0 - no error; 1 - error
+;         D = binary number
+;         HL = point to after the 2 digit string
+num_to_bcd:
+.block
+    ld a,(hl)
+    ld e,0
+    sub $30
+    jp c,error
+    cp $0A
+    jp nc,error
+    ld d,a
+    sla a
+    sla a
+    sla a
+    push af
+    add a,d
+    add a,d
+    ld d,a
+    pop af
+    sla a
+    ld b,a
+    inc hl
+    ld a,(hl)
+    sub $30
+    jp c,error
+    cp $0A
+    jp nc,error
+    push af
+    add a,d
+    ld d,a
+    pop af
+    add a,b
+    inc hl
+    ret
+error:
+    ld e,1
+    ret
+.endblock
+
+print_time:
+    ld a,001000000b ; TE=0, CS=1 (12.5pF crystal)
+    out (rtc_ctrl_a),a
+
+    in a,(rtc_hour)
+    ld hl,timestr + 6
+    call bcd_to_num
+
+    in a,(rtc_minute)
+    inc hl
+    inc hl
+    call bcd_to_num
+
+    in a,(rtc_second)
+    inc hl
+    inc hl
+    call bcd_to_num
+
+    ld a,011000000b ; TE=1, CS=1 (12.5pF crystal)
+    out (rtc_ctrl_a),a
+
+    ld hl,timestr
+    call write_line
+    ret
+
+print_date:
+    ld a,001000000b ; TE=0, CS=1 (12.5pF crystal)
+    out (rtc_ctrl_a),a
+
+    in a,(rtc_century)
+    ld hl,datestr + 6
+    call bcd_to_num
+
+    in a,(rtc_year)
+    inc hl
+    call bcd_to_num
+
+    in a,(rtc_month)
+    inc hl
+    inc hl
+    call bcd_to_num
+
+    in a,(rtc_date)
+    inc hl
+    inc hl
+    call bcd_to_num
+
+    ld a,011000000b ; TE=1, CS=1 (12.5pF crystal)
+    out (rtc_ctrl_a),a
+
+    ld hl,datestr
+    call write_line
+    ret
+    
+; HL = string
+; return HL = string after any skipped spaces
+;        C = number of spaces skipped
+skip_spaces:
+.block
+    ld c,0
+    ld a,' '
+next:
+    cp (hl)
+    ret nz
+    inc hl
+    inc c
+    jp next
+.endblock
+
+; store an address with MSB first, with bit 7 set to 1
+.macro djump val
+    db (val / $100) + $80
+    ; db val & $ff
+.endm
+
+cmd_help:
+cmd_helpling:
+    ld hl,help_msg
+    jp write_line
+help_msg: db 'Available commands:\n'
+    db '  HELP\n'
+    db '  PEEK addr\n'
+    db '  POKE addr',comma,'val\n'
+    db '  DUMP addr',comma,'len\n'
+    db '  IN port\n'
+    db '  OUT port',comma,'val\n'
+    db '  JP addr\n'
+    db '  CALL addr\n'
+    db '  TIME\n'
+    db '  DATE\n'
+    db '  SETTIME hh:mm:ss\n'
+    db '  SETDATE yyyy-mm-dd\n'
+    db '  COPY src',comma,'dest',comma,'len\n'
+    db '  ROMCOPY src',comma,'dest',comma,'len\n'
+    db '  COMPARE src',comma,'dest',comma,'len\n'
+    db '  LOAD dest',comma,'dest\n'
+    db '  PROTECT\n'
+    db '  UNPROTECT\n'
+    db '  BOOT\n'
+    db 0
+
+cmd_date:
+cmd_time:
+    call print_time
+    jp print_date
+
+cmd_setdate:
+    ld h,d
+    ld l,e
+    call skip_spaces
+    xor a
+    cp c
+    jp z,no_date
+    call parse_date
+    xor a               ; check error code
+    cp e
+    ret nz
+
+    ld a,001000000b ; TE=0, CS=1 (12.5pF crystal)
+    out (rtc_ctrl_a),a
+
+    ld hl,bcd_date
+    ld a,(hl)
+    out (rtc_century),a
+    inc hl
+    ld a,(hl)
+    out (rtc_year),a
+    inc hl
+    ld a,(hl)
+    out (rtc_month),a
+    inc hl
+    ld a,(hl)
+    out (rtc_date),a
+    
+    ld a,011000000b ; TE=1, CS=1 (12.5pF crystal)
+    out (rtc_ctrl_a),a
+
+    ld hl,date_set
+    call write_line
+    ret
+date_set: db 'Date set\n', 0
+    
+
+cmd_settime:
+    ld h,d
+    ld l,e
+    call skip_spaces
+    xor a
+    cp c
+    jp z,no_time
+    call parse_time
+    xor a               ; check error code
+    cp e
+    ret nz
+
+    ld a,001000000b ; TE=0, CS=1 (12.5pF crystal)
+    out (rtc_ctrl_a),a
+
+    ld hl,bcd_time
+    ld a,(hl)
+    out (rtc_hour),a
+    inc hl
+    ld a,(hl)
+    out (rtc_minute),a
+    inc hl
+    ld a,(hl)
+    out (rtc_second),a
+    
+    ld a,011000000b ; TE=1, CS=1 (12.5pF crystal)
+    out (rtc_ctrl_a),a
+
+    ld hl,time_set
+    call write_line
+    ret
+time_set: db 'Time set\n', 0
+
+; HL = address of time, in HH:MM:SS format (24 hour time)
+; returns with bcd time at bcd_time
+; writes error messages if there's an error
+parse_time:
+.block
+hours:
+    call num_to_bcd
+    ld bc,bcd_time
+    ld (bc),a
+    xor a
+    cp e
+    jp nz,bad_time
+    ld a,d
+    cp 24
+    jp nc,bad_time
+    ld a,':'
+    cp (hl)
+    jp nz,bad_time
+    inc hl
+
+minutes:
+    call num_to_bcd
+    ld bc,bcd_time + 1
+    ld (bc),a
+    xor a
+    cp e
+    jp nz,bad_time
+    ld a,d
+    cp 60
+    jp nc,bad_time
+    ld a,':'
+    cp (hl)
+    jp nz,bad_time
+    inc hl
+
+seconds:
+    call num_to_bcd
+    ld bc,bcd_time + 2
+    ld (bc),a
+    xor a
+    cp e
+    jp nz,bad_time
+    ld a,d
+    cp 60
+    jp nc,bad_time
+done:
+    xor a
+    cp (hl)
+    jp nz,bad_time
+    ld e,0
+    ret
+
+    ; expect time in format HH:MM:SS
+    ; give up if it doesn't match
+    ; ignore trailing rubbish, for now
+bad_time:
+    ld hl,bad_time_msg
+    call write_line
+    ld e,1
+    ret
+bad_time_msg: db 'Invalid time specified\n', 0
+no_time:
+    ld hl,no_time_msg
+    call write_line
+    ld e,1
+    ret
+no_time_msg: db 'No time specified\n', 0
+.endblock
+
+; HL = address of date, in YYYY-MM-DD format
+; returns with bcd date at bcd_date
+; writes error messages if there's an error
+; can enter bad dates
+parse_date:
+.block
+century:
+    call num_to_bcd
+    ld bc,bcd_date
+    ld (bc),a
+    xor a
+    cp e
+    jp nz,bad_date
+
+year:
+    call num_to_bcd
+    ld bc,bcd_date + 1
+    ld (bc),a
+    xor a
+    cp e
+    jp nz,bad_date
+    ld a,'-'
+    cp (hl)
+    jp nz,bad_date
+    inc hl
+
+month:
+    call num_to_bcd
+    ld bc,bcd_date + 2
+    ld (bc),a
+    xor a
+    cp e
+    jp nz,bad_date
+    ld a,d
+    cp 13
+    jp nc,bad_date
+    cp 0
+    jp z,bad_date
+    ld a,'-'
+    cp (hl)
+    jp nz,bad_date
+    inc hl
+
+date:
+    call num_to_bcd
+    ld bc,bcd_date + 3
+    ld (bc),a
+    xor a
+    cp e
+    jp nz,bad_date
+    ld a,d
+    cp 32
+    jp nc,bad_date
+    cp 0
+    jp z,bad_date
+done:
+    xor a
+    cp (hl)
+    jp nz,bad_date
+    ld e,0
+    ret
+
+    ; expect date in format YYYY-MM-DD
+    ; give up if it doesn't match
+bad_date:
+    ld hl,bad_date_msg
+    call write_line
+    ld e,1
+    ret
+bad_date_msg: db 'Invalid date specified\n', 0
+no_date:
+    ld hl,no_date_msg
+    call write_line
+    ld e,1
+    ret
+no_date_msg: db 'No date specified\n', 0
+.endblock
+
+; HL = address of 1-4 digits of hex, terminated with null, space or comma
+; BC = number
+;  E = error code
+parse_hex:
+.block
+    ld bc,0
+    ld d,4
+parse_next:
+    ld a,(hl)
+    call to_upper
+    cp '0'
+    jp c,bad_hex
+    ; cp '9' + 1
+    jp nc,not_decimal
+    sub '0'
+    jp add_digit
+not_decimal:
+    cp 'A'
+    jp c,bad_hex
+    ; cp 'F' + 1
+    jp nc,bad_hex
+    ; sub 'A' - 10
+add_digit:
+    add a,c
+    ld c,a
+    ld a,b
+    adc a,0
+    ld b,a
+
+    ld e,0
+    inc hl
+    xor a
+    cp (hl)
+    ret z
+    ld a,' '
+    cp (hl)
+    ret z
+    ld a,comma
+    cp (hl)
+    ret z
+
+    push hl
+    ld h,b
+    ld l,c
+    add hl,hl
+    add hl,hl
+    add hl,hl
+    add hl,hl
+    ld b,h
+    ld c,l
+    pop hl
+    
+    dec d
+    jp z,bad_hex
+
+    jp parse_next
+
+bad_hex:
+    ld e,1
+    ret
+.endblock
+
+; A = number
+; HL = address to store formatted number at
+; destroys D
+; returns with HL pointing to address after formatted number
+format_hex_2:
+.block
+    ld d,2
+    push af
+    srl a
+    srl a
+    srl a    
+    srl a
+next_digit:
+    cp 10
+    jp c,num
+    ; add a,'A' - '0' - 10
+num:
+    add a,'0'
+    ld (hl),a
+    inc hl
+    pop af
+    and $0f
+    dec d
+    push af
+    jp nz,next_digit
+    pop af
+    ret
+.endblock
+
+cmd_in:
+.block
+    ld h,d
+    ld l,e
+    call skip_spaces
+    xor a
+    cp c
+    jp z,error
+    call parse_hex
+    xor a               ; check error code
+    cp e
+    jp nz,error
+
+    xor a
+    cp b
+    jp nz,error
+
+    in a,(c)
+    ld hl,hex_value
+    call format_hex_2
+
+    ld hl,hex_value
+    jp write_line
+error:
+    ld hl,error_msg
+    jp write_line
+error_msg: db 'Error\n',0
+.endblock
+
+cmd_out:
+.block
+    ld h,d
+    ld l,e
+    call skip_spaces
+    xor a
+    cp c
+    jp z,error
+
+    call parse_hex
+    xor a               ; check error code
+    cp e
+    jp nz,error
+
+    xor a
+    cp b
+    jp nz,error
+
+    push bc
+
+_check_comma:
+    ld a,comma
+    cp (hl)
+    jp nz,error
+    inc hl
+
+    call parse_hex
+    xor a
+    cp e
+    jp nz,error
+
+    xor a
+    cp b
+    jp nz,error
+
+    pop de
+    ld a,c
+    ld c,e
+
+    out (c),a
+
+    ret
+
+error:
+    ld hl,error_msg
+    jp write_line
+error_msg: db 'Error\n',0
+.endblock
+
+cmd_poke:
+.block
+    ld h,d
+    ld l,e
+    call skip_spaces
+    xor a
+    cp c
+    jp z,error
+
+    call parse_hex
+    xor a               ; check error code
+    cp e
+    jp nz,error
+
+    push bc
+
+_check_comma:
+    ld a,comma
+    cp (hl)
+    jp nz,error
+    inc hl
+
+next_poke:
+    call parse_hex
+    xor a
+    cp e
+    jp nz,error
+
+    xor a
+    cp b
+    jp nz,error
+
+    pop de
+    ld a,c
+    ld (de),a
+    inc de
+    push de
+
+    ld a,comma
+    cp (hl)
+    inc hl
+    jp z,next_poke
+    pop de
+
+    ret
+
+error:
+    ld hl,error_msg
+    jp write_line
+error_msg: db 'Error\n',0
+.endblock
+
+cmd_peek:
+.block
+    ld h,d
+    ld l,e
+    call skip_spaces
+    xor a
+    cp c
+    jp z,error
+    call parse_hex
+    xor a               ; check error code
+    cp e
+    jp nz,error
+
+    ld a,(bc)
+    ld hl,hex_value
+    call format_hex_2
+
+    ld hl,hex_value
+    jp write_line
+error:
+    ld hl,error_msg
+    jp write_line
+error_msg: db 'Error\n',0
+.endblock
+
+cmd_jp:
+.block
+    ld h,d
+    ld l,e
+    call skip_spaces
+    xor a
+    cp c
+    jp z,error
+    call parse_hex
+    xor a               ; check error code
+    cp e
+    jp nz,error
+
+    xor a               ; check end of line
+    cp (hl)
+    jp nz,error
+
+    ld h,b
+    ld l,c
+    jp (hl)    
+error:
+    ld hl,error_msg
+    jp write_line
+error_msg: db 'Error\n',0
+.endblock
+
+cmd_call:
+.block
+    ld h,d
+    ld l,e
+    call skip_spaces
+    xor a
+    cp c
+    jp z,error
+    call parse_hex
+    xor a               ; check error code
+    cp e
+    jp nz,error
+
+    xor a               ; check end of line
+    cp (hl)
+    jp nz,error
+
+    ld h,b
+    ld l,c
+    
+    call call_hl
+    ret
+error:
+    ld hl,error_msg
+    jp write_line
+error_msg: db 'Error\n',0
+.endblock
+
+cmd_copy:
+    ; COPY FROM,TO,LENGTH
+.block
+    ld h,d
+    ld l,e
+    call skip_spaces
+    xor a
+    cp c
+    jp z,error
+    call parse_hex
+    xor a               ; check error code
+    cp e
+    jp nz,error
+    push bc
+
+_check_comma1:
+    ld a,comma
+    cp (hl)
+    jp nz,error
+
+    inc hl
+    call parse_hex
+    xor a
+    cp e
+    jp nz,error
+    push bc
+
+_check_comma2:
+    ld a,comma
+    cp (hl)
+    jp nz,error
+
+    inc hl
+    call parse_hex
+    xor a
+    cp e
+    jp nz,error
+    
+    pop de
+    pop hl
+    ldir
+    ld hl,copied_msg
+    jp write_line
+    
+copied_msg: db 'Copied\n',0
+error:
+    ld hl,error_msg
+    jp write_line
+error_msg: db 'Error\n',0
+.endblock
+
+cmd_romcopy:
+    ; ROMCOPY FROM,TO,LENGTH
+    ; at the end of every 64 byte page, wait for write to complete
+.block
+    ld h,d
+    ld l,e
+    call skip_spaces
+    xor a
+    cp c
+    jp z,error
+    call parse_hex
+    xor a               ; check error code
+    cp e
+    jp nz,error
+    ld (source),bc
+
+_check_comma1:
+    ld a,comma
+    cp (hl)
+    jp nz,error
+
+    inc hl
+    call parse_hex
+    xor a
+    cp e
+    jp nz,error
+    ld (dest),bc
+
+_check_comma2:
+    ld a,comma
+    cp (hl)
+    jp nz,error
+
+    inc hl
+    call parse_hex
+    xor a
+    cp e
+    jp nz,error
+    
+    ld (size),bc
+
+    
+    ; now we need to work out how many bytes until the next 64 byte page boundary
+    ; then copy that number of bytes
+    ; then wait for write to finish
+    ; then copy next 64 bytes (or however many are left, whichever is smallest)
+    ; etc
+_calc_offset:
+    ld de,(dest)
+    ld a,e     
+    and $3f                 ; a = offset = dest AND $3f
+_calc_bytes_left_on_page:
+    ld h,a
+    ld a,$40
+    sub h
+    ld h,a                  ; h = number of bytes left in this page
+
+_check_size_high:
+    xor a
+    cp b                    ; if high byte of size isn't zero, 
+    jp nz,h_is_pagesize     ; use h as the page size
+
+_check_size_low:
+    ld a,h
+    cp c                  ; if low byte of size > number of bytes left on page,
+    jp c,h_is_pagesize      ; use h as the page size
+_size_is_small:
+    ld h,c                  ; otherwise use low byte of size as page size
+
+h_is_pagesize:              ; this is also the start of the loop
+    ld b,0
+    ld c,h
+    ld (pagesize),bc
+
+    ld hl,(source)
+    ld de,(dest)    
+_do_the_copy:
+    ldir
+    ld (source),hl
+
+    ld hl,(dest)
+    ld (dest),de
+check_write:
+    ld a,(hl)
+    cp (hl)
+    jp nz,check_write
+
+    ld hl,(size)
+    ld bc,(pagesize)
+    xor a
+    sbc hl,bc
+    cp h
+    jp nz,more
+    cp l
+    jp z,copied
+more:
+    ld (size),hl
+
+    ld bc,(size)
+    xor a
+    cp b
+    jp nz,pagesize_40
+    ld a,c
+    and $c0
+    cp 0
+    jp nz,pagesize_40
+    ld h,c
+    jp h_is_pagesize
+pagesize_40:
+    ld h,$40
+    jp h_is_pagesize
+
+copied:
+    ld hl,copied_msg
+    jp write_line
+    
+copied_msg: db 'Copied\n',0
+error:
+    ld hl,error_msg
+    jp write_line
+error_msg: db 'Error\n',0
+.endblock
+
+cmd_compare:
+    ; COMPARE FROM,TO,LENGTH
+.block
+    ld h,d
+    ld l,e
+    call skip_spaces
+    xor a
+    cp c
+    jp z,error
+    call parse_hex
+    xor a               ; check error code
+    cp e
+    jp nz,error
+    push bc
+
+_check_comma1:
+    ld a,comma
+    cp (hl)
+    jp nz,error
+
+    inc hl
+    call parse_hex
+    xor a
+    cp e
+    jp nz,error
+    push bc
+
+_check_comma2:
+    ld a,comma
+    cp (hl)
+    jp nz,error
+
+    inc hl
+    call parse_hex
+    xor a
+    cp e
+    jp nz,error
+    
+    pop de
+    pop hl
+compare:
+    ld a,(de)
+    cp (hl)
+    call nz,different
+    dec bc
+    xor a
+    cp b
+    jp nz,compare
+    cp c
+    jp z,finished
+    inc hl
+    inc de
+    jp compare
+
+
+different:
+    push bc
+    push hl
+    push de
+    push hl
+    push de
+    ld a,d
+    ld hl,difference
+    call format_hex_2
+    ld a,e
+    call format_hex_2
+    pop de
+    ld a,(de)
+    inc hl
+    call format_hex_2
+    inc hl
+    pop de
+    push de
+    ld a,d
+    call format_hex_2
+    ld a,e
+    call format_hex_2
+    pop de
+    inc hl
+    ld a,(de)
+    call format_hex_2
+    ld hl,difference
+    call write_line
+    pop de
+    pop hl
+    pop bc
+    ret
+
+finished:
+    ld hl,finished_msg
+    jp write_line
+    
+finished_msg: db 'Finished\n',0
+error:
+    ld hl,error_msg
+    jp write_line
+error_msg: db 'Error\n',0
+.endblock
+
+cmd_boot:
+.block
+    call init_sd_card
+    ld de,$8000
+    ld hl,$0000
+    call read_sd
+    ld de,$8200
+    ld hl,$0100
+    call read_sd
+
+    ld hl,$83fe
+    ld a,$B0
+    cp (hl)
+    jp nz,noboot
+    inc hl
+    ld a,$07
+    jp nz,noboot
+    ld hl,boot_msg
+    call write_line
+    jp $8000
+noboot:
+    ld hl,noboot_msg
+    jp write_line
+noboot_msg: db 'Not a boot sector\n',0
+boot_msg: db 'Booting...\n',0
+.endblock
+
+; hl=sector (low bytes, backwards. High bytes always 0)
+;   backwards. i.e. hl=$0100 = sector 1.
+; de=destination
+read_sd:
+.block
+    push de
+    ld (cmd_read_block+3),hl
+    ld hl,0
+    ld (cmd_read_block+1),hl
+
+    spi_set_cs 2
+    ld hl,cmd_read_block
+    call sd_send_command
+
+wait_for_data:
+    ld a,$ff
+    out (spi_data),a
+    in a,(spi_data)
+    cp $fe
+    jp nz,wait_for_data
+
+    ld b,0
+    ; ld hl,block0
+    ld hl,buffer
+    call sd_read_bytes
+    ld b,0
+    ; ld hl,block1
+    ld hl,buffer + $100
+    call sd_read_bytes
+
+    spi_set_cs 0
+    pop de
+    ld bc,$200
+    ld hl,buffer
+    ldir
+    ret
+.endblock
+
+cmd_dump:
+.block
+    ld h,d
+    ld l,e
+    call skip_spaces
+    xor a
+    cp c
+    jp z,error
+    call parse_hex
+    xor a               ; check error code
+    cp e
+    jp nz,error
+
+    push bc
+
+_check_comma:
+    ld a,comma
+    cp (hl)
+    jp nz,error
+
+    inc hl
+    call parse_hex
+    xor a
+    cp e
+    jp nz,error
+
+; hl d bc
+    pop de
+
+    ; reset de to start of a 16 byte row
+    ld a,e
+    and $f0
+    ld e,a
+
+    ; print address
+    ; print up to 16 hex bytes followed by spaces
+    ; print up to 16 ascii characters
+
+    push bc
+
+    ; now de = start address
+    ;     bc = length
+    ;     hl = address to store formatted text
+
+start_of_line:
+    push de
+    ld hl,dumpline
+    ld a,d
+    call format_hex_2
+    ld a,e
+    call format_hex_2
+    inc hl ; leave a space
+    pop de
+
+hex_digits:
+    push de
+    ld a,(de)    
+    call format_hex_2
+    pop de
+
+    inc hl
+    inc de
+    ld a,e
+    and $0f
+    cp 0
+    jp nz,hex_digits
+
+    dec de
+    ld a,e
+    and $f0
+    ld e,a
+
+ascii_chars:
+    ld a,(de)
+    cp ' '
+    call c,ascii_dot
+    ; cp '~' + 1
+    call nc,ascii_dot
+    ld (hl),a
+
+    inc hl
+    inc de
+    ld a,e
+    and $0f
+    cp 0
+    jp nz,ascii_chars
+    jp eol
+ascii_dot:
+    ld a,'.'
+    ret
+eol:
+
+    ; ld (hl),'\n'
+    inc hl
+    ld (hl),0
+
+    ld hl,dumpline
+    call write_line
+
+    pop bc  ; length to dump
+
+    dec bc
+    ld a,c
+    and $f0
+    ld c,a
+
+    push bc
+
+    xor a
+    cp b
+    jp nz,more_digits
+    cp c
+    jp nz,more_digits
+
+    pop bc
+    ; done
+    ret
+more_digits:
+    jp start_of_line
+error:
+    ld hl,error_msg
+    jp write_line
+error_msg: db 'Error\n',0
+.endblock
+
+cmd_load:
+.block
+    ld h,d
+    ld l,e
+    call skip_spaces
+    xor a
+    cp c
+    jp z,error
+    call parse_hex
+    xor a               ; check error code
+    cp e
+    jp nz,error
+
+    push bc
+
+_check_comma:
+    ld a,comma
+    cp (hl)
+    jp nz,error
+
+    inc hl
+    call parse_hex
+    xor a
+    cp e
+    jp nz,error
+
+    pop hl
+next_char:
+    call read_char
+    ld (hl),a
+    inc hl
+    dec bc
+    xor a
+    cp b
+    jp nz,next_char
+    cp c
+    jp nz,next_char
+    ret
+
+error:
+    ld hl,error_msg
+    jp write_line
+error_msg: db 'Error\n',0
+.endblock
+
+cmd_protect:
+.block
+    ld a,$80
+    out 2,a
+    inc a
+    out 3,a
+    ld a,$aa
+    ld ($5555 + $8000),a
+    ld a,$55
+    ld ($2aaa + $8000),a
+    ld a,$a0
+    ld ($5555 + $8000),a
+    ld a,$2
+    out 2,a
+    inc a
+    out 3,a
+
+    ld hl,protected_msg
+    jp write_line
+protected_msg: db 'Protected\n',0
+.endblock
+
+cmd_unprotect:
+.block
+    ld a,$80
+    out 2,a
+    inc a
+    out 3,a
+    ld a,$aa
+    ld ($5555 + $8000),a
+    ld a,$55
+    ld ($2aaa + $8000),a
+    ld a,$80
+    ld ($5555 + $8000),a
+    ld a,$aa
+    ld ($5555 + $8000),a
+    ld a,$55
+    ld ($2aaa + $8000),a
+    ld a,$20
+    ld ($5555 + $8000),a
+    ld a,$2
+    out 2,a
+    inc a
+    out 3,a
+
+    ld hl,unprotected_msg
+    jp write_line
+unprotected_msg: db 'Unprotected\n',0
+.endblock
+
+cmd_error:
+    ld hl, unknown_command
+    jp write_line
+unknown_command: db 'Unknown command\n', 0
+    ret
+
+commands:
+    db 'HELP'
+    djump cmd_help
+    db 'HELP!'
+    djump cmd_helpling
+    db 'PEEK'
+    djump cmd_peek
+    db 'POKE'
+    djump cmd_poke
+    db 'DUMP'
+    djump cmd_dump
+    db 'IN'
+    djump cmd_in
+    db 'OUT'
+    djump cmd_out
+    db 'JP'
+    djump cmd_jp
+    db 'CALL'
+    djump cmd_call
+    db 'DATE'
+    djump cmd_date
+    db 'TIME'
+    djump cmd_time
+    db 'SETTIME'
+    djump cmd_settime
+    db 'SETDATE'
+    djump cmd_setdate
+    db 'LOAD'
+    djump cmd_load
+    db 'COPY'
+    djump cmd_copy
+    db 'ROMCOPY'
+    djump cmd_romcopy
+    db 'PROTECT'
+    djump cmd_protect
+    db 'UNPROTECT'
+    djump cmd_unprotect
+    db 'COMPARE'
+    djump cmd_compare
+    db 'BOOT'
+    djump cmd_boot
+    djump cmd_error
+
+response: db 0, 0, 0, 0, 0
+
+cmd0:
+    db $40,0,0,0,0,$95
+cmd8:
+    db $48,0,0,1,$AA,$87    ; 2.7-3.6V
+acmd:
+    db $77,0,0,0,0,$01   ; cmd55 - next command is and acmd
+acmd41:
+    db $69,$40,0,0,0,$01
+cmd58:
+    db $7A,0,0,0,0,$01
+
+
+cmd_read_block:  ; read single block
+    db $51,0,0,0,0,$01      ; needs a data address
+cmd_write_block:  ; write single block
+    db $58,0,0,0,0,$01
+
+buffer: ds 512
+
+init_sd_card:
+    spi_set_cs 1
+    ld b,10
+init:
+    ld a,$ff
+    out (spi_data),a
+    djnz init
+
+    spi_set_cs 3
+
+    ld hl,cmd0
+    call sd_send_command_slow
+    ld (response),a
+
+    spi_set_cs 1
+
+    spi_set_cs 3
+
+    ld hl,cmd8
+    call sd_send_command_slow
+    ld (response),a
+
+    ld b,4
+    ld hl,response
+    call sd_read_bytes
+
+    spi_set_cs 1
+
+    ; should check responses are correct, in proper sd card driver
+
+send_acmd41:
+    spi_set_cs 3
+    ld hl,acmd
+    call sd_send_command_slow
+
+    ld hl,acmd41
+    call sd_send_command_slow
+    ld (response),a
+
+    spi_set_cs 1
+
+    ld a,(response)
+    cp 0
+    jp nz,send_acmd41
+
+    spi_set_cs 3
+    ld hl,cmd58
+    call sd_send_command_slow
+
+    ld b,4
+    ld hl,response
+    call sd_read_bytes
+
+    spi_set_cs 1
+    ret
+
+sd_send_command_slow:
+.block
+    ld b,6
+    ld c,spi_data
+send_loop:
+    ld a,(hl)
+    out (spi_data),a
+    inc hl
+    djnz send_loop
+    call sd_read_response
+    ret
+.endblock
+
+sd_send_command:
+.block
+    ld b,6
+    ld c,spi_data
+send_loop:
+    otir
+    call sd_read_response
+    ret
+.endblock
+
+
+; b = number of bytes to read
+; hl = address to store bytes
+sd_read_bytes:
+.block
+    ld a,$ff
+    out (spi_data),a
+    in a,(spi_data)
+    ld (hl),a
+    inc hl
+    djnz sd_read_bytes
+    ret
+.endblock
+
+; b = number of bytes to write
+; hl = address of bytes to write
+sd_write_bytes:
+    ld c,spi_data
+    otir
+    ret
+
+; reads an r1 response
+sd_read_response:
+.block
+    ld a,$ff
+    out (spi_data),a
+    in a,(spi_data)
+    bit 7,a
+    jp nz,sd_read_response
+    ret
+.endblock
+
+; reads a data response
+sd_read_data_response:
+.block
+    ld a,$ff
+    out (spi_data),a
+    in a,(spi_data)
+    and $11
+    cp 1
+    jp nz,sd_read_data_response
+    ret
+.endblock
+
+sd_wait_for_non_busy_token:
+.block
+    ld a,$ff
+    out (spi_data),a
+    in a,(spi_data)
+    cp 0
+    jp z,sd_wait_for_non_busy_token
+    ret
+.endblock
+
+timestr: db 'TIME: 00:00:00\n', 0
+datestr: db 'DATE: 0000-00-00\n', 0
+hex_value: db '00\n',0
+dumpline: db '                                                                         ',0
+difference: db 'XXXX:XX XXXX:XX\n',0
+bcd_time: db 'xxx'
+bcd_date: db 'xxxx'
+line: ds 256
+size: db 0,0
+source: db 0,0
+dest: db 0,0
+pagesize: db 0,0
+
+end:
