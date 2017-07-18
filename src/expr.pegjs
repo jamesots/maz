@@ -97,7 +97,29 @@ label = text1:[a-zA-Z] text2:[a-zA-Z0-9_]* !{
 ws = [ \t]+
 wsnl = [ \t\r\n]+
 
-expr = bitwiseor
+expr = logicalor
+
+logicalor = t1:logicaland t2:(ws? '||' ws? logicaland)* {
+        let result = lookupVar(t1);
+        for (const group of t2) {
+            const operator = group[1];
+            const term = lookupVar(group[3]);
+
+            result = ((result != 0) || (term != 0)) ? 1 : 0;
+        }
+        return result;
+    }
+
+logicaland = t1:bitwiseor t2:(ws? '&&' ws? bitwiseor)* {
+        let result = lookupVar(t1);
+        for (const group of t2) {
+            const operator = group[1];
+            const term = lookupVar(group[3]);
+
+            result = ((result != 0) && (term != 0)) ? 1 : 0;
+        }
+        return result;
+    }
 
 bitwiseor = t1:bitwisexor t2:(ws? ('|'/'or'i) ws? bitwisexor)* {
         let result = lookupVar(t1);

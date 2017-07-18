@@ -327,4 +327,26 @@ fdescribe('expr', function() {
         result = expr.parse(`10101100b | 11001010b or 10000001b`);
         expect(result).toBe(0b11101111);
     });
+
+    it('should logical and things', function() {
+        let result = expr.parse(`1 && 1`);
+        expect(result).toBe(1);
+        result = expr.parse(`1 && 0`);
+        expect(result).toBe(0);
+        result = expr.parse(`12 && 5`);
+        expect(result).toBe(1);
+    });
+
+    it('should logical or things', function() {
+        let result = expr.parse(`1 || 1`);
+        expect(result).toBe(1);
+        result = expr.parse(`1 || 0`);
+        expect(result).toBe(1);
+        result = expr.parse(`0 || 1`);
+        expect(result).toBe(1);
+        result = expr.parse(`0 || 0`);
+        expect(result).toBe(0);
+        result = expr.parse(`12 || 0`);
+        expect(result).toBe(1);
+    });
 });
