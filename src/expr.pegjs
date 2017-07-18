@@ -29,12 +29,15 @@
     }
 
     function isString(term) {
-        return typeof term === 'string' && term.length !== 1;
+        return typeof term === 'string' && term.length !== 1
+            && term.length !== 2;
     }
 
     function toNumber(term) {
         if (typeof term === 'string' && term.length === 1) {
             return term.charCodeAt(0);
+        } else if (typeof term === 'string' && term.length === 2) {
+            return term.charCodeAt(0) * 256 + term.charCodeAt(1);
         }
         if (typeof term === 'number') {
             return term;
@@ -94,7 +97,31 @@ label = text1:[a-zA-Z] text2:[a-zA-Z0-9_]* !{
 ws = [ \t]+
 wsnl = [ \t\r\n]+
 
-expr = shift
+expr = greaterless
+
+greaterless = t1:shift t2:(ws? ('<='/'>='/'<'/'>') ws? shift)* {
+        let result = lookupVar(t1);
+        for (const group of t2) {
+            const operator = group[1];
+            const term = lookupVar(group[3]);
+
+            switch (operator) {
+                case '<' : 
+                    result = result < term ? 1 : 0;
+                    break;
+                case '>' : 
+                    result = result > term ? 1 : 0;
+                    break;
+                case '<=' : 
+                    result = result <= term ? 1 : 0;
+                    break;
+                case '>=' : 
+                    result = result >= term ? 1 : 0;
+                    break;
+            }
+        }
+        return result;
+    }
 
 shift = t1:plusminus t2:(ws? ('<<'/'>>') ws? plusminus)* {
         let result = lookupVar(t1);
@@ -161,7 +188,7 @@ function = 'min('i ws? expr1:expr ws? ',' ws? expr2:expr ws? ')' {
         if (isString(expr1)) {
             return expr1 <= expr2 ? expr1 : expr2;
         }
-        return Math.min(toNumber(lookupVar(expr1)), toNumber(lookupVar(expr2)));
+        return Math.min(toNumber(expr1), toNumber(expr2));
     }
     / 'max('i ws? expr1:expr ws? ',' ws? expr2:expr ws? ')' {
         expr1 = lookupVar(expr1);
@@ -172,10 +199,10 @@ function = 'min('i ws? expr1:expr ws? ',' ws? expr2:expr ws? ')' {
         if (isString(expr1)) {
             return expr1 >= expr2 ? expr1 : expr2;
         }
-        return Math.max(toNumber(lookupVar(expr1)), toNumber(lookupVar(expr2)));
+        return Math.max(toNumber(expr1), toNumber(expr2));
     }
 
-unary = operator:[\!~+-]? expr:factor {
+unary = operator:[!~+-]? expr:factor {
     expr = lookupVar(expr);
     if (operator && isString(expr)) {
         throw `Cannot ${operator} a string (${expr})`;
@@ -183,7 +210,7 @@ unary = operator:[\!~+-]? expr:factor {
     if (operator === '!') {
         return toNumber(expr) === 0 ? 1 : 0;
     } else if (operator === '~') {
-        return (~toNumber(expr)) & 0xFF;
+        return ~toNumber(expr);
     } else if (operator === '+') {
         return toNumber(expr);
     } else if (operator === '-') {

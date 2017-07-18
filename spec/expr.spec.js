@@ -66,6 +66,11 @@ fdescribe('expr', function() {
         expect(result).toBe(66);
     });
 
+    it('should add number and char-word', function() {
+        const result = expr.parse(`1 + "AA"`);
+        expect(result).toBe(16706);
+    });
+
     it('should not add number and string', function() {
         expect(function() {
             expr.parse(`1 + "bob"`);
@@ -159,9 +164,9 @@ fdescribe('expr', function() {
 
     it('should invert numbers', function() {
         let result = expr.parse(`~1`);
-        expect(result).toBe(0xFE);
+        expect(result).toBe(-2);
         result = expr.parse(`~240`);
-        expect(result).toBe(15);
+        expect(result).toBe(-241);
     });
 
     it('should not invert strings', function() {
@@ -244,5 +249,34 @@ fdescribe('expr', function() {
         expect(function() {
             expr.parse(`-"bob"`);
         }).toThrow();
+    });
+
+    it('should compare things', function() {
+        // let result = expr.parse(`5 < 3`);
+        // expect(result).toBe(0);
+        // result = expr.parse(`5 > 3`);
+        // expect(result).toBe(1);
+        // result = expr.parse(`5 > 3 < 2`);
+        // expect(result).toBe(1);
+        // result = expr.parse(`5 > 3 < 0`);
+        // expect(result).toBe(0);
+        // result = expr.parse(`"a" < "b"`);
+        // expect(result).toBe(1);
+        // result = expr.parse(`"aaaa" < "aaab"`);
+        // expect(result).toBe(1);
+        // result = expr.parse(`"aaaa" < 1`);
+        // expect(result).toBe(0);
+        // result = expr.parse(`"0" < 1`);
+        // expect(result).toBe(1);
+        // result = expr.parse(`"123" < 124`);
+        // expect(result).toBe(1);
+        result = expr.parse(`10 <= 3`);
+        expect(result).toBe(0);
+        result = expr.parse(`11 <= 11`);
+        expect(result).toBe(1);
+        result = expr.parse(`12 >= 3`);
+        expect(result).toBe(1);
+        result = expr.parse(`13 >= 13`);
+        expect(result).toBe(1);
     });
 });

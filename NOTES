@@ -99,3 +99,40 @@ variables will have unique names.
 
 The parameters to a macro are added a symbols with the macro's prefix,
 and their values are also initialized.
+
+
+EXPRESSIONS
+
+can always use a char instead of a number, and get its ascii value
+zmac gets an error on overflow - if trying to use value in wrong place (i.e. 16 bit in 8 bit space)
+
+!  string:error; number:0 -> 1, all other values -> 0;  char:convert to number first???
+~  string:error, or invert all bytes?  number:invert char:convert to number first
++  string:error, or parse as number?  number:leave as is    char:convert to number
+-  string:error   number:negate   char:convert to number first
+
+*  string/string:error; string/number: repeat string; number/number: multiply
+/  string/string:error; string/number: error; number/number: divide
+%  string/string:error; string/number: error; number/number: modulus
+
++  string/string:concat; string/number: 
+-
+
+<<
+>>
+
+< > <= >=
+
+== = != <>
+
+&
+
+^
+
+|
+
+&&
+
+||
+
+?:
