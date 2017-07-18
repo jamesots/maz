@@ -175,4 +175,40 @@ fdescribe('expr', function() {
             expr.parse(`!"bob"`);
         }).toThrow();
     });
+
+    it('should min things', function() {
+        let result = expr.parse(`min(1, 2)`);
+        expect(result).toBe(1);
+        result = expr.parse(`min('a', 'z')`);
+        expect(result).toBe(97);
+        result = expr.parse(`min("abba", "zappa")`);
+        expect(result).toBe("abba");
+    });
+
+    it('should not min string and number', function() {
+        expect(function() {
+            expr.parse(`min("bob", 1)`);
+        }).toThrow();
+        expect(function() {
+            expr.parse(`min(1, "bob")`);
+        }).toThrow();
+    });
+
+    it('should max things', function() {
+        let result = expr.parse(`max(1, 2)`);
+        expect(result).toBe(2);
+        result = expr.parse(`max('a', 'z')`);
+        expect(result).toBe(122);
+        result = expr.parse(`max("abba", "zappa")`);
+        expect(result).toBe("zappa");
+    });
+
+    it('should not max string and number', function() {
+        expect(function() {
+            expr.parse(`max("bob", 1)`);
+        }).toThrow();
+        expect(function() {
+            expr.parse(`max(1, "bob")`);
+        }).toThrow();
+    });
 });

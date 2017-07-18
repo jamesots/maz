@@ -143,6 +143,7 @@ term = t1:unary t2:(ws? [*/%] ws? unary)* {
 factor = '(' expr:expr ')' {
         return expr;
     }
+    / function
     / number_literal
     / label:label {
         return {
@@ -150,6 +151,29 @@ factor = '(' expr:expr ')' {
         }
     }
     / string
+
+function = 'min('i ws? expr1:expr ws? ',' ws? expr2:expr ws? ')' {
+        expr1 = lookupVar(expr1);
+        expr2 = lookupVar(expr2);
+        if ((isString(expr1) && !isString(expr2)) || (!isString(expr1) && isString(expr2))) {
+            throw `Cannot find min of number and string (${expr1}, ${expr2})`;
+        }
+        if (isString(expr1)) {
+            return expr1 <= expr2 ? expr1 : expr2;
+        }
+        return Math.min(toNumber(lookupVar(expr1)), toNumber(lookupVar(expr2)));
+    }
+    / 'max('i ws? expr1:expr ws? ',' ws? expr2:expr ws? ')' {
+        expr1 = lookupVar(expr1);
+        expr2 = lookupVar(expr2);
+        if ((isString(expr1) && !isString(expr2)) || (!isString(expr1) && isString(expr2))) {
+            throw `Cannot find max of number and string (${expr1}, ${expr2})`;
+        }
+        if (isString(expr1)) {
+            return expr1 >= expr2 ? expr1 : expr2;
+        }
+        return Math.max(toNumber(lookupVar(expr1)), toNumber(lookupVar(expr2)));
+    }
 
 unary = operator:[\!~]? expr:factor {
     expr = lookupVar(expr);
