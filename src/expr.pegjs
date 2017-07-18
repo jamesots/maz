@@ -22,7 +22,7 @@
     }
 
     function shift(t1, t2, operator) {
-        if (operator === '<<') {
+        if (operator === '<<' || operator === 'shl') {
             return t1 << t2;
         }
         return t1 >> t2;
@@ -80,22 +80,7 @@
 
 start = expr
 
-labeldef = label:label ':' {
-    return {
-        label: label
-    }
-}
-
-label = text1:[a-zA-Z] text2:[a-zA-Z0-9_]* !{
-        const text = text1 + text2.join('');
-        return (text === 'bc' || text === 'de' || text === 'hl' || text === 'sp');
-    } {
-        return text();
-    }
-
-
 ws = [ \t]+
-wsnl = [ \t\r\n]+
 
 expr = ternary
 
@@ -168,7 +153,7 @@ bitwiseand = t1:equal t2:(ws? ('&'/'and'i) ws? equal)* {
         return result;
     }
 
-equal = t1:greaterless t2:(ws? ('=='/'='/'!='/'<>') ws? greaterless)* {
+equal = t1:greaterless t2:(ws? ('=='/'='/'!='/'<>'/'eq'/'ne') ws? greaterless)* {
         let result = lookupVar(t1);
         for (const group of t2) {
             const operator = group[1];
@@ -176,11 +161,13 @@ equal = t1:greaterless t2:(ws? ('=='/'='/'!='/'<>') ws? greaterless)* {
 
             switch (operator) {
                 case '==' : 
-                case '=' : 
+                case '=' :
+                case 'eq' : 
                     result = result == term ? 1 : 0;
                     break;
                 case '!=' : 
-                case '<>' : 
+                case '<>' :
+                case 'ne' : 
                     result = result != term ? 1 : 0;
                     break;
             }
@@ -188,7 +175,7 @@ equal = t1:greaterless t2:(ws? ('=='/'='/'!='/'<>') ws? greaterless)* {
         return result;
     }
 
-greaterless = t1:shift t2:(ws? ('<='/'>='/'<'/'>') ws? shift)* {
+greaterless = t1:shift t2:(ws? ('<='/'>='/'<'/'>'/'lte'/'lt'/'gte'/'gt') ws? shift)* {
         let result = lookupVar(t1);
         for (const group of t2) {
             const operator = group[1];
@@ -196,15 +183,19 @@ greaterless = t1:shift t2:(ws? ('<='/'>='/'<'/'>') ws? shift)* {
 
             switch (operator) {
                 case '<' : 
+                case 'lt' :
                     result = result < term ? 1 : 0;
                     break;
                 case '>' : 
+                case 'gt' :
                     result = result > term ? 1 : 0;
                     break;
-                case '<=' : 
+                case '<=' :
+                case 'lte' : 
                     result = result <= term ? 1 : 0;
                     break;
                 case '>=' : 
+                case 'gte' :
                     result = result >= term ? 1 : 0;
                     break;
             }
@@ -212,7 +203,7 @@ greaterless = t1:shift t2:(ws? ('<='/'>='/'<'/'>') ws? shift)* {
         return result;
     }
 
-shift = t1:plusminus t2:(ws? ('<<'/'>>') ws? plusminus)* {
+shift = t1:plusminus t2:(ws? ('<<'/'>>'/'shl'/'shr') ws? plusminus)* {
         let result = lookupVar(t1);
         for (const group of t2) {
             const operator = group[1];
@@ -256,6 +247,23 @@ term = t1:unary t2:(ws? [*/%] ws? unary)* {
         return result;
     }
 
+unary = operator:[!~+-]? expr:factor {
+    expr = lookupVar(expr);
+    if (operator && isString(expr)) {
+        throw `Cannot ${operator} a string (${expr})`;
+    }
+    if (operator === '!') {
+        return toNumber(expr) === 0 ? 1 : 0;
+    } else if (operator === '~') {
+        return ~toNumber(expr);
+    } else if (operator === '+') {
+        return toNumber(expr);
+    } else if (operator === '-') {
+        return -toNumber(expr);
+    }
+    return expr;
+}
+
 factor = '(' expr:expr ')' {
         return expr;
     }
@@ -290,23 +298,6 @@ function = 'min('i ws? expr1:expr ws? ',' ws? expr2:expr ws? ')' {
         }
         return Math.max(toNumber(expr1), toNumber(expr2));
     }
-
-unary = operator:[!~+-]? expr:factor {
-    expr = lookupVar(expr);
-    if (operator && isString(expr)) {
-        throw `Cannot ${operator} a string (${expr})`;
-    }
-    if (operator === '!') {
-        return toNumber(expr) === 0 ? 1 : 0;
-    } else if (operator === '~') {
-        return ~toNumber(expr);
-    } else if (operator === '+') {
-        return toNumber(expr);
-    } else if (operator === '-') {
-        return -toNumber(expr);
-    }
-    return expr;
-}
 
 number_literal = binary_literal
     / hex_literal
@@ -365,3 +356,9 @@ hex_escape_sequence = "x" digits:$([0-9a-f]i [0-9a-f]i) {
         return String.fromCharCode(parseInt(digits, 16));
     }
 
+label = text1:[a-zA-Z] text2:[a-zA-Z0-9_]* !{
+        const text = text1 + text2.join('');
+        return (text === 'bc' || text === 'de' || text === 'hl' || text === 'sp');
+    } {
+        return text();
+    }
