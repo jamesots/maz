@@ -175,7 +175,7 @@ function = 'min('i ws? expr1:expr ws? ',' ws? expr2:expr ws? ')' {
         return Math.max(toNumber(lookupVar(expr1)), toNumber(lookupVar(expr2)));
     }
 
-unary = operator:[\!~]? expr:factor {
+unary = operator:[\!~+-]? expr:factor {
     expr = lookupVar(expr);
     if (operator && isString(expr)) {
         throw `Cannot ${operator} a string (${expr})`;
@@ -184,6 +184,10 @@ unary = operator:[\!~]? expr:factor {
         return toNumber(expr) === 0 ? 1 : 0;
     } else if (operator === '~') {
         return (~toNumber(expr)) & 0xFF;
+    } else if (operator === '+') {
+        return toNumber(expr);
+    } else if (operator === '-') {
+        return -toNumber(expr);
     }
     return expr;
 }

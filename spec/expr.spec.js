@@ -211,4 +211,38 @@ fdescribe('expr', function() {
             expr.parse(`max(1, "bob")`);
         }).toThrow();
     });
+
+    it('should recognise +', function() {
+        let result = expr.parse(`+5`);
+        expect(result).toBe(5);
+        result = expr.parse(`2 + +3`);
+        expect(result).toBe(5);
+        result = expr.parse(`2++3`);
+        expect(result).toBe(5);
+        result = expr.parse(`+'a'`);
+        expect(result).toBe(97);
+    });
+
+    it('should recognise -', function() {
+        let result = expr.parse(`-5`);
+        expect(result).toBe(-5);
+        result = expr.parse(`2 + -3`);
+        expect(result).toBe(-1);
+        result = expr.parse(`2+-3`);
+        expect(result).toBe(-1);
+        result = expr.parse(`-'a'`);
+        expect(result).toBe(-97);
+    });
+
+    it('should not allow + string', function() {
+        expect(function() {
+            expr.parse(`+"bob"`);
+        }).toThrow();
+    });
+
+    it('should not allow - string', function() {
+        expect(function() {
+            expr.parse(`-"bob"`);
+        }).toThrow();
+    });
 });
