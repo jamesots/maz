@@ -1,6 +1,6 @@
 const expr = require('../build/expr');
 
-fdescribe('expr', function() {
+describe('expr', function() {
     it('should parse number', function() {
         const result = expr.parse(`123`);
         expect(result).toBe(123);

@@ -1,6 +1,20 @@
 {
     const Parser = require('expr-eval').Parser;
 
+    function exprVars(els, indices) {
+        let varlist = [];
+        if (els) {
+            for (let i = 0; i < els.length; i++) {
+                const el = els[i];
+                for (let j = 0; j < indices.length; j++) {
+                    const index = indices[j];
+                    varlist = varlist.concat(el[index]);
+                }
+            }
+        }
+        return varlist;
+    }
+
     function expr16(expr) {
         if (expr.expression) {
             return [expr, null]
@@ -1154,50 +1168,75 @@ ixyhl = 'ixh'i { return [0xdd, 0]; }
 ws = [ \t]+
 wsnl = [ \t\r\n]+
 
-expr = t1:term t2:(ws? [+-] ws? term)* {
-        let result = t1;
-        for (const term of t2) {
-            result += ` ${term[1]} ${term[3]}`;
-        }
-        try {
-            const value = Parser.evaluate(new String(result));
-            return value;
-        } catch (e) {
-            return {
-                expression: result
-            }
-        }
+expr = t1:ternary {
+    return {
+        expression: text(),
+        vars: t1
     }
-
-term = t1:factor t2:(ws? [*/] ws? factor)* {
-        let result = t1;
-        for (const term of t2) {
-            result += ` ${term[1]} ${term[3]}`;
-        }
-        return result;
+}
+ternary = t1:logicalor t2:(ws? '?' ws? t2:expr ws? ':' ws? t3:expr)?  { 
+    return  t1.concat(exprVars(t2, [3, 7]));
+}
+logicalor = t1:logicaland t2:(ws? '||' ws? logicaland)*  {
+    return  t1.concat(exprVars(t2, [3]));
+}
+logicaland = t1:bitwiseor t2:(ws? '&&' ws? bitwiseor)*  {
+    return  t1.concat(exprVars(t2, [3]));
+}
+bitwiseor = t1:bitwisexor t2:(ws? ('|'/'or'i) ws? bitwisexor)*  { 
+    return  t1.concat(exprVars(t2, [3]));
+}
+bitwisexor = t1:bitwiseand t2:(ws? ('^'/'xor'i) ws? bitwiseand)* { 
+    return  t1.concat(exprVars(t2, [3]));
+}
+bitwiseand = t1:equal t2:(ws? ('&'/'and'i) ws? equal)*  { 
+    return  t1.concat(exprVars(t2, [3]));
+}
+equal = t1:greaterless t2:(ws? ('=='/'='/'!='/'<>'/'eq'/'ne') ws? greaterless)*  { 
+    return  t1.concat(exprVars(t2, [3]));
+}
+greaterless = t1:shift t2:(ws? ('<='/'>='/'<'/'>'/'lte'/'lt'/'gte'/'gt') ws? shift)*  { 
+    return  t1.concat(exprVars(t2, [3]));
+}
+shift = t1:plusminus t2:(ws? ('<<'/'>>'/'shl'/'shr') ws? plusminus)*  { 
+    return  t1.concat(exprVars(t2, [3]));
+}
+plusminus = t1:term t2:(ws? [+-] ws? term)*  { 
+    return  t1.concat(exprVars(t2, [3]));
+}
+term = t1:unary t2:(ws? [*/%] ws? unary)*  { 
+    return  t1.concat(exprVars(t2, [3]));
+}
+unary = operator:[!~+-]? expr:factor  { 
+    return expr;
+}
+factor = '(' expr:expr ')'  { 
+        return expr;
     }
-
-factor = '(' expr ')'
-    / number_literal
-    / label
-
-number_literal = binary_literal
-    / hex_literal
-    / decimal_literal
-    / octal_literal
-
-decimal_literal = [0-9][0-9_]* {
-        return parseInt(text().replace(/_/g,''), 10)
+    / f:function { 
+        return f;
     }
-hex_literal = '$' [0-9a-f]i[0-9a-f_]i* {
-        return parseInt(text().replace(/[_\$]/g,''), 16);
+    / number_literal { 
+        return [];
     }
-    / [0-9a-f][0-9a-f_]i* 'h' {
-        return parseInt(text().replace(/[_h]/g,''), 16)
+    / label:label { 
+        return [label];
     }
-binary_literal = [01][01_]* 'b' {
-        return parseInt(text().replace(/[_b]/g,''), 2)
+    / string { 
+        return [];
     }
-octal_literal = [0-7][0-7_]* 'o' {
-        return parseInt(text().replace(/[_o]/g,''), 8)
+function = 'min('i ws? expr1:expr ws? ',' ws? expr2:expr ws? ')'  { 
+        return expr1.concat(expr2);
     }
+    / 'max('i ws? expr1:expr ws? ',' ws? expr2:expr ws? ')' { 
+        return expr1.concat(expr2);
+    }
+number_literal = binary_literal { return []; }
+    / hex_literal { return []; }
+    / decimal_literal { return []; }
+    / octal_literal { return []; }
+decimal_literal = [0-9][0-9_]*  { return []; }
+hex_literal = '$' [0-9a-f]i[0-9a-f_]i*  { return []; }
+    / [0-9][0-9a-f_]i* 'h'  { return []; }
+binary_literal = [01][01_]* 'b'  { return []; }
+octal_literal = [0-7][0-7_]* 'o'  { return []; }

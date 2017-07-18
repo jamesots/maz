@@ -1,6 +1,6 @@
 const expr = require('../build/expr-vars');
 
-fdescribe('expr-reduced', function() {
+    describe('expr-reduced', function() {
     it('should parse things', function() {
         const result = expr.parse(`123 + thing * bob + max(a, b + 2 * "hello")`);
         console.log(JSON.stringify(result, undefined, 2));
