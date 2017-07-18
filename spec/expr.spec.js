@@ -300,4 +300,31 @@ fdescribe('expr', function() {
         result = expr.parse(`10 <> 10`);
         expect(result).toBe(0);
     });
+
+    it('should bitwise and things', function() {
+        let result = expr.parse(`11111111b and 11001010b`);
+        expect(result).toBe(0b11001010);
+        result = expr.parse(`10101100b & 11001010b`);
+        expect(result).toBe(0b10001000);
+        result = expr.parse(`10101100b & 11001010b and 10000000b`);
+        expect(result).toBe(0b10000000);
+    });
+
+    it('should bitwise xor things', function() {
+        let result = expr.parse(`11111111b xor 11001010b`);
+        expect(result).toBe(0b00110101);
+        result = expr.parse(`10101100b ^ 11001010b`);
+        expect(result).toBe(0b01100110);
+        result = expr.parse(`10101100b ^ 11001010b xor 10000000b`);
+        expect(result).toBe(0b11100110);
+    });
+
+    it('should bitwise or things', function() {
+        let result = expr.parse(`11110000b or 11001010b`);
+        expect(result).toBe(0b11111010);
+        result = expr.parse(`10101100b | 11001010b`);
+        expect(result).toBe(0b11101110);
+        result = expr.parse(`10101100b | 11001010b or 10000001b`);
+        expect(result).toBe(0b11101111);
+    });
 });

@@ -97,7 +97,40 @@ label = text1:[a-zA-Z] text2:[a-zA-Z0-9_]* !{
 ws = [ \t]+
 wsnl = [ \t\r\n]+
 
-expr = equal
+expr = bitwiseor
+
+bitwiseor = t1:bitwisexor t2:(ws? ('|'/'or'i) ws? bitwisexor)* {
+        let result = lookupVar(t1);
+        for (const group of t2) {
+            const operator = group[1];
+            const term = lookupVar(group[3]);
+
+            result = result | term;
+        }
+        return result;
+    }
+
+bitwisexor = t1:bitwiseand t2:(ws? ('^'/'xor'i) ws? bitwiseand)* {
+        let result = lookupVar(t1);
+        for (const group of t2) {
+            const operator = group[1];
+            const term = lookupVar(group[3]);
+
+            result = result ^ term;
+        }
+        return result;
+    }
+
+bitwiseand = t1:equal t2:(ws? ('&'/'and'i) ws? equal)* {
+        let result = lookupVar(t1);
+        for (const group of t2) {
+            const operator = group[1];
+            const term = lookupVar(group[3]);
+
+            result = result & term;
+        }
+        return result;
+    }
 
 equal = t1:greaterless t2:(ws? ('=='/'='/'!='/'<>') ws? greaterless)* {
         let result = lookupVar(t1);
