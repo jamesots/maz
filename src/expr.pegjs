@@ -97,7 +97,27 @@ label = text1:[a-zA-Z] text2:[a-zA-Z0-9_]* !{
 ws = [ \t]+
 wsnl = [ \t\r\n]+
 
-expr = greaterless
+expr = equal
+
+equal = t1:greaterless t2:(ws? ('=='/'='/'!='/'<>') ws? greaterless)* {
+        let result = lookupVar(t1);
+        for (const group of t2) {
+            const operator = group[1];
+            const term = lookupVar(group[3]);
+
+            switch (operator) {
+                case '==' : 
+                case '=' : 
+                    result = result == term ? 1 : 0;
+                    break;
+                case '!=' : 
+                case '<>' : 
+                    result = result != term ? 1 : 0;
+                    break;
+            }
+        }
+        return result;
+    }
 
 greaterless = t1:shift t2:(ws? ('<='/'>='/'<'/'>') ws? shift)* {
         let result = lookupVar(t1);
