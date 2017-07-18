@@ -1,4 +1,4 @@
-const expr = require('../build/expr-reduced');
+const expr = require('../build/expr-vars');
 
 fdescribe('expr-reduced', function() {
     it('should parse things', function() {
