@@ -349,4 +349,13 @@ fdescribe('expr', function() {
         result = expr.parse(`12 || 0`);
         expect(result).toBe(1);
     });
+
+    it('should do ternary things', function() {
+        let result = expr.parse(`1 ? 2 : 3`);
+        expect(result).toBe(2);
+        result = expr.parse(`0 ? 2 : 3`);
+        expect(result).toBe(3);
+        result = expr.parse(`10 ? 2 : 3`);
+        expect(result).toBe(2);
+    });
 });

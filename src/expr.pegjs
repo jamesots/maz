@@ -97,7 +97,21 @@ label = text1:[a-zA-Z] text2:[a-zA-Z0-9_]* !{
 ws = [ \t]+
 wsnl = [ \t\r\n]+
 
-expr = logicalor
+expr = ternary
+
+ternary = t1:logicalor t2:(ws? '?' ws? t2:expr ws? ':' ws? t3:expr)? {
+    t1 = lookupVar(t1);
+    if (t2) {
+        let trueval = lookupVar(t2[3]);
+        let falseval = lookupVar(t2[7]);
+        if (t1 != 0) {
+            return trueval;
+        } else {
+            return falseval;
+        }
+    }
+    return t1;
+}
 
 logicalor = t1:logicaland t2:(ws? '||' ws? logicaland)* {
         let result = lookupVar(t1);
