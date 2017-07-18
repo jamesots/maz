@@ -124,7 +124,7 @@ plusminus = t1:term t2:(ws? [+-] ws? term)* {
         return result;
     }
 
-term = t1:factor t2:(ws? [*/%] ws? factor)* {
+term = t1:unary t2:(ws? [*/%] ws? unary)* {
         let result = t1;
         for (const group of t2) {
             const operator = group[1];
@@ -150,6 +150,19 @@ factor = '(' expr:expr ')' {
         }
     }
     / string
+
+unary = operator:[\!~]? expr:factor {
+    expr = lookupVar(expr);
+    if (operator && isString(expr)) {
+        throw `Cannot ${operator} a string (${expr})`;
+    }
+    if (operator === '!') {
+        return toNumber(expr) === 0 ? 1 : 0;
+    } else if (operator === '~') {
+        return (~toNumber(expr)) & 0xFF;
+    }
+    return expr;
+}
 
 number_literal = binary_literal
     / hex_literal

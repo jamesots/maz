@@ -144,4 +144,35 @@ fdescribe('expr', function() {
         const result = expr.parse(`6 + 2 >> 2`);
         expect(result).toBe(2);
     });
+
+    it('should not 0 to 1', function() {
+        const result = expr.parse(`!0`);
+        expect(result).toBe(1);
+    });
+
+    it('should not other numbers to 0', function() {
+        let result = expr.parse(`!1`);
+        expect(result).toBe(0);
+        result = expr.parse(`!12`);
+        expect(result).toBe(0);
+    });
+
+    it('should invert numbers', function() {
+        let result = expr.parse(`~1`);
+        expect(result).toBe(0xFE);
+        result = expr.parse(`~240`);
+        expect(result).toBe(15);
+    });
+
+    it('should not invert strings', function() {
+        expect(function() {
+            expr.parse(`~"bob"`);
+        }).toThrow();
+    });
+
+    it('should not not strings', function() {
+        expect(function() {
+            expr.parse(`!"bob"`);
+        }).toThrow();
+    });
 });
