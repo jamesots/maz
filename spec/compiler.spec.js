@@ -29,7 +29,6 @@ describe('compiler', function() {
             two: null
         });
         expect(ast[1].prefix).toBe('%0_');
-        expect(ast[3].prefix).toBe('%0_');
     });
     it('should get symbols in two blocks', function() {
         const ast = [
@@ -50,9 +49,7 @@ describe('compiler', function() {
             two: null
         });
         expect(ast[1].prefix).toBe('%0_');
-        expect(ast[3].prefix).toBe('%0_');
         expect(ast[4].prefix).toBe('%1_');
-        expect(ast[6].prefix).toBe('%1_');
     });
     it('should get symbols in nested blocks', function() {
         const ast = [
@@ -74,8 +71,6 @@ describe('compiler', function() {
         });
         expect(ast[1].prefix).toBe('%0_');
         expect(ast[3].prefix).toBe('%1_%0_');
-        expect(ast[5].prefix).toBe('%1_%0_');
-        expect(ast[6].prefix).toBe('%0_');
     });
     it('should get symbols in multiple nested blocks', function() {
         const ast = [
@@ -105,12 +100,8 @@ describe('compiler', function() {
         });
         expect(ast[1].prefix).toBe('%0_');
         expect(ast[3].prefix).toBe('%1_%0_');
-        expect(ast[5].prefix).toBe('%1_%0_');
-        expect(ast[6].prefix).toBe('%0_');
         expect(ast[7].prefix).toBe('%2_');
         expect(ast[8].prefix).toBe('%3_%2_');
-        expect(ast[10].prefix).toBe('%3_%2_');
-        expect(ast[12].prefix).toBe('%2_');
     });
     it('should assign PC', function() {
         const ast = [
@@ -249,7 +240,7 @@ describe('compiler', function() {
             { label: '%0_one' },
             { equ: 2 },
             { bytes: [ {expression: 'one', vars: ['one']}], references: ['one']},
-            { endblock: true, prefix: '%0_'},
+            { endblock: true},
             { bytes: [ {expression: 'one', vars: ['one']}], references: ['one']}
         ];
         const symbols = {
@@ -264,7 +255,7 @@ describe('compiler', function() {
             { label: '%0_one' },
             { equ: 2 },
             { bytes: [ 2 ], references: ['one']},
-            { endblock: true, prefix: '%0_'},
+            { endblock: true},
             { bytes: [ 1 ], references: ['one']}
         ])
     });

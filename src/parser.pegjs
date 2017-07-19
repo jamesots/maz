@@ -90,6 +90,7 @@ unlabelled_statement = directive
 
 directive = org
     / db
+    / ds
     / equ
     / macro
     / endm
@@ -178,6 +179,12 @@ equ = '.'? 'equ'i ws expr:expr {
         equ: expr,
         location: loc()
     }
+}
+
+ds = '.'? ('ds'i / 'defs'i) ws? expr:expr {
+    return {
+        defs: expr  // note: expression must be evaluable before assigning addresses
+    };
 }
 
 db = '.'? ('db'i / 'defb'i) ws? dbytes:dbytes {

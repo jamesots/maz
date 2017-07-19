@@ -1545,8 +1545,7 @@ cmd_read_block:  ; read single block
 cmd_write_block:  ; write single block
     db $58,0,0,0,0,$01
 
-buffer: db 0
-; buffer: ds 512
+buffer: ds 512
 
 init_sd_card:
     spi_set_cs 1
@@ -1688,8 +1687,7 @@ dumpline: db '                                                                  
 difference: db 'XXXX:XX XXXX:XX\n',0
 bcd_time: db 'xxx'
 bcd_date: db 'xxxx'
-line: db 256
-; line: ds 256
+line: ds 256
 size: db 0,0
 source: db 0,0
 dest: db 0,0

@@ -97,7 +97,6 @@ export function getSymbols(ast) {
             el.prefix = labelPrefix(blocks);
             nextBlock++;
         } else if (el.endblock || el.endmacrocall) {
-            el.prefix = labelPrefix(blocks);
             blocks.pop();
         } else if (el.macrocall) {
             blocks.push(nextBlock);
@@ -167,8 +166,16 @@ export function expandMacros(ast, macros) {
 export function assignPCandEQU(ast, symbols) {
     let pc = 0;
     let inMacro = false;
+    let prefixes = [];
     for (let i = 0; i < ast.length; i++) {
         const el = ast[i];
+        if (el.prefix) {
+            prefixes.push(el.prefix);
+        }
+        if (el.endmacro || el.endblock) {
+            prefixes.pop();
+        }
+
         if (el.macrodef) {
             inMacro = true;
         } else if (el.endmacro) {
@@ -180,6 +187,12 @@ export function assignPCandEQU(ast, symbols) {
         if (el.label) {
             symbols[el.label] = pc;
             continue;
+        } else if (el.defs !== undefined) {
+            let size = el.defs;
+            if (size.expression) {
+                size = evaluateExpression(prefixes[prefixes.length - 1] || '', size.expression, symbols, []);
+            }
+            pc += size;
         } else if (el.equ) {
             if (i > 0 && ast[i - 1].label) {
                 let ii = i - 1;
@@ -190,7 +203,7 @@ export function assignPCandEQU(ast, symbols) {
             } else {
                 console.log("Error: equ has no label " + location(el));
             }
-        } else if (el.org) {
+        } else if (el.org !== undefined) {
             pc = el.org;
         } else if (el.bytes) {
             el.address = pc;
@@ -201,14 +214,9 @@ export function assignPCandEQU(ast, symbols) {
     }
 }
 
-export function evaluateSymbol(symbol, symbols, evaluated) {
-    if (evaluated.indexOf(symbol) !== -1) {
-        throw "Circular symbol dependency";
-    }
-    evaluated.push(symbol);
-    const variables = symbols[symbol].vars;
+export function evaluateExpression(prefix, expr, symbols, evaluated) {
+    const variables = expr.vars;
     const subVars = {}; // substitute variables
-    const prefix = getWholePrefix(symbol);
     for (const variable of variables) {
         const subVar = findVariable(symbols, prefix, variable);
 
@@ -220,7 +228,16 @@ export function evaluateSymbol(symbol, symbols, evaluated) {
         }
         subVars[variable] = symbols[subVar];
     }
-    symbols[symbol] = Expr.parse(symbols[symbol].expression, {variables: subVars});
+    return Expr.parse(expr.expression, {variables: subVars});
+}
+
+export function evaluateSymbol(symbol, symbols, evaluated) {
+    if (evaluated.indexOf(symbol) !== -1) {
+        throw "Circular symbol dependency";
+    }
+    evaluated.push(symbol);
+    const prefix = getWholePrefix(symbol);
+    symbols[symbol] = evaluateExpression(prefix, symbols[symbol], symbols, evaluated)
 }
 
 export function findVariable(symbols, prefix, variable) {
@@ -270,7 +287,7 @@ export function updateBytes(ast, symbols) {
     const prefixes = [];
     let inMacro = false;
     for (const el of ast) {
-        if (el.block || el.macrocall) {
+        if (el.prefix) {
             prefixes.push(el.prefix);
         }
         if (el.endblock || el.endmacrocall) {

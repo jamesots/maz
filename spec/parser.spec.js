@@ -20,12 +20,12 @@ describe('parser', function() {
     }
 
     it('should parse empty file', function() {
-        const result = parse(``)
+        const result = parse(``);
         expect(result).toBeNull();
     });
     it('should parse whitespace only', function() {
         const result = parse(`      
-        `)
+        `);
         expect(result).toBeNull();
     });
     it('should parse nop', function() {
@@ -1251,7 +1251,7 @@ describe('parser', function() {
         ['push iy', [0xfd, 0xe5]],
         ['jp (iy)', [0xfd, 0xe9]],
         ['ld sp,iy', [0xfd, 0xf9]],
-    ]
+    ];
     for (const opcode of opcodes) {
         it('should parse ' + opcode[0], function() {;
             const result = parse(opcode[0]);
@@ -1362,6 +1362,27 @@ nop`);
             params: ['a', 'b', 'c'],
             location: {
                 line: 1, column: 1
+            }
+        });
+    });
+    it('should parse defs', function() {
+        const result = parse('defs 123');
+        expect(result[0]).toEqual({
+            defs: 123
+        });
+    });
+    it('should parse ds', function() {
+        const result = parse('ds 123');
+        expect(result[0]).toEqual({
+            defs: 123
+        });
+    });
+    it('should parse ds with expression', function() {
+        const result = parse('ds a + 2');
+        expect(result[0]).toEqual({
+            defs: {
+                expression: 'a + 2',
+                vars: ['a']
             }
         });
     });
