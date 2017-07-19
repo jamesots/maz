@@ -9,6 +9,7 @@ sourceMapSupport.install();
 const optionDefinitions = [
     { name: 'src', alias: 's', type: String, multiple: false, defaultOption: true },
     { name: 'out', alias: 'o', type: String, multiple: false },
+    { name: 'list', alias: 'l', type: String, multiple: false },
     { name: 'help', alias: 'h', type: Boolean, multiple: false }
 ];
 const options = commandLineArgs(optionDefinitions);
@@ -39,7 +40,9 @@ try {
     console.log(JSON.stringify(ast, undefined, 2));
     console.log(JSON.stringify(symbols, undefined, 2));
     const bytes = compiler.getBytes(ast);
-    console.log(JSON.stringify(bytes, undefined, 2));
+    // console.log(JSON.stringify(bytes, undefined, 2));
+    const list = compiler.getList(source, ast);
+    console.log(JSON.stringify(list, undefined, 2)); 
 
     fs.writeFileSync(options.out, Buffer.from(bytes));
 

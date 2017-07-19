@@ -183,6 +183,8 @@ equ = '.'? 'equ'i ws expr:expr {
 
 ds = '.'? ('ds'i / 'defs'i) ws? expr:expr {
     return {
+        text: text(),
+        location: loc(),
         defs: expr  // note: expression must be evaluable before assigning addresses
     };
 }

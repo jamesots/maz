@@ -192,6 +192,7 @@ export function assignPCandEQU(ast, symbols) {
             if (size.expression) {
                 size = evaluateExpression(prefixes[prefixes.length - 1] || '', size, symbols, []);
             }
+            el.address = pc;
             pc += size;
         } else if (el.equ) {
             if (i > 0 && ast[i - 1].label) {
@@ -336,6 +337,41 @@ export function updateBytes(ast, symbols) {
             }
         }
     }    
+}
+
+/**
+ * Each line should be
+ * LLLL ADDR BYTES SRC  - max 8 bytes? - multiple lines if more
+ */
+export function getList(code, ast) {
+    let lines = code.split('\n');
+    let list = [];
+    let inMacro = false;
+    for (const el of ast) {
+        if (el.text) {
+            let byteString = '';
+            if (el.bytes) {
+                for (const byte of el.bytes) {
+                    byteString += pad((byte & 0xFF).toString(16), 2, '0');
+                }
+            }
+            list.push(`${pad(el.location.line, 4)} ${pad(el.address.toString(16), 4, '0')} ${padr(byteString, 12).substring(0, 12)} ${lines[el.location.line - 1]}`);
+            for (let i = 12; i < byteString.length; i += 12) {
+                list.push(`          ${padr(byteString.substring(i, i + 12), 12).substring(0, 12)}`)
+            }
+        }
+    }
+    return list;    
+}
+
+function pad(num, size, chr = ' ') {
+    let result = '' + num;
+    return chr.repeat(Math.max(0, size - result.length)) + result;
+}
+
+function padr(num, size, chr = ' ') {
+    let result = '' + num;
+    return result + chr.repeat(Math.max(0, size - result.length));
 }
 
 export function getBytes(ast) {
