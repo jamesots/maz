@@ -339,6 +339,8 @@ export function updateBytes(ast, symbols) {
     }    
 }
 
+const BYTELEN = 8;
+
 /**
  * Each line should be
  * LLLL ADDR BYTES SRC  - max 8 bytes? - multiple lines if more
@@ -351,10 +353,24 @@ export function getList(code, ast) {
     let address = undefined;
     let bytes = [];
 
+    let inMacro = false;
+    let startingMacro = false;
+    let endingMacro = false;
+
     for (const el of ast) {
         if (el.location) {
             if (el.location.line != line && line !== 0) {
-                dumpLine(list, lines, line, address, bytes);
+                dumpLine(list, lines, line, address, bytes, inMacro);
+
+                if (endingMacro) {
+                    inMacro = false;
+                    endingMacro = false;
+                }
+                if (startingMacro) {
+                    list.push('           ' + ' '.repeat(BYTELEN * 2) + '* UNROLL MACRO')
+                    inMacro = true;
+                    startingMacro = false;
+                }
 
                 address = undefined;
                 bytes = [];
@@ -367,15 +383,20 @@ export function getList(code, ast) {
                 bytes = el.bytes;
             }
         }
+        if (el.macrocall) {
+            startingMacro = true;
+        }
+        if (el.endmacrocall) {
+            endingMacro = true;
+        }
     }
     if (lines[line - 1]) {
-        dumpLine(list, lines, line, address, bytes);
+        dumpLine(list, lines, line, address, bytes, inMacro);
     }
     return list;    
 }
 
-function dumpLine(list, lines, line, address, bytes) {
-    const BYTELEN = 8;
+function dumpLine(list, lines, line, address, bytes, inMacro) {
     let byteString = '';
     if (bytes) {
         for (const byte of bytes) {
@@ -386,7 +407,7 @@ function dumpLine(list, lines, line, address, bytes) {
     if (address) {
         addressString = pad(address.toString(16), 4, '0');
     }
-    list.push(`${pad(line, 4)} ${addressString} ${padr(byteString, BYTELEN * 2).substring(0, BYTELEN * 2)} ${lines[line - 1]}`);
+    list.push(`${pad(line, 4)} ${addressString} ${padr(byteString, BYTELEN * 2).substring(0, BYTELEN * 2)} ${inMacro ? '*' : ' '}${lines[line - 1]}`);
     for (let i = BYTELEN * 2; i < byteString.length; i += BYTELEN * 2) {
         list.push(`          ${padr(byteString.substring(i, i + BYTELEN * 2), BYTELEN * 2).substring(0,BYTELEN * 2)}`)
     }
