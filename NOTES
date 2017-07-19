@@ -103,6 +103,8 @@ and their values are also initialized.
 
 EXPRESSIONS
 
+This might all be lies:
+
 can always use a char instead of a number, and get its ascii value
 zmac gets an error on overflow - if trying to use value in wrong place (i.e. 16 bit in 8 bit space)
 
