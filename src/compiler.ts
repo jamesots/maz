@@ -149,7 +149,7 @@ export function expandMacros(ast, macros) {
             }
             el.params = JSON.parse(JSON.stringify(macro.params));
             el.expanded = true;
-            ast.splice(i + 1, 0, ...macro.ast);
+            ast.splice(i + 1, 0, ...(JSON.parse(JSON.stringify(macro.ast))));
             ast.splice(i + 1 + macro.ast.length, 0, { endmacrocall: true });
             i += macro.ast.length + 1;
         }

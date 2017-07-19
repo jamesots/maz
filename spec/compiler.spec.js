@@ -373,6 +373,46 @@ describe('compiler', function() {
             { bytes: [4] }
         ]);
     });
+    it('should make copy of macro when expanding', function() {
+        const ast = [
+            { macrodef: 'thing', params: ['a', 'b'] },
+            { bytes: [1, 2, 3, {expression: 'a + b', vars: ['a', 'b']}] },
+            { endmacro: true },
+            { bytes: [0] },
+            { macrocall: 'thing', args: [1,'hello'] },
+            { macrocall: 'thing', args: [2,'bob'] },
+            { bytes: [4] }
+        ];
+        const macros = compiler.getMacros(ast);
+        compiler.expandMacros(ast, macros);
+        expect(ast).toEqual([
+            { macrodef: 'thing', params: ['a', 'b'] },
+            { bytes: [1, 2, 3, {expression: 'a + b', vars: ['a', 'b']}] },
+            { endmacro: true},
+            { bytes: [0] },
+            { macrocall: 'thing', params: ['a', 'b'], args: [1,'hello'], expanded: true },
+            { bytes: [1, 2, 3, {expression: 'a + b', vars: ['a', 'b']}] },
+            { endmacrocall: true },
+            { macrocall: 'thing', params: ['a', 'b'], args: [2,'bob'], expanded: true },
+            { bytes: [1, 2, 3, {expression: 'a + b', vars: ['a', 'b']}] },
+            { endmacrocall: true },
+            { bytes: [4] }
+        ]);
+        ast[8].bytes = [3];
+        expect(ast).toEqual([
+            { macrodef: 'thing', params: ['a', 'b'] },
+            { bytes: [1, 2, 3, {expression: 'a + b', vars: ['a', 'b']}] },
+            { endmacro: true},
+            { bytes: [0] },
+            { macrocall: 'thing', params: ['a', 'b'], args: [1,'hello'], expanded: true },
+            { bytes: [1, 2, 3, {expression: 'a + b', vars: ['a', 'b']}] },
+            { endmacrocall: true },
+            { macrocall: 'thing', params: ['a', 'b'], args: [2,'bob'], expanded: true },
+            { bytes: [3] },
+            { endmacrocall: true },
+            { bytes: [4] }
+        ]);
+    });
     it('should get symbols from expanded macros', function() {
         const ast = [
             { macrodef: 'thing', params: ['a', 'b'] },
