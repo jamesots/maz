@@ -41,7 +41,7 @@ try {
     console.log(JSON.stringify(symbols, undefined, 2));
     const bytes = compiler.getBytes(ast);
     // console.log(JSON.stringify(bytes, undefined, 2));
-    const list = compiler.getList(source, ast);
+    const list = compiler.getList(source, ast, symbols);
     console.log(JSON.stringify(list, undefined, 2)); 
 
     fs.writeFileSync(options.out, Buffer.from(bytes));

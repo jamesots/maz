@@ -345,7 +345,7 @@ const BYTELEN = 8;
  * Each line should be
  * LLLL ADDR BYTES SRC  - max 8 bytes? - multiple lines if more
  */
-export function getList(code, ast) {
+export function getList(code, ast, symbols) {
     let lines = code.split('\n');
     let list = [];
     let line = 0;
@@ -393,6 +393,15 @@ export function getList(code, ast) {
     if (lines[line - 1]) {
         dumpLine(list, lines, line, address, bytes, inMacro);
     }
+
+    list.push('');
+
+    for (const symbol in symbols) {
+        if (!symbol.startsWith('%')) {
+            list.push(`${padr(symbol, 20)} ${pad(symbols[symbol].toString(16), 4, '0')}`);
+        }
+    }
+
     return list;    
 }
 
