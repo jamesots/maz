@@ -11,7 +11,8 @@
     "tsc-watch": "tsc --watch",
     "test": "jasmine",
     "xtest": "jasmine-ts 'spec/**/*.spec.ts'",
-    "start": "node build/maz.js"
+    "start": "node build/maz.js",
+    "z80": "node build/maz.js -s examples/z80monitor.z80 -o /tmp/build.bin"
   },
   "author": "James Ots <code@jamesots.com>",
   "license": "MIT",

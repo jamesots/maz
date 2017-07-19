@@ -227,9 +227,9 @@ found_jump:
 to_upper:
     cp 'a'
     ret c
-    ; cp 'z' + 1
+    cp 'z' + 1
     ret nc
-    ; sub 'a' - 'A'
+    sub 'a' - 'A'
     ret
 
 rtc_ctrl_a: equ $2f
@@ -374,7 +374,7 @@ next:
 ; store an address with MSB first, with bit 7 set to 1
 .macro djump val
     db (val / $100) + $80
-    ; db val & $ff
+    db val & $ff
 .endm
 
 cmd_help:
@@ -637,16 +637,16 @@ parse_next:
     call to_upper
     cp '0'
     jp c,bad_hex
-    ; cp '9' + 1
+    cp '9' + 1
     jp nc,not_decimal
     sub '0'
     jp add_digit
 not_decimal:
     cp 'A'
     jp c,bad_hex
-    ; cp 'F' + 1
+    cp 'F' + 1
     jp nc,bad_hex
-    ; sub 'A' - 10
+    sub 'A' - 10
 add_digit:
     add a,c
     ld c,a
@@ -702,7 +702,7 @@ format_hex_2:
 next_digit:
     cp 10
     jp c,num
-    ; add a,'A' - '0' - 10
+    add a,'A' - '0' - 10
 num:
     add a,'0'
     ld (hl),a
@@ -1247,11 +1247,9 @@ wait_for_data:
     jp nz,wait_for_data
 
     ld b,0
-    ; ld hl,block0
     ld hl,buffer
     call sd_read_bytes
     ld b,0
-    ; ld hl,block1
     ld hl,buffer + $100
     call sd_read_bytes
 
@@ -1339,7 +1337,7 @@ ascii_chars:
     ld a,(de)
     cp ' '
     call c,ascii_dot
-    ; cp '~' + 1
+    cp '~' + 1
     call nc,ascii_dot
     ld (hl),a
 
@@ -1355,7 +1353,7 @@ ascii_dot:
     ret
 eol:
 
-    ; ld (hl),'\n'
+    ld (hl),'\n'
     inc hl
     ld (hl),0
 
