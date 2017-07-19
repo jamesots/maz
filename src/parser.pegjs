@@ -1168,7 +1168,7 @@ ixyhl = 'ixh'i { return [0xdd, 0]; }
 ws = [ \t]+
 wsnl = [ \t\r\n]+
 
-expr = t1:ternary {
+expr = t1:expr1 {
     if (t1.length === 0) {
         return Expr.parse(text(), {});
     }
@@ -1177,7 +1177,10 @@ expr = t1:ternary {
         vars: t1
     }
 }
-ternary = t1:logicalor t2:(ws? '?' ws? t2:expr ws? ':' ws? t3:expr)?  { 
+expr1 = t1:ternary {
+    return t1;
+}
+ternary = t1:logicalor t2:(ws? '?' ws? t2:expr1 ws? ':' ws? t3:expr1)?  { 
     return  t1.concat(exprVars(t2, [3, 7]));
 }
 logicalor = t1:logicaland t2:(ws? '||' ws? logicaland)*  {
@@ -1213,7 +1216,7 @@ term = t1:unary t2:(ws? [*/%] ws? unary)*  {
 unary = operator:[!~+-]? expr:factor  { 
     return expr;
 }
-factor = '(' expr:expr ')'  { 
+factor = '(' expr:expr1 ')'  { 
         return expr;
     }
     / f:function { 
@@ -1228,10 +1231,10 @@ factor = '(' expr:expr ')'  {
     / string { 
         return [];
     }
-function = 'min('i ws? expr1:expr ws? ',' ws? expr2:expr ws? ')'  { 
+function = 'min('i ws? expr1:expr1 ws? ',' ws? expr2:expr1 ws? ')'  { 
         return expr1.concat(expr2);
     }
-    / 'max('i ws? expr1:expr ws? ',' ws? expr2:expr ws? ')' { 
+    / 'max('i ws? expr1:expr1 ws? ',' ws? expr2:expr1 ws? ')' { 
         return expr1.concat(expr2);
     }
 number_literal = binary_literal { return []; }

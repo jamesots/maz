@@ -482,7 +482,6 @@ time_set: db 'Time set\n', 0
 ; returns with bcd time at bcd_time
 ; writes error messages if there's an error
 parse_time:
-.block
 hours:
     call num_to_bcd
     ld bc,bcd_time
@@ -545,14 +544,12 @@ no_time:
     ld e,1
     ret
 no_time_msg: db 'No time specified\n', 0
-.endblock
 
 ; HL = address of date, in YYYY-MM-DD format
 ; returns with bcd date at bcd_date
 ; writes error messages if there's an error
 ; can enter bad dates
 parse_date:
-.block
 century:
     call num_to_bcd
     ld bc,bcd_date
@@ -623,7 +620,6 @@ no_date:
     ld e,1
     ret
 no_date_msg: db 'No date specified\n', 0
-.endblock
 
 ; HL = address of 1-4 digits of hex, terminated with null, space or comma
 ; BC = number
@@ -1434,9 +1430,9 @@ error_msg: db 'Error\n',0
 cmd_protect:
 .block
     ld a,$80
-    out 2,a
+    out (2),a
     inc a
-    out 3,a
+    out (3),a
     ld a,$aa
     ld ($5555 + $8000),a
     ld a,$55
@@ -1444,9 +1440,9 @@ cmd_protect:
     ld a,$a0
     ld ($5555 + $8000),a
     ld a,$2
-    out 2,a
+    out (2),a
     inc a
-    out 3,a
+    out (3),a
 
     ld hl,protected_msg
     jp write_line
@@ -1456,9 +1452,9 @@ protected_msg: db 'Protected\n',0
 cmd_unprotect:
 .block
     ld a,$80
-    out 2,a
+    out (2),a
     inc a
-    out 3,a
+    out (3),a
     ld a,$aa
     ld ($5555 + $8000),a
     ld a,$55
@@ -1472,9 +1468,9 @@ cmd_unprotect:
     ld a,$20
     ld ($5555 + $8000),a
     ld a,$2
-    out 2,a
+    out (2),a
     inc a
-    out 3,a
+    out (3),a
 
     ld hl,unprotected_msg
     jp write_line
@@ -1549,7 +1545,8 @@ cmd_read_block:  ; read single block
 cmd_write_block:  ; write single block
     db $58,0,0,0,0,$01
 
-buffer: ds 512
+buffer: db 0
+; buffer: ds 512
 
 init_sd_card:
     spi_set_cs 1
@@ -1691,10 +1688,13 @@ dumpline: db '                                                                  
 difference: db 'XXXX:XX XXXX:XX\n',0
 bcd_time: db 'xxx'
 bcd_date: db 'xxxx'
-line: ds 256
+line: db 256
+; line: ds 256
 size: db 0,0
 source: db 0,0
 dest: db 0,0
 pagesize: db 0,0
 
 end:
+
+; fix two ds instructions

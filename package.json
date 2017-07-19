@@ -5,7 +5,7 @@
   "main": "maz.js",
   "private": true,
   "scripts": {
-    "parser": "pegjs --optimize speed --trace -o build/parser.js src/parser.pegjs",
+    "parser": "pegjs --optimize speed -o build/parser.js src/parser.pegjs",
     "expr": "pegjs --optimize speed -o build/expr.js src/expr.pegjs",
     "tsc": "tsc",
     "tsc-watch": "tsc --watch",
