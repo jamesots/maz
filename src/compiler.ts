@@ -344,29 +344,52 @@ export function updateBytes(ast, symbols) {
  * LLLL ADDR BYTES SRC  - max 8 bytes? - multiple lines if more
  */
 export function getList(code, ast) {
-    const BYTELEN = 8;
     let lines = code.split('\n');
     let list = [];
-    let inMacro = false;
+    let line = 0;
+
+    let address = undefined;
+    let bytes = [];
+
     for (const el of ast) {
         if (el.location) {
-            let byteString = '';
-            if (el.bytes) {
-                for (const byte of el.bytes) {
-                    byteString += pad((byte & 0xFF).toString(16), 2, '0');
-                }
+            if (el.location.line != line && line !== 0) {
+                dumpLine(list, lines, line, address, bytes);
+
+                address = undefined;
+                bytes = [];
             }
-            let address = '    ';
+            line = el.location.line;
             if (el.address) {
-                address = pad(el.address.toString(16), 4, '0');
+                address = el.address;
             }
-            list.push(`${pad(el.location.line, 4)} ${address} ${padr(byteString, BYTELEN * 2).substring(0, BYTELEN * 2)} ${lines[el.location.line - 1]}`);
-            for (let i = BYTELEN * 2; i < byteString.length; i += BYTELEN * 2) {
-                list.push(`          ${padr(byteString.substring(i, i + BYTELEN * 2), BYTELEN * 2).substring(0,BYTELEN * 2)}`)
+            if (el.bytes) {
+                bytes = el.bytes;
             }
         }
     }
+    if (lines[line - 1]) {
+        dumpLine(list, lines, line, address, bytes);
+    }
     return list;    
+}
+
+function dumpLine(list, lines, line, address, bytes) {
+    const BYTELEN = 8;
+    let byteString = '';
+    if (bytes) {
+        for (const byte of bytes) {
+            byteString += pad((byte & 0xFF).toString(16), 2, '0');
+        }
+    }
+    let addressString = '    ';
+    if (address) {
+        addressString = pad(address.toString(16), 4, '0');
+    }
+    list.push(`${pad(line, 4)} ${addressString} ${padr(byteString, BYTELEN * 2).substring(0, BYTELEN * 2)} ${lines[line - 1]}`);
+    for (let i = BYTELEN * 2; i < byteString.length; i += BYTELEN * 2) {
+        list.push(`          ${padr(byteString.substring(i, i + BYTELEN * 2), BYTELEN * 2).substring(0,BYTELEN * 2)}`)
+    }
 }
 
 function pad(num, size, chr = ' ') {
