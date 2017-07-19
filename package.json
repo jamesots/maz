@@ -3,7 +3,6 @@
   "version": "0.1.0",
   "description": "Macro Assembler for Z80",
   "main": "lib/maz.js",
-  "private": true,
   "bin": {
     "maz": "lib/maz.js"
   },
