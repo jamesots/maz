@@ -31,20 +31,17 @@ describe('parser', function() {
     it('should parse nop', function() {
         const result = parse('nop');
         expect(result.length).toBe(1);
-        expect(result[0].text).toEqual('nop');
         expect(result[0].bytes).toEqual([0]);
     });
     it('should parse nop with whitespace', function() {
         const result = parse('  nop   ');
         expect(result.length).toBe(1);
-        expect(result[0].text).toEqual('nop');
         expect(result[0].bytes).toEqual([0]);
     });
     it('should parse nop with label', function() {
         const result = parse('thing:  nop   ');
         expect(result.length).toBe(2);
         expect(result[0].label).toEqual('thing');
-        expect(result[1].text).toEqual('nop');
         expect(result[1].bytes).toEqual([0]);
     });
     it('should parse nop with two labels', function() {
@@ -54,7 +51,6 @@ describe('parser', function() {
         expect(result.length).toBe(3);
         expect(result[0].label).toEqual('blah');
         expect(result[1].label).toEqual('thing');
-        expect(result[2].text).toEqual('nop');
         expect(result[2].bytes).toEqual([0]);
     });
     it('should parse nop with comment, followed by nop', function() {
@@ -63,10 +59,8 @@ describe('parser', function() {
         expect(result.length).toBe(3);
         expect(result[0].label).toEqual('thing');
 
-        expect(result[1].text).toEqual('nop');
         expect(result[1].bytes).toEqual([0]);
 
-        expect(result[2].text).toEqual('nop');
         expect(result[2].bytes).toEqual([0]);
         expect(result[2].label).toBeUndefined();
     });
@@ -74,7 +68,6 @@ describe('parser', function() {
         const result = parse(`thing:  nop  ; lovely stuff`);
         expect(result.length).toBe(2);
         expect(result[0].label).toEqual('thing');
-        expect(result[1].text).toEqual('nop');
         expect(result[1].bytes).toEqual([0]);
     });
 
@@ -1368,13 +1361,19 @@ nop`);
     it('should parse defs', function() {
         const result = parse('defs 123');
         expect(result[0]).toEqual({
-            defs: 123
+            defs: 123,
+            location: {
+                line: 1, column: 1
+            }
         });
     });
     it('should parse ds', function() {
         const result = parse('ds 123');
         expect(result[0]).toEqual({
-            defs: 123
+            defs: 123,
+            location: {
+                line: 1, column: 1
+            }
         });
     });
     it('should parse ds with expression', function() {
@@ -1383,6 +1382,9 @@ nop`);
             defs: {
                 expression: 'a + 2',
                 vars: ['a']
+            },
+            location: {
+                line: 1, column: 1
             }
         });
     });

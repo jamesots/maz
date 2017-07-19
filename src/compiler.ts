@@ -349,14 +349,18 @@ export function getList(code, ast) {
     let list = [];
     let inMacro = false;
     for (const el of ast) {
-        if (el.text) {
+        if (el.location) {
             let byteString = '';
             if (el.bytes) {
                 for (const byte of el.bytes) {
                     byteString += pad((byte & 0xFF).toString(16), 2, '0');
                 }
             }
-            list.push(`${pad(el.location.line, 4)} ${pad(el.address.toString(16), 4, '0')} ${padr(byteString, BYTELEN * 2).substring(0, BYTELEN * 2)} ${lines[el.location.line - 1]}`);
+            let address = '    ';
+            if (el.address) {
+                address = pad(el.address.toString(16), 4, '0');
+            }
+            list.push(`${pad(el.location.line, 4)} ${address} ${padr(byteString, BYTELEN * 2).substring(0, BYTELEN * 2)} ${lines[el.location.line - 1]}`);
             for (let i = BYTELEN * 2; i < byteString.length; i += BYTELEN * 2) {
                 list.push(`          ${padr(byteString.substring(i, i + BYTELEN * 2), BYTELEN * 2).substring(0,BYTELEN * 2)}`)
             }
