@@ -2,19 +2,20 @@
   "name": "maz",
   "version": "0.1.0",
   "description": "Macro Assembler for Z80",
-  "main": "build/maz.js",
+  "main": "lib/maz.js",
   "private": true,
   "bin": {
-    "maz": "build/maz.js"
+    "maz": "lib/maz.js"
   },
+  "types": "lib/maz.d.ts",
   "scripts": {
-    "build-parser": "pegjs --optimize speed -o build/parser.js src/parser.pegjs",
-    "build-expr": "pegjs --optimize speed -o build/expr.js src/expr.pegjs",
+    "build-parser": "pegjs --optimize speed -o lib/parser.js src/parser.pegjs",
+    "build-expr": "pegjs --optimize speed -o lib/expr.js src/expr.pegjs",
     "build-tsc": "tsc",
-    "prepublish": "npm run build-parser && npm run build-expr && npm run build-tsc",
+    "prepublish": "npm run build-tsc && npm run build-parser && npm run build-expr",
     "test": "jasmine",
-    "start": "node build/maz.js",
-    "test-z80": "node build/maz.js -s examples/z80monitor.z80 -o /tmp/z80monitor.bin -l /tmp/z80monitor.lst"
+    "start": "node lib/maz.js",
+    "test-z80": "node lib/maz.js -s examples/z80monitor.z80 -o /tmp/z80monitor.bin -l /tmp/z80monitor.lst"
   },
   "author": "James Ots <code@jamesots.com>",
   "license": "MIT",
