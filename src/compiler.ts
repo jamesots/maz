@@ -190,7 +190,7 @@ export function assignPCandEQU(ast, symbols) {
         } else if (el.defs !== undefined) {
             let size = el.defs;
             if (size.expression) {
-                size = evaluateExpression(prefixes[prefixes.length - 1] || '', size.expression, symbols, []);
+                size = evaluateExpression(prefixes[prefixes.length - 1] || '', size, symbols, []);
             }
             pc += size;
         } else if (el.equ) {

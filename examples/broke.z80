@@ -1,20 +1,4 @@
-macro print num
-    ld c,9
-    ld de,str
-    call 5
-    ret
-str: db num,0
-endm
-
-
-    ld a,one + two
-    print "hello"
-one: equ 1
-two: equ 2
-    
-; one: equ 1
-; .block
-; one: equ 2
-;     ld a,one
-; .endblock
-;     ld a,one
+z: equ 5
+ds 10  + a
+a: equ b
+b:
