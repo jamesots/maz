@@ -13,13 +13,13 @@ export function compile(code, options) {
     }
     try {
         const ast = parser.parse(code, parserOptions);
-        console.log(JSON.stringify(ast, undefined, 2));
+        // console.log(JSON.stringify(ast, undefined, 2));
         
         const macros = getMacros(ast);
         expandMacros(ast, macros);
         const symbols = getSymbols(ast);
 
-        console.log(JSON.stringify(ast, undefined, 2));
+        // console.log(JSON.stringify(ast, undefined, 2));
 
         assignPCandEQU(ast, symbols);
         evaluateSymbols(symbols);
@@ -344,6 +344,7 @@ export function updateBytes(ast, symbols) {
  * LLLL ADDR BYTES SRC  - max 8 bytes? - multiple lines if more
  */
 export function getList(code, ast) {
+    const BYTELEN = 8;
     let lines = code.split('\n');
     let list = [];
     let inMacro = false;
@@ -355,9 +356,9 @@ export function getList(code, ast) {
                     byteString += pad((byte & 0xFF).toString(16), 2, '0');
                 }
             }
-            list.push(`${pad(el.location.line, 4)} ${pad(el.address.toString(16), 4, '0')} ${padr(byteString, 12).substring(0, 12)} ${lines[el.location.line - 1]}`);
-            for (let i = 12; i < byteString.length; i += 12) {
-                list.push(`          ${padr(byteString.substring(i, i + 12), 12).substring(0, 12)}`)
+            list.push(`${pad(el.location.line, 4)} ${pad(el.address.toString(16), 4, '0')} ${padr(byteString, BYTELEN * 2).substring(0, BYTELEN * 2)} ${lines[el.location.line - 1]}`);
+            for (let i = BYTELEN * 2; i < byteString.length; i += BYTELEN * 2) {
+                list.push(`          ${padr(byteString.substring(i, i + BYTELEN * 2), BYTELEN * 2).substring(0,BYTELEN * 2)}`)
             }
         }
     }
