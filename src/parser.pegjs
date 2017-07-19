@@ -1,5 +1,5 @@
 {
-    const Parser = require('expr-eval').Parser;
+    const Expr = require('./expr');
 
     function exprVars(els, indices) {
         let varlist = [];
@@ -1169,6 +1169,9 @@ ws = [ \t]+
 wsnl = [ \t\r\n]+
 
 expr = t1:ternary {
+    if (t1.length === 0) {
+        return Expr.parse(text(), {});
+    }
     return {
         expression: text(),
         vars: t1

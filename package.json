@@ -7,7 +7,6 @@
   "scripts": {
     "parser": "pegjs --optimize speed --trace -o build/parser.js src/parser.pegjs",
     "expr": "pegjs --optimize speed -o build/expr.js src/expr.pegjs",
-    "expr-vars": "pegjs --optimize speed -o build/expr-vars.js src/expr-vars.pegjs",
     "tsc": "tsc",
     "tsc-watch": "tsc --watch",
     "test": "jasmine",
