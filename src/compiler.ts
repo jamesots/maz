@@ -1,6 +1,6 @@
 import * as parser from './parser';
-import { Parser } from 'expr-eval';
 import * as Tracer from 'pegjs-backtrace';
+import * as Expr from './expr';
 
 export function compile(code, options) {
     const parserOptions = {} as any;
@@ -206,8 +206,7 @@ export function evaluateSymbol(symbol, symbols, evaluated) {
         throw "Circular symbol dependency";
     }
     evaluated.push(symbol);
-    const expr = Parser.parse(symbols[symbol].expression);
-    const variables = expr.variables();
+    const variables = symbols[symbol].vars;
     const subVars = {}; // substitute variables
     const prefix = getWholePrefix(symbol);
     for (const variable of variables) {
@@ -221,7 +220,7 @@ export function evaluateSymbol(symbol, symbols, evaluated) {
         }
         subVars[variable] = symbols[subVar];
     }
-    symbols[symbol] = expr.evaluate(subVars);
+    symbols[symbol] = Expr.parse(symbols[symbol].expression, {variables: subVars});
 }
 
 export function findVariable(symbols, prefix, variable) {
@@ -286,8 +285,7 @@ export function updateBytes(ast, symbols) {
             for (let i = 0; i < el.bytes.length; i++) {
                 const byte = el.bytes[i];
                 if (byte && byte.expression) {
-                    const expr = Parser.parse(byte.expression);
-                    const variables = expr.variables();
+                    const variables = byte.vars;
 
                     const subVars = {}; // substitute variables
                     const prefix = prefixes[prefixes.length - 1] || '';
@@ -304,7 +302,7 @@ export function updateBytes(ast, symbols) {
                         subVars[variable] = symbols[subVar];
                     }
 
-                    const value = expr.evaluate(subVars) as any;
+                    const value = Expr.parse(byte.expression, {variables: subVars})
                     if (typeof value === 'string') {
                         let bytes = [];
                         for (let i = 0; i < value.length; i++) {

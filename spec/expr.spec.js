@@ -1,4 +1,6 @@
 const expr = require('../build/expr');
+const sourceMapSupport = require('source-map-support');
+sourceMapSupport.install();
 
 describe('expr', function() {
     it('should parse number', function() {

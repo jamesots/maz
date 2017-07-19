@@ -1,12 +1,14 @@
-const maz = require('../build/compiler');
+const compiler = require('../build/compiler');
+const sourceMapSupport = require('source-map-support');
+sourceMapSupport.install();
 
-describe('maz', function() {
+describe('compiler', function() {
     it('should get symbols', function() {
         const ast = [
             {label: 'one'},
             {label: 'two'},
         ];
-        const symbols = maz.getSymbols(ast);
+        const symbols = compiler.getSymbols(ast);
         expect(symbols).toEqual({
             one: null,
             two: null
@@ -20,7 +22,7 @@ describe('maz', function() {
             {endblock: true},
             {label: 'two'},
         ];
-        const symbols = maz.getSymbols(ast);
+        const symbols = compiler.getSymbols(ast);
         expect(symbols).toEqual({
             one: null,
             '%0_one': null,
@@ -40,7 +42,7 @@ describe('maz', function() {
             {endblock: true},
             {label: 'two'},
         ];
-        const symbols = maz.getSymbols(ast);
+        const symbols = compiler.getSymbols(ast);
         expect(symbols).toEqual({
             one: null,
             '%0_one': null,
@@ -63,7 +65,7 @@ describe('maz', function() {
             {endblock: true},
             {label: 'two'},
         ];
-        const symbols = maz.getSymbols(ast);
+        const symbols = compiler.getSymbols(ast);
         expect(symbols).toEqual({
             one: null,
             '%0_one': null,
@@ -92,7 +94,7 @@ describe('maz', function() {
             {endblock: true},
             {label: 'two'},
         ];
-        const symbols = maz.getSymbols(ast);
+        const symbols = compiler.getSymbols(ast);
         expect(symbols).toEqual({
             one: null,
             '%0_one': null,
@@ -122,7 +124,7 @@ describe('maz', function() {
             two: null,
             three: null
         }
-        maz.assignPCandEQU(ast, symbols);
+        compiler.assignPCandEQU(ast, symbols);
         expect(symbols.one).toBe(0);
         expect(symbols.two).toBe(3);
         expect(symbols.three).toBe(3);
@@ -142,7 +144,7 @@ describe('maz', function() {
             two: null,
             three: null
         }
-        maz.assignPCandEQU(ast, symbols);
+        compiler.assignPCandEQU(ast, symbols);
         expect(symbols.one).toBe(5);
         expect(symbols.two).toBe(5);
         expect(symbols.three).toEqual({expr:'one'});
@@ -150,10 +152,10 @@ describe('maz', function() {
     it('should evaluate symbols', function() {
         const symbols = {
             one: 1,
-            two: {expression: 'three'},
-            three: {expression: 'one'}
+            two: {expression: 'three', vars: ['three']},
+            three: {expression: 'one', vars: ['one']}
         };
-        maz.evaluateSymbols(symbols);
+        compiler.evaluateSymbols(symbols);
         expect(symbols).toEqual({
             one: 1,
             two: 1,
@@ -163,22 +165,22 @@ describe('maz', function() {
     it('should evaluate symbols and detect circular references', function() {
         const symbols = {
             one: 1,
-            two: {expression: 'three'},
-            three: {expression: 'two'}
+            two: {expression: 'three', vars: ['three']},
+            three: {expression: 'two', vars: ['two']}
         };
         expect(function() {
-             maz.evaluateSymbols(symbols);
+             compiler.evaluateSymbols(symbols);
         }).toThrow();
     });
     it('should evaluate symbols with scope', function() {
         const symbols = {
-            '%1_two': {expression: 'three'},
+            '%1_two': {expression: 'three', vars: ['three']},
             three: 3,
             '%1_three': 4,
             '%2_%1_three': 5,
-            '%2_%1_bob': {expression: 'three + two'}
+            '%2_%1_bob': {expression: 'three + two', vars: ['three', 'two']}
         };
-        maz.evaluateSymbols(symbols);
+        compiler.evaluateSymbols(symbols);
         expect(symbols).toEqual({
             '%1_two': 4,
             three: 3,
@@ -188,10 +190,10 @@ describe('maz', function() {
         });
     });
     it('should get whole prefix', function() {
-        expect(maz.getWholePrefix('%2_%3_%4_bob')).toBe('%2_%3_%4_');
+        expect(compiler.getWholePrefix('%2_%3_%4_bob')).toBe('%2_%3_%4_');
     });
     it('should get reduced prefix', function() {
-        expect(maz.getReducedPrefix('%2_%3_%4_')).toBe('%3_%4_');
+        expect(compiler.getReducedPrefix('%2_%3_%4_')).toBe('%3_%4_');
     });
     it('should find variable', function() {
         const symbols = {
@@ -207,33 +209,33 @@ describe('maz', function() {
             '%0_b': 256,
             '%1_%0_b': 512
         }
-        expect(maz.findVariable(symbols, '%2_%1_%0_', 'a')).toBe('%2_%1_%0_a');
-        expect(maz.findVariable(symbols, '%2_%1_%0_', 'b')).toBe('%2_%1_%0_b');
-        expect(maz.findVariable(symbols, '%2_%1_%0_', 'c')).toBe('%1_%0_c');
-        expect(maz.findVariable(symbols, '%2_%1_%0_', 'd')).toBe('%0_d');
-        expect(maz.findVariable(symbols, '%2_%1_%0_', 'e')).toBe('e');
+        expect(compiler.findVariable(symbols, '%2_%1_%0_', 'a')).toBe('%2_%1_%0_a');
+        expect(compiler.findVariable(symbols, '%2_%1_%0_', 'b')).toBe('%2_%1_%0_b');
+        expect(compiler.findVariable(symbols, '%2_%1_%0_', 'c')).toBe('%1_%0_c');
+        expect(compiler.findVariable(symbols, '%2_%1_%0_', 'd')).toBe('%0_d');
+        expect(compiler.findVariable(symbols, '%2_%1_%0_', 'e')).toBe('e');
 
-        expect(maz.findVariable(symbols, '%1_%0_', 'b')).toBe('%1_%0_b');
-        expect(maz.findVariable(symbols, '%1_%0_', 'c')).toBe('%1_%0_c');
-        expect(maz.findVariable(symbols, '%1_%0_', 'd')).toBe('%0_d');
-        expect(maz.findVariable(symbols, '%1_%0_', 'e')).toBe('e');
+        expect(compiler.findVariable(symbols, '%1_%0_', 'b')).toBe('%1_%0_b');
+        expect(compiler.findVariable(symbols, '%1_%0_', 'c')).toBe('%1_%0_c');
+        expect(compiler.findVariable(symbols, '%1_%0_', 'd')).toBe('%0_d');
+        expect(compiler.findVariable(symbols, '%1_%0_', 'e')).toBe('e');
 
-        expect(maz.findVariable(symbols, '%0_', 'c')).toBe('%0_c');
-        expect(maz.findVariable(symbols, '%0_', 'd')).toBe('%0_d');
-        expect(maz.findVariable(symbols, '%0_', 'e')).toBe('e');
+        expect(compiler.findVariable(symbols, '%0_', 'c')).toBe('%0_c');
+        expect(compiler.findVariable(symbols, '%0_', 'd')).toBe('%0_d');
+        expect(compiler.findVariable(symbols, '%0_', 'e')).toBe('e');
 
-        expect(maz.findVariable(symbols, '', 'd')).toBe('d');
-        expect(maz.findVariable(symbols, '', 'e')).toBe('e');
+        expect(compiler.findVariable(symbols, '', 'd')).toBe('d');
+        expect(compiler.findVariable(symbols, '', 'e')).toBe('e');
     });
     it('should update bytes', function() {
         const ast = [
-            { references: ['three'], bytes: [0, {expression: 'three'}]},
-            { references: ['three'], bytes: [0, {expression: 'three'}, null]}
+            { references: ['three'], bytes: [0, {expression: 'three', vars: ['three']}]},
+            { references: ['three'], bytes: [0, {expression: 'three', vars: ['three']}, null]}
         ];
         const symbols = {
             three: 0x1234
         }
-        maz.updateBytes(ast, symbols);
+        compiler.updateBytes(ast, symbols);
         expect(ast).toEqual([
             { references: ['three'], bytes: [0, 0x34]},
             { references: ['three'], bytes: [0, 0x34, 0x12]}
@@ -246,15 +248,15 @@ describe('maz', function() {
             { block: true, prefix: '%0_'},
             { label: '%0_one' },
             { equ: 2 },
-            { bytes: [ {expression: 'one'}], references: ['one']},
+            { bytes: [ {expression: 'one', vars: ['one']}], references: ['one']},
             { endblock: true, prefix: '%0_'},
-            { bytes: [ {expression: 'one'}], references: ['one']}
+            { bytes: [ {expression: 'one', vars: ['one']}], references: ['one']}
         ];
         const symbols = {
             one: 1,
             '%0_one': 2
         }
-        maz.updateBytes(ast, symbols);
+        compiler.updateBytes(ast, symbols);
         expect(ast).toEqual([
             { label: 'one' },
             { equ: 1 },
@@ -271,7 +273,7 @@ describe('maz', function() {
             { macrodef: 'thing' },
             { endmacro: true }
         ];
-        const macros = maz.getMacros(ast);
+        const macros = compiler.getMacros(ast);
         expect(macros).toEqual({
             thing: {
                 params: [],
@@ -285,7 +287,7 @@ describe('maz', function() {
             { bytes: [1, 2, 3] },
             { endmacro: true }
         ];
-        const macros = maz.getMacros(ast);
+        const macros = compiler.getMacros(ast);
         expect(macros).toEqual({
             thing: {
                 params: [],
@@ -301,7 +303,7 @@ describe('maz', function() {
             { bytes: [1, 2, 3] },
             { endmacro: true }
         ];
-        const macros = maz.getMacros(ast);
+        const macros = compiler.getMacros(ast);
         expect(macros).toEqual({
             thing: {
                 params: ['a', 'b'],
@@ -317,7 +319,7 @@ describe('maz', function() {
             { endmacro: true }
         ];
         expect(function() {
-            maz.getMacros(ast);
+            compiler.getMacros(ast);
         }).toThrow();
     });
     it('should not like macros which don\'t end', function() {
@@ -325,7 +327,7 @@ describe('maz', function() {
             { macrodef: 'thing2' },
         ];
         expect(function() {
-            maz.getMacros(ast);
+            compiler.getMacros(ast);
         }).toThrow();
     });
     it('should not like macros which don\'t start', function() {
@@ -333,7 +335,7 @@ describe('maz', function() {
             { endmacro: true },
         ];
         expect(function() {
-            maz.getMacros(ast);
+            compiler.getMacros(ast);
         }).toThrow();
     });
     it('should expand macros', function() {
@@ -345,8 +347,8 @@ describe('maz', function() {
             { macrocall: 'thing' },
             { bytes: [4] }
         ];
-        const macros = maz.getMacros(ast);
-        maz.expandMacros(ast, macros);
+        const macros = compiler.getMacros(ast);
+        compiler.expandMacros(ast, macros);
         expect(ast).toEqual([
             { macrodef: 'thing' },
             { bytes: [1, 2, 3] },
@@ -361,21 +363,21 @@ describe('maz', function() {
     it('should expand macros with params', function() {
         const ast = [
             { macrodef: 'thing', params: ['a', 'b'] },
-            { bytes: [1, 2, 3, {expression: 'a + b'}] },
+            { bytes: [1, 2, 3, {expression: 'a + b', vars: ['a', 'b']}] },
             { endmacro: true },
             { bytes: [0] },
             { macrocall: 'thing', args: [1,'hello'] },
             { bytes: [4] }
         ];
-        const macros = maz.getMacros(ast);
-        maz.expandMacros(ast, macros);
+        const macros = compiler.getMacros(ast);
+        compiler.expandMacros(ast, macros);
         expect(ast).toEqual([
             { macrodef: 'thing', params: ['a', 'b'] },
-            { bytes: [1, 2, 3, {expression: 'a + b'}] },
+            { bytes: [1, 2, 3, {expression: 'a + b', vars: ['a', 'b']}] },
             { endmacro: true},
             { bytes: [0] },
             { macrocall: 'thing', params: ['a', 'b'], args: [1,'hello'], expanded: true },
-            { bytes: [1, 2, 3, {expression: 'a + b'}] },
+            { bytes: [1, 2, 3, {expression: 'a + b', vars: ['a', 'b']}] },
             { endmacrocall: true },
             { bytes: [4] }
         ]);
@@ -383,15 +385,15 @@ describe('maz', function() {
     it('should get symbols from expanded macros', function() {
         const ast = [
             { macrodef: 'thing', params: ['a', 'b'] },
-            { bytes: [1, 2, 3, {expression: 'a + b'}] },
+            { bytes: [1, 2, 3, {expression: 'a + b', vars: ['a', 'b']}] },
             { endmacro: true},
             { bytes: [0] },
             { macrocall: 'thing', params: ['a', 'b'], args: [1,'hello'], expanded: true },
-            { bytes: [1, 2, 3, {expression: 'a + b'}] },
+            { bytes: [1, 2, 3, {expression: 'a + b', vars: ['a', 'b']}] },
             { endmacrocall: true },
             { bytes: [4] }
         ];
-        const symbols = maz.getSymbols(ast);
+        const symbols = compiler.getSymbols(ast);
         expect(symbols).toEqual({
             '%0_a': 1,
             '%0_b': 'hello'
