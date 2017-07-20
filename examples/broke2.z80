@@ -1,18 +1,12 @@
 org $100
     ld a,1
-one:
-    ld b,2
-    jp two
-    ld c,3
-org $101
-    ld d,4
-.phase $200
-    ld e,5
-two:
-    jp one
-.endphase
-    ld hl,three
-three:
-    ld hl,0
-org $120
-    db "hello"
+
+.phase $105
+
+.align $10
+    ld a,2
+
+.dephase
+
+.align $10
+    ld a,3

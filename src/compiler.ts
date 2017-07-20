@@ -214,6 +214,12 @@ export function assignPCandEQU(ast, symbols) {
             pc = el.phase;
         } else if (el.endphase) {
             pc = out;
+        } else if (el.align !== undefined) {
+            let add = el.align - (pc % el.align);
+            if (add !== el.align) {
+                pc += add;
+                out += add;
+            }
         } else if (el.bytes) {
             el.address = pc;
             el.out = out;

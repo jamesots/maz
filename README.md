@@ -49,4 +49,6 @@ Any directive shown below without a leading full stop (period) may also be writt
 <dd>Start a block. Any labels declared within the block are only visible within that block. Blocks can be nested, so labels are also visible to blocks within the block.</dd>
 <dt>.endblock</dt>
 <dd>End a block.</dd>
+<dt>.align <i>expression</i></dt>
+<dd>Align the next byte so that its address modulo <i>expression</i> is zero. (If we're in phased compilation, the phase address is aligned.)</dd>
 </dl>
