@@ -1,4 +1,4 @@
-const expr = require('../build/expr');
+const expr = require('../lib/expr');
 const sourceMapSupport = require('source-map-support');
 sourceMapSupport.install();
 

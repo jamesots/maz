@@ -1,16 +1,16 @@
 import * as parser from './parser';
-import * as Tracer from 'pegjs-backtrace';
+// import * as Tracer from 'pegjs-backtrace';
 import * as Expr from './expr';
 
 export function compile(code, options) {
     const parserOptions = {} as any;
-    const tracer = new Tracer(code, {
-        showTrace: true,
-        showFullPath: true
-    });
-    if (options.trace) {
-        parserOptions.tracer = tracer;
-    }
+    // const tracer = new Tracer(code, {
+    //     showTrace: true,
+    //     showFullPath: true
+    // });
+    // if (options.trace) {
+    //     parserOptions.tracer = tracer;
+    // }
     try {
         const ast = parser.parse(code, parserOptions);
         // console.log(JSON.stringify(ast, undefined, 2));
@@ -33,11 +33,11 @@ export function compile(code, options) {
         updateBytes(ast, symbols);
         return [ast, symbols];
     } catch (e) {
-        if (options.trace) {
-            // console.log(tracer.getBacktraceString());
-        } else {
+        // if (options.trace) {
+        //     // console.log(tracer.getBacktraceString());
+        // } else {
             throw e;
-        }
+        // }
     }
 }
 
@@ -165,8 +165,10 @@ export function expandMacros(ast, macros) {
  */
 export function assignPCandEQU(ast, symbols) {
     let pc = 0;
+    let out = 0;
     let inMacro = false;
     let prefixes = [];
+    let pcStack = [];
     for (let i = 0; i < ast.length; i++) {
         const el = ast[i];
         if (el.prefix) {
@@ -193,7 +195,9 @@ export function assignPCandEQU(ast, symbols) {
                 size = evaluateExpression(prefixes[prefixes.length - 1] || '', size, symbols, []);
             }
             el.address = pc;
+            el.out = out;
             pc += size;
+            out += size;
         } else if (el.equ) {
             if (i > 0 && ast[i - 1].label) {
                 let ii = i - 1;
@@ -206,11 +210,18 @@ export function assignPCandEQU(ast, symbols) {
             }
         } else if (el.org !== undefined) {
             pc = el.org;
+            out = el.org;
+        } else if (el.phase !== undefined) {
+            pcStack.push(pc);
+            pc = el.phase;
+        } else if (el.endphase) {
+            pc = pcStack.pop();
         } else if (el.bytes) {
             el.address = pc;
+            el.out = out;
             
-            // need special case for phase, ds, ...?
             pc += el.bytes.length;
+            out += el.bytes.length;
         }
     }
 }
@@ -350,7 +361,7 @@ export function getList(code, ast, symbols) {
     let list = [];
     let line = 0;
 
-    let address = undefined;
+    let out = undefined;
     let bytes = [];
 
     let inMacro = false;
@@ -360,7 +371,7 @@ export function getList(code, ast, symbols) {
     for (const el of ast) {
         if (el.location) {
             if (el.location.line != line && line !== 0) {
-                dumpLine(list, lines, line, address, bytes, inMacro);
+                dumpLine(list, lines, line, out, bytes, inMacro);
 
                 if (endingMacro) {
                     inMacro = false;
@@ -372,12 +383,12 @@ export function getList(code, ast, symbols) {
                     startingMacro = false;
                 }
 
-                address = undefined;
+                out = undefined;
                 bytes = [];
             }
             line = el.location.line;
-            if (el.address) {
-                address = el.address;
+            if (el.out) {
+                out = el.out;
             }
             if (el.bytes) {
                 bytes = el.bytes;
@@ -391,7 +402,7 @@ export function getList(code, ast, symbols) {
         }
     }
     if (lines[line - 1]) {
-        dumpLine(list, lines, line, address, bytes, inMacro);
+        dumpLine(list, lines, line, out, bytes, inMacro);
     }
 
     list.push('');
@@ -405,18 +416,18 @@ export function getList(code, ast, symbols) {
     return list;    
 }
 
-function dumpLine(list, lines, line, address, bytes, inMacro) {
+function dumpLine(list, lines, line, out, bytes, inMacro) {
     let byteString = '';
     if (bytes) {
         for (const byte of bytes) {
             byteString += pad((byte & 0xFF).toString(16), 2, '0');
         }
     }
-    let addressString = '    ';
-    if (address) {
-        addressString = pad(address.toString(16), 4, '0');
+    let outString = '    ';
+    if (out) {
+        outString = pad(out.toString(16), 4, '0');
     }
-    list.push(`${pad(line, 4)} ${addressString} ${padr(byteString, BYTELEN * 2).substring(0, BYTELEN * 2)} ${inMacro ? '*' : ' '}${lines[line - 1]}`);
+    list.push(`${pad(line, 4)} ${outString} ${padr(byteString, BYTELEN * 2).substring(0, BYTELEN * 2)} ${inMacro ? '*' : ' '}${lines[line - 1]}`);
     for (let i = BYTELEN * 2; i < byteString.length; i += BYTELEN * 2) {
         list.push(`          ${padr(byteString.substring(i, i + BYTELEN * 2), BYTELEN * 2).substring(0,BYTELEN * 2)}`)
     }
@@ -434,6 +445,8 @@ function padr(num, size, chr = ' ') {
 
 export function getBytes(ast) {
     let bytes = [];
+    let startOut = null;
+    let out = null;
     let inMacro = false;
     for (const el of ast) {
         if (el.macrodef) {
@@ -442,7 +455,27 @@ export function getBytes(ast) {
             inMacro = false;
         }
         if (el.bytes && !inMacro) {
-            bytes = bytes.concat(el.bytes);
+            const end = bytes.length + startOut;
+            if (out === null || el.out === end) {
+                if (startOut === null) {
+                    startOut = el.out;
+                }
+                out = el.bytes.length + el.out;
+                bytes = bytes.concat(el.bytes);
+            } else if (el.out > end) {
+                for (let i = out; i < el.out; i++) {
+                    bytes.push(0);
+                }
+                bytes = bytes.concat(el.bytes);
+                out = el.bytes.length + el.out;
+            } else if (el.out < startOut) {
+                throw "Cannot ORG to earlier address than first ORG";
+            } else if (el.out < end) {
+                for (let i = 0; i < el.bytes.length; i++) {
+                    bytes[(el.out - startOut) + i] = el.bytes[i];
+                }
+                out = el.bytes.length + el.out;
+            }
         }
     }
     return bytes;

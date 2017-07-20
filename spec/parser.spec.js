@@ -1,4 +1,4 @@
-const parser = require('../build/parser');
+const parser = require('../lib/parser');
 const Tracer = require('pegjs-backtrace');
 const sourceMapSupport = require('source-map-support');
 sourceMapSupport.install();
