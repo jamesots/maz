@@ -440,6 +440,8 @@ function padr(num, size, chr = ' ') {
 
 export function getBytes(ast) {
     let bytes = [];
+    let startAddress = null;
+    let address = null;
     let inMacro = false;
     for (const el of ast) {
         if (el.macrodef) {
@@ -448,7 +450,26 @@ export function getBytes(ast) {
             inMacro = false;
         }
         if (el.bytes && !inMacro) {
-            bytes = bytes.concat(el.bytes);
+            if (address === null || address === el.address) {
+                if (startAddress === null) {
+                    startAddress = el.address;
+                }
+                address = el.bytes.length + el.address;
+                bytes = bytes.concat(el.bytes);
+            } else if (el.address > address) {
+                for (let i = address; i < el.address; i++) {
+                    bytes.push(0);
+                }
+                bytes = bytes.concat(el.bytes);
+                address = el.bytes.length + el.address;
+            } else if (el.address < startAddress) {
+                throw "Cannot ORG to earlier address than first ORG";
+            } else if (el.address < address) {
+                for (let i = 0; i < el.bytes.length; i++) {
+                    bytes[(el.address - startAddress) + i] = el.bytes[i];
+                }
+                address = el.bytes.length + el.address;
+            }
         }
     }
     return bytes;

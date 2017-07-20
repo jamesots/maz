@@ -449,5 +449,33 @@ describe('compiler', function() {
             '%0_a': 1,
             '%0_b': 'hello'
         });
-    })
+    });
+    it('should get bytes with org', function() {
+        const ast = [
+            { bytes: [1,2,3], address: 0 },
+            { bytes: [4,5,6], address: 10 },
+            { bytes: [7,8,9], address: 2 },
+        ];
+        const bytes = compiler.getBytes(ast);
+        expect(bytes).toEqual([1,2,7,8,9,0,0,0,0,0,4,5,6]);
+    });
+    it('should get bytes with org, non-zero start', function() {
+        const ast = [
+            { bytes: [1,2,3], address: 5 },
+            { bytes: [4,5,6], address: 15 },
+            { bytes: [7,8,9], address: 7 },
+        ];
+        const bytes = compiler.getBytes(ast);
+        expect(bytes).toEqual([1,2,7,8,9,0,0,0,0,0,4,5,6]);
+    });
+    it('should not allow ORG less than first ORG', function() {
+        const ast = [
+            { bytes: [1,2,3], address: 5 },
+            { bytes: [4,5,6], address: 0 },
+            { bytes: [7,8,9], address: 7 },
+        ];
+        expect(function() {
+            const bytes = compiler.getBytes(ast);
+        }).toThrow();
+    });
 });
