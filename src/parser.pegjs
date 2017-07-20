@@ -120,7 +120,7 @@ phase = '.phase'i ws expr:expr {
     }
 }
 
-endphase = '.endphase'i {
+endphase = ('.endphase'i/'.dephase'i) {
     return {
         endphase: true,
         location: loc()

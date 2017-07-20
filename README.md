@@ -34,6 +34,7 @@ Any directive shown below without a leading full stop (period) may also be writt
 <dt>.phase <i>expression</i></dt>
 <dd>Set phase. This sets the location that code is compiled to run at, but the code continues to be placed directly after the previous code. (TODO: Explain this properly).</dd>
 <dt>.endphase</dt>
+<dt>.dephase</dt>
 <dd>End phase – Ends phased compilation, and returns to compiling at the address the code is being placed. (TODO: This is a terrible explanation).</dd>
 <dt>macro <i>macroname</i> <i>labels</i></dt>
 <dd>Define a macro. The parameters can be treated the same as EQUates until the macro ends.
