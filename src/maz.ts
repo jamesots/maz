@@ -32,7 +32,7 @@ if (!options.src || !options.out || options.help) {
     process.exit(-1);
 }
 
-console.log("MAZ v0.1.0");
+console.log("MAZ v0.1.1");
 console.log("WARNING: maz is under development, and likely to break without");
 console.log("         warning, and future versions will probably be completely");
 console.log("         incompatible.");
