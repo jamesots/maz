@@ -1,16 +1,16 @@
 import * as parser from './parser';
-import * as Tracer from 'pegjs-backtrace';
+// import * as Tracer from 'pegjs-backtrace';
 import * as Expr from './expr';
 
 export function compile(code, options) {
     const parserOptions = {} as any;
-    const tracer = new Tracer(code, {
-        showTrace: true,
-        showFullPath: true
-    });
-    if (options.trace) {
-        parserOptions.tracer = tracer;
-    }
+    // const tracer = new Tracer(code, {
+    //     showTrace: true,
+    //     showFullPath: true
+    // });
+    // if (options.trace) {
+    //     parserOptions.tracer = tracer;
+    // }
     try {
         const ast = parser.parse(code, parserOptions);
         // console.log(JSON.stringify(ast, undefined, 2));
@@ -33,11 +33,11 @@ export function compile(code, options) {
         updateBytes(ast, symbols);
         return [ast, symbols];
     } catch (e) {
-        if (options.trace) {
-            // console.log(tracer.getBacktraceString());
-        } else {
+        // if (options.trace) {
+        //     // console.log(tracer.getBacktraceString());
+        // } else {
             throw e;
-        }
+        // }
     }
 }
 
