@@ -168,7 +168,6 @@ export function assignPCandEQU(ast, symbols) {
     let out = 0;
     let inMacro = false;
     let prefixes = [];
-    let pcStack = [];
     for (let i = 0; i < ast.length; i++) {
         const el = ast[i];
         if (el.prefix) {
@@ -212,10 +211,9 @@ export function assignPCandEQU(ast, symbols) {
             pc = el.org;
             out = el.org;
         } else if (el.phase !== undefined) {
-            pcStack.push(pc);
             pc = el.phase;
         } else if (el.endphase) {
-            pc = pcStack.pop();
+            pc = out;
         } else if (el.bytes) {
             el.address = pc;
             el.out = out;
@@ -362,6 +360,7 @@ export function getList(code, ast, symbols) {
     let line = 0;
 
     let out = undefined;
+    let address = undefined;
     let bytes = [];
 
     let inMacro = false;
@@ -371,7 +370,7 @@ export function getList(code, ast, symbols) {
     for (const el of ast) {
         if (el.location) {
             if (el.location.line != line && line !== 0) {
-                dumpLine(list, lines, line, out, bytes, inMacro);
+                dumpLine(list, lines, line, out, address, bytes, inMacro);
 
                 if (endingMacro) {
                     inMacro = false;
@@ -384,11 +383,13 @@ export function getList(code, ast, symbols) {
                 }
 
                 out = undefined;
+                address = undefined;
                 bytes = [];
             }
             line = el.location.line;
             if (el.out) {
                 out = el.out;
+                address = el.address;
             }
             if (el.bytes) {
                 bytes = el.bytes;
@@ -402,7 +403,7 @@ export function getList(code, ast, symbols) {
         }
     }
     if (lines[line - 1]) {
-        dumpLine(list, lines, line, out, bytes, inMacro);
+        dumpLine(list, lines, line, out, address, bytes, inMacro);
     }
 
     list.push('');
@@ -416,7 +417,7 @@ export function getList(code, ast, symbols) {
     return list;    
 }
 
-function dumpLine(list, lines, line, out, bytes, inMacro) {
+function dumpLine(list, lines, line, out, address, bytes, inMacro) {
     let byteString = '';
     if (bytes) {
         for (const byte of bytes) {
@@ -427,7 +428,11 @@ function dumpLine(list, lines, line, out, bytes, inMacro) {
     if (out) {
         outString = pad(out.toString(16), 4, '0');
     }
-    list.push(`${pad(line, 4)} ${outString} ${padr(byteString, BYTELEN * 2).substring(0, BYTELEN * 2)} ${inMacro ? '*' : ' '}${lines[line - 1]}`);
+    let addressString = '    ';
+    if (address) {
+        addressString = pad(address.toString(16), 4, '0');
+    }
+    list.push(`${pad(line, 4)} ${address !== out?addressString + '@':''}${outString} ${padr(byteString, BYTELEN * 2).substring(0, BYTELEN * 2)} ${inMacro ? '*' : ' '}${lines[line - 1]}`);
     for (let i = BYTELEN * 2; i < byteString.length; i += BYTELEN * 2) {
         list.push(`          ${padr(byteString.substring(i, i + BYTELEN * 2), BYTELEN * 2).substring(0,BYTELEN * 2)}`)
     }

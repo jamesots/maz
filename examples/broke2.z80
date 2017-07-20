@@ -1,18 +1,18 @@
 org $100
-ld a,1
+    ld a,1
 one:
-ld b,2
-jp two
-ld c,3
+    ld b,2
+    jp two
+    ld c,3
 org $101
-ld d,4
+    ld d,4
 .phase $200
-ld e,5
+    ld e,5
 two:
-jp one
+    jp one
 .endphase
-ld hl,three
+    ld hl,three
 three:
-ld hl,0
+    ld hl,0
 org $120
-db "hello"
+    db "hello"

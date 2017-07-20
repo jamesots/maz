@@ -148,8 +148,8 @@ describe('compiler', function() {
         expect(symbols.four).toBe(126);
         expect(symbols.five).toBe(203);
         expect(symbols.six).toBe(303);
-        expect(symbols.seven).toBe(209);
-        expect(symbols.eight).toBe(132);
+        expect(symbols.seven).toBe(144);
+        expect(symbols.eight).toBe(150);
         expect(ast).toEqual([
             {label: 'one'},
             {bytes: [0,0,0], address: 0, out: 0},
@@ -170,11 +170,11 @@ describe('compiler', function() {
             {label: 'six'},
             {bytes: [0,0,0], address: 303, out: 138},
             {endphase: true},
-            {bytes: [0,0,0], address: 206, out: 141},
+            {bytes: [0,0,0], address: 141, out: 141},
             {label: 'seven'},
-            {bytes: [0,0,0], address: 209, out: 144},
+            {bytes: [0,0,0], address: 144, out: 144},
             {endphase: true},
-            {bytes: [0,0,0], address: 129, out: 147},
+            {bytes: [0,0,0], address: 147, out: 147},
             {label: 'eight'}
         ]);
     });
