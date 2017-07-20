@@ -1,1 +1,6 @@
-xor chr
+org $100
+ld a,1
+ld b,2
+ld c,3
+org $101
+ld d,4

@@ -1,4 +1,4 @@
-const compiler = require('../build/compiler');
+const compiler = require('../lib/compiler');
 const sourceMapSupport = require('source-map-support');
 sourceMapSupport.install();
 
@@ -108,17 +108,37 @@ describe('compiler', function() {
             {label: 'one'},
             {bytes: [0,0,0]},
             {label: 'two'},
-            {label: 'three'}
+            {label: 'three'},
+            {org: 123},
+            {label: 'four'},
+            {phase: 200},
+            {label: 'five'},
+            {phase: 300},
+            {label: 'six'},
+            {endphase: true},
+            {label: 'seven'},
+            {endphase: true},
+            {label: 'eight'}
         ];
         const symbols = {
             one: null,
             two: null,
-            three: null
+            three: null,
+            four: null,
+            five: null,
+            six: null,
+            seven: null,
+            eight: null
         }
         compiler.assignPCandEQU(ast, symbols);
         expect(symbols.one).toBe(0);
         expect(symbols.two).toBe(3);
         expect(symbols.three).toBe(3);
+        expect(symbols.four).toBe(123);
+        expect(symbols.five).toBe(200);
+        expect(symbols.six).toBe(300);
+        expect(symbols.seven).toBe(200);
+        expect(symbols.eight).toBe(123);
     });
     it('should assign EQU', function() {
         const ast = [

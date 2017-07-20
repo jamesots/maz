@@ -88,6 +88,8 @@ unlabelled_statement = directive
     / comment
 
 directive = org
+    / phase
+    / endphase
     / db
     / ds
     / equ
@@ -107,6 +109,20 @@ comment = ';' comment:([^\n]*) {
 org = '.'? 'org'i ws expr:expr {
     return {
         org: expr,
+        location: loc()
+    }
+}
+
+phase = '.phase'i ws expr:expr {
+    return {
+        phase: expr,
+        location: loc()
+    }
+}
+
+endphase = '.endphase'i ws expr:expr {
+    return {
+        endphase: true,
         location: loc()
     }
 }

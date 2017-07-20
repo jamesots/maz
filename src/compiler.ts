@@ -167,6 +167,7 @@ export function assignPCandEQU(ast, symbols) {
     let pc = 0;
     let inMacro = false;
     let prefixes = [];
+    let pcStack = [];
     for (let i = 0; i < ast.length; i++) {
         const el = ast[i];
         if (el.prefix) {
@@ -206,6 +207,11 @@ export function assignPCandEQU(ast, symbols) {
             }
         } else if (el.org !== undefined) {
             pc = el.org;
+        } else if (el.phase !== undefined) {
+            pcStack.push(pc);
+            pc = el.phase;
+        } else if (el.endphase) {
+            pc = pcStack.pop();
         } else if (el.bytes) {
             el.address = pc;
             
