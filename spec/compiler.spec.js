@@ -108,16 +108,27 @@ describe('compiler', function() {
             {label: 'one'},
             {bytes: [0,0,0]},
             {label: 'two'},
+            {bytes: [0,0,0]},
             {label: 'three'},
+            {bytes: [0,0,0]},
             {org: 123},
+            {bytes: [0,0,0]},
             {label: 'four'},
+            {bytes: [0,0,0]},
             {phase: 200},
+            {bytes: [0,0,0]},
             {label: 'five'},
+            {bytes: [0,0,0]},
             {phase: 300},
+            {bytes: [0,0,0]},
             {label: 'six'},
+            {bytes: [0,0,0]},
             {endphase: true},
+            {bytes: [0,0,0]},
             {label: 'seven'},
+            {bytes: [0,0,0]},
             {endphase: true},
+            {bytes: [0,0,0]},
             {label: 'eight'}
         ];
         const symbols = {
@@ -133,12 +144,39 @@ describe('compiler', function() {
         compiler.assignPCandEQU(ast, symbols);
         expect(symbols.one).toBe(0);
         expect(symbols.two).toBe(3);
-        expect(symbols.three).toBe(3);
-        expect(symbols.four).toBe(123);
-        expect(symbols.five).toBe(200);
-        expect(symbols.six).toBe(300);
-        expect(symbols.seven).toBe(200);
-        expect(symbols.eight).toBe(123);
+        expect(symbols.three).toBe(6);
+        expect(symbols.four).toBe(126);
+        expect(symbols.five).toBe(203);
+        expect(symbols.six).toBe(303);
+        expect(symbols.seven).toBe(209);
+        expect(symbols.eight).toBe(132);
+        expect(ast).toEqual([
+            {label: 'one'},
+            {bytes: [0,0,0], address: 0, out: 0},
+            {label: 'two'},
+            {bytes: [0,0,0], address: 3, out: 3},
+            {label: 'three'},
+            {bytes: [0,0,0], address: 6, out: 6},
+            {org: 123},
+            {bytes: [0,0,0], address: 123, out: 123},
+            {label: 'four'},
+            {bytes: [0,0,0], address: 126, out: 126},
+            {phase: 200},
+            {bytes: [0,0,0], address: 200, out: 129},
+            {label: 'five'},
+            {bytes: [0,0,0], address: 203, out: 132},
+            {phase: 300},
+            {bytes: [0,0,0], address: 300, out: 135},
+            {label: 'six'},
+            {bytes: [0,0,0], address: 303, out: 138},
+            {endphase: true},
+            {bytes: [0,0,0], address: 206, out: 141},
+            {label: 'seven'},
+            {bytes: [0,0,0], address: 209, out: 144},
+            {endphase: true},
+            {bytes: [0,0,0], address: 129, out: 147},
+            {label: 'eight'}
+        ]);
     });
     it('should assign EQU', function() {
         const ast = [
@@ -452,27 +490,27 @@ describe('compiler', function() {
     });
     it('should get bytes with org', function() {
         const ast = [
-            { bytes: [1,2,3], address: 0 },
-            { bytes: [4,5,6], address: 10 },
-            { bytes: [7,8,9], address: 2 },
+            { bytes: [1,2,3], out: 0 },
+            { bytes: [4,5,6], out: 10 },
+            { bytes: [7,8,9], out: 2 },
         ];
         const bytes = compiler.getBytes(ast);
         expect(bytes).toEqual([1,2,7,8,9,0,0,0,0,0,4,5,6]);
     });
     it('should get bytes with org, non-zero start', function() {
         const ast = [
-            { bytes: [1,2,3], address: 5 },
-            { bytes: [4,5,6], address: 15 },
-            { bytes: [7,8,9], address: 7 },
+            { bytes: [1,2,3], out: 5 },
+            { bytes: [4,5,6], out: 15 },
+            { bytes: [7,8,9], out: 7 },
         ];
         const bytes = compiler.getBytes(ast);
         expect(bytes).toEqual([1,2,7,8,9,0,0,0,0,0,4,5,6]);
     });
     it('should not allow ORG less than first ORG', function() {
         const ast = [
-            { bytes: [1,2,3], address: 5 },
-            { bytes: [4,5,6], address: 0 },
-            { bytes: [7,8,9], address: 7 },
+            { bytes: [1,2,3], out: 5 },
+            { bytes: [4,5,6], out: 0 },
+            { bytes: [7,8,9], out: 7 },
         ];
         expect(function() {
             const bytes = compiler.getBytes(ast);
