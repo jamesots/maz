@@ -63,6 +63,7 @@ try {
 } catch (e) {
     if (e.name === "SyntaxError") {
         console.log(`Syntax error on line ${e.location.start.line} col ${e.location.start.column}`);
+        console.log(e.message);
         console.log('> ' + source.split('\n')[e.location.start.line - 1]);
         console.log('> ' + ' '.repeat(e.location.start.column - 1) + '^');
     } else {

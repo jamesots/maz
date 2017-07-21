@@ -184,7 +184,7 @@ exprlist = expr:expr list:(ws? ',' ws? exprlist)? {
     return expr;
 }
 
-args = arg1:arg arg2:(ws? ',' ws? args)? {
+args = arg1:expr arg2:(ws? ',' ws? args)? {
     if (!Array.isArray(arg1)) {
         arg1 = [arg1];
     }
@@ -193,9 +193,6 @@ args = arg1:arg arg2:(ws? ',' ws? args)? {
     }
     return arg1;
 }
-
-arg = string
-    / expr
 
 equ = '.'? 'equ'i ws expr:expr {
     return {
@@ -215,24 +212,28 @@ db = '.'? ('db'i / 'defb'i) ws? dbytes:dbytes {
     return res(dbytes);
 }
 
-dbytes = db1:dbyte ws? ',' ws? db2:dbytes {
-        if (Array.isArray(db1)) {
-            return db1.concat(db2);
-        }
-        return [db1].concat(db2);
+dbytes = db1:dbyte db2:(ws? ',' ws? dbytes)? {
+    if (!Array.isArray(db1)) {
+        db1 = [db1];
     }
-    / dbyte
+    if (db2) {
+        db1 = db1.concat(db2[3]);
+    }
+    return db1;
+}
 
-dbyte = str:string {
-        let bytes = [];
-        for (let i = 0; i < str.length; i++) {
-            bytes.push(str.charCodeAt(i));
+dbyte = ex:expr {
+    if (typeof ex === 'string') {
+        const bytes = [];
+        for (let i = 0; i < ex.length; i++) {
+            bytes.push(ex.charCodeAt(i));
         }
         return bytes;
-    }
-    / expr:expr {
-        return [expr]
-    }
+    } else if (!Array.isArray(ex)) {
+        return [ex];
+    } 
+    return ex;
+}
 
 string = '"' str:(double_string_char*) '"' { return str.join(''); }
     / "'" str:(single_string_char*) "'" { return str.join(''); }

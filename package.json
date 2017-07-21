@@ -10,6 +10,8 @@
   "scripts": {
     "build-parser": "pegjs --optimize speed -o lib/parser.js src/parser.pegjs",
     "build-expr": "pegjs --optimize speed -o lib/expr.js src/expr.pegjs",
+    "trace-parser": "pegjs --optimize speed --trace -o lib/parser.js src/parser.pegjs",
+    "trace-expr": "pegjs --optimize speed --trace -o lib/expr.js src/expr.pegjs",
     "build-tsc": "tsc",
     "prepublish": "npm run build-tsc && npm run build-parser && npm run build-expr",
     "test": "jasmine",
