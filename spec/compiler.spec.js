@@ -30,6 +30,26 @@ describe('compiler', function() {
         });
         expect(ast[1].prefix).toBe('%0_');
     });
+    it('should not allow symbol to repeat at top level', function() {
+        const ast = [
+            {label: 'one'},
+            {label: 'one'},
+        ];
+        expect(function() {
+            compiler.getSymbols(ast);
+        }).toThrow();
+    });
+    it('should not allow symbol to repeat in a block', function() {
+        const ast = [
+            {block: true},
+            {label: 'one'},
+            {label: 'one'},
+            {endblock: true}
+        ];
+        expect(function() {
+            compiler.getSymbols(ast);
+        }).toThrow();
+    });
     it('should get symbols in two blocks', function() {
         const ast = [
             {label: 'one'},
@@ -329,6 +349,17 @@ describe('compiler', function() {
                 ast: []
             }
         })
+    });
+    it('should not allow macro name to repeat', function() {
+        const ast = [
+            { macrodef: 'thing' },
+            { endmacro: true },
+            { macrodef: 'thing' },
+            { endmacro: true }
+        ];
+        expect(function() {
+            const macros = compiler.getMacros(ast);
+        }).toThrow();
     });
     it('should find macros with content', function() {
         const ast = [

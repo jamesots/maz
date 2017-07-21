@@ -56,6 +56,9 @@ export function getMacros(ast) {
                 ast: [],
                 params: el.params || []
             };
+            if (macros[macroName]) {
+                throw `Already defined macro ${macroName} at ${location(el)}`;
+            }
         } else if (el.endmacro) {
             if (!macro) {
                 throw "Not in a macro " + location(el);
@@ -87,9 +90,15 @@ export function getSymbols(ast) {
         const el = ast[i];
         if (el.label && !inMacro) {
             if (blocks.length > 0) {
+                if (typeof symbols[labelName(blocks, el.label)] !== 'undefined') {
+                    throw `Label '${el.label}' already defined at in this block at ${location(el)}`;
+                }
                 symbols[labelName(blocks, el.label)] = null;
                 el.label = labelName(blocks, el.label);
             } else {
+                if (typeof symbols[el.label] !== 'undefined') {
+                    throw `Label '${el.label}' already defined at ${location(el)}`;
+                }
                 symbols[el.label] = null;
             }
         } else if (el.block) {
