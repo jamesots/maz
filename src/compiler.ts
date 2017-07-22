@@ -230,6 +230,9 @@ export function assignPCandEQU(ast, symbols) {
         } else if (el.endphase) {
             pc = out;
         } else if (el.align !== undefined) {
+            if (el.align.expression) {
+                el.align = evaluateExpression(prefixes[prefixes.length - 1], el.align, symbols);
+            }
             let add = el.align - (pc % el.align);
             if (add !== el.align) {
                 pc += add;
