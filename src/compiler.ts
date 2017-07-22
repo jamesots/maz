@@ -211,6 +211,10 @@ export function assignPCandEQU(ast, symbols) {
                 symbols[el.label] = pc;
             }
             continue;
+        } else if (el.equ) {
+            if (el.equ.expression) {
+                el.equ.address = pc;
+            }
         } else if (el.defs !== undefined) {
             let size = el.defs;
             if (size.expression) {
@@ -255,6 +259,9 @@ export function assignPCandEQU(ast, symbols) {
 export function evaluateExpression(prefix = '', expr, symbols, evaluated = []) {
     const variables = expr.vars;
     const subVars = {}; // substitute variables
+    if (typeof expr.address !== undefined) {
+        symbols['$'] = expr.address;
+    }
     for (const variable of variables) {
         const subVar = findVariable(symbols, prefix, variable);
 
@@ -308,6 +315,7 @@ export function getWholePrefix(symbol) {
 }
 
 export function evaluateSymbols(symbols) {
+    // console.log(`eval symbols ${JSON.stringify(symbols, undefined, 2)}`);
     const evaluated = [];
     for (const symbol in symbols) {
         // console.log('evaluate ' + symbol);
@@ -415,7 +423,7 @@ export function getList(code, ast, symbols) {
                 bytes = [];
             }
             line = el.location.line;
-            if (el.out) {
+            if (el.out !== undefined) {
                 out = el.out;
                 address = el.address;
             }
@@ -453,11 +461,11 @@ function dumpLine(list, lines, line, out, address, bytes, inMacro) {
         }
     }
     let outString = '    ';
-    if (out) {
+    if (out !== undefined) {
         outString = pad(out.toString(16), 4, '0');
     }
     let addressString = '    ';
-    if (address) {
+    if (address !== undefined) {
         addressString = pad(address.toString(16), 4, '0');
     }
     list.push(`${pad(line, 4)} ${address !== out?addressString + '@':''}${outString} ${padr(byteString, BYTELEN * 2).substring(0, BYTELEN * 2)} ${inMacro ? '*' : ' '}${lines[line - 1]}`);

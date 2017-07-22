@@ -146,6 +146,27 @@ describe('compiler', function() {
             one: 5,
         });
     });
+    it('should add address to EQSs with expressions', function() {
+        const ast = [
+            {label: 'one'},
+            {equ: {
+                expression: '$',
+                vars: ['$']
+            }},
+        ];
+        const symbols = {
+            one: null
+        }
+        compiler.assignPCandEQU(ast, symbols);
+        expect(ast).toEqual([
+            {label: 'one'},
+            {equ: {
+                expression: '$',
+                vars: ['$'],
+                address: 0
+            }},
+        ]);
+    });
     it('should assign PC', function() {
         const ast = [
             {label: 'one'},

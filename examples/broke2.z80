@@ -1,3 +1,4 @@
+size: equ end - $
 zero: equ 100
 db 1,2,$
 ld a,zero
@@ -7,3 +8,4 @@ db 1,2,$
 one: equ $
 two: equ $ + 1
 db 0
+end:
