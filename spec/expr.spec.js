@@ -360,4 +360,9 @@ describe('expr', function() {
         result = expr.parse(`10 ? 2 : 3`);
         expect(result).toBe(2);
     });
+
+    it('should parse $', function() {
+        let result = expr.parse('$', { variables: {'$': 10}});
+        expect(result).toBe(10);
+    })
 });

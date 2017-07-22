@@ -268,6 +268,11 @@ factor = '(' expr:expr ')' {
         return expr;
     }
     / function
+    / '$' !([0-9a-z]i) {
+        return {
+            variable: '$'
+        }
+    }
     / number_literal
     / label:label {
         return {

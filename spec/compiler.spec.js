@@ -456,7 +456,8 @@ describe('compiler', function() {
     it('should update bytes', function() {
         const ast = [
             { references: ['three'], bytes: [0, {expression: 'three', vars: ['three']}]},
-            { references: ['three'], bytes: [0, {expression: 'three', vars: ['three']}, null]}
+            { references: ['three'], bytes: [0, {expression: 'three', vars: ['three']}, null]},
+            { references: ['$'], bytes: [0, {expression: '$', vars: ['$']}], address: 5}
         ];
         const symbols = {
             three: 0x1234
@@ -464,7 +465,8 @@ describe('compiler', function() {
         compiler.updateBytes(ast, symbols);
         expect(ast).toEqual([
             { references: ['three'], bytes: [0, 0x34]},
-            { references: ['three'], bytes: [0, 0x34, 0x12]}
+            { references: ['three'], bytes: [0, 0x34, 0x12]},
+            { references: ['$'], bytes: [0, 5], address: 5}
         ])
     });
     it('should update bytes with scope', function() {

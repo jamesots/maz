@@ -1254,6 +1254,9 @@ factor = '(' expr:expr1 ')'  {
     / f:function { 
         return f;
     }
+    / '$' !([0-9a-z]i) {
+        return ['$']
+    }
     / number_literal { 
         return [];
     }

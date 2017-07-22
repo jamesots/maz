@@ -16,7 +16,8 @@
     "prepublish": "npm run build-tsc && npm run build-parser && npm run build-expr",
     "test": "jasmine",
     "start": "node lib/maz.js",
-    "test-z80": "node lib/maz.js -s examples/z80monitor.z80 -o /tmp/z80monitor.bin -l /tmp/z80monitor.lst"
+    "test-z80": "node lib/maz.js -s examples/z80monitor.z80 -o /tmp/z80monitor.bin -l /tmp/z80monitor.lst",
+    "test-broke2": "node lib/maz.js -s examples/broke2.z80 -o /tmp/broke2.bin -l /tmp/broke2.lst"
   },
   "author": "James Ots <code@jamesots.com>",
   "license": "MIT",

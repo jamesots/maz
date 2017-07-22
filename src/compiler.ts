@@ -333,6 +333,7 @@ export function updateBytes(ast, symbols) {
             inMacro = false;
         }
         if (el.references && !inMacro) {
+            symbols['$'] = el.address;
             for (let i = 0; i < el.bytes.length; i++) {
                 const byte = el.bytes[i];
                 if (byte && byte.expression) {

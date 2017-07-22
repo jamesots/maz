@@ -1,12 +1,3 @@
-org $100
-    ld a,1
-
-.phase $105
-
-.align $10
-    ld a,2
-
-.dephase
-
-.align $10
-    ld a,3
+db 1,2,$
+ld a,$
+db 1,2,$
