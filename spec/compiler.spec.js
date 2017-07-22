@@ -123,6 +123,29 @@ describe('compiler', function() {
         expect(ast[7].prefix).toBe('%2_');
         expect(ast[8].prefix).toBe('%3_%2_');
     });
+    it('should get symbols of EQUs', function() {
+        const ast = [
+            {label: 'one'},
+            {equ: 5},
+        ];
+        const symbols = compiler.getSymbols(ast);
+        expect(symbols).toEqual({
+            one: 5,
+        });
+    });
+    it('should not reset already assigned symbols', function() {
+        const ast = [
+            {label: 'one'},
+            {equ: 5},
+        ];
+        const symbols = {
+            one: 5
+        }
+        compiler.assignPCandEQU(ast, symbols);
+        expect(symbols).toEqual({
+            one: 5,
+        });
+    });
     it('should assign PC', function() {
         const ast = [
             {label: 'one'},

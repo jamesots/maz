@@ -18,10 +18,12 @@ export function compile(code, options) {
         const macros = getMacros(ast);
         expandMacros(ast, macros);
         const symbols = getSymbols(ast);
-
-        // console.log(JSON.stringify(ast, undefined, 2));
+        // console.log(JSON.stringify(symbols, undefined, 2));
 
         assignPCandEQU(ast, symbols);
+        // console.log(JSON.stringify(ast, undefined, 2));
+        // console.log(JSON.stringify(symbols, undefined, 2));
+
         evaluateSymbols(symbols);
 
         for (const symbol in symbols) {
@@ -205,7 +207,9 @@ export function assignPCandEQU(ast, symbols) {
             continue;
         }
         if (el.label) {
-            symbols[el.label] = pc;
+            if (symbols[el.label] === null) {
+                symbols[el.label] = pc;
+            }
             continue;
         } else if (el.defs !== undefined) {
             let size = el.defs;
@@ -304,7 +308,6 @@ export function getWholePrefix(symbol) {
 }
 
 export function evaluateSymbols(symbols) {
-    // console.log('eval symbols ' + JSON.stringify(symbols, undefined, 2));
     const evaluated = [];
     for (const symbol in symbols) {
         // console.log('evaluate ' + symbol);
