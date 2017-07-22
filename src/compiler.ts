@@ -223,6 +223,9 @@ export function assignPCandEQU(ast, symbols) {
             pc = el.org;
             out = el.org;
         } else if (el.phase !== undefined) {
+            if (el.phase.expression) {
+                el.phase = evaluateExpression(prefixes[prefixes.length - 1], el.phase, symbols);
+            }
             pc = el.phase;
         } else if (el.endphase) {
             pc = out;

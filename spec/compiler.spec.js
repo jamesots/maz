@@ -252,6 +252,60 @@ describe('compiler', function() {
             {equ: 5}
         ]);
     });
+    it('should evaluate PHASE expressions where possible', function() {
+        const ast = [
+            {label: 'one'},
+            {phase: { 
+                expression: 'one',
+                vars: ['one']
+            }}
+        ];
+        const symbols = {
+            one: null,
+        }
+        compiler.assignPCandEQU(ast, symbols);
+        expect(symbols.one).toBe(0);
+        expect(ast).toEqual([
+            {label: 'one'},
+            {phase: 0},
+        ]);
+    });
+    it('should not evaluate PHASE expressions where not possible', function() {
+        const ast = [
+            {label: 'one'},
+            {phase: { 
+                expression: 'two',
+                vars: ['two']
+            }},
+            {label: 'two'},
+        ];
+        const symbols = {
+            one: null,
+            two: null,
+        }
+        expect(function() {
+            compiler.assignPCandEQU(ast, symbols);
+        }).toThrow();
+    });
+    it('should evaluate PHASE expressions where possible', function() {
+        const ast = [
+            {phase: { 
+                expression: 'one',
+                vars: ['one']
+            }},
+            {label: 'one'},
+            {equ: 5}
+        ];
+        const symbols = {
+            one: 5,
+        }
+        compiler.assignPCandEQU(ast, symbols);
+        expect(ast).toEqual([
+            {phase: 5},
+            {label: 'one'},
+            {equ: 5}
+        ]);
+    });
     it('should get EQU', function() {
         const ast = [
             {label: 'one'},
