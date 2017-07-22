@@ -124,6 +124,16 @@ export function getSymbols(ast) {
             inMacro = true;
         } else if (el.endmacro) {
             inMacro = false;
+        } else if (el.equ) {
+            if (i > 0 && ast[i - 1].label) {
+                let ii = i - 1;
+                while (ast[ii] && ast[ii].label) {
+                    symbols[ast[ii].label] = el.equ;
+                    ii--;
+                }
+            } else {
+                console.log("Error: equ has no label " + location(el));
+            }
         }
     }
     if (blocks.length !== 0) {
@@ -200,23 +210,16 @@ export function assignPCandEQU(ast, symbols) {
         } else if (el.defs !== undefined) {
             let size = el.defs;
             if (size.expression) {
-                size = evaluateExpression(prefixes[prefixes.length - 1] || '', size, symbols, []);
+                size = evaluateExpression(prefixes[prefixes.length - 1], size, symbols);
             }
             el.address = pc;
             el.out = out;
             pc += size;
             out += size;
-        } else if (el.equ) {
-            if (i > 0 && ast[i - 1].label) {
-                let ii = i - 1;
-                while (ast[ii] && ast[ii].label) {
-                    symbols[ast[ii].label] = el.equ;
-                    ii--;
-                }
-            } else {
-                console.log("Error: equ has no label " + location(el));
-            }
         } else if (el.org !== undefined) {
+            if (el.org.expression) {
+                el.org = evaluateExpression(prefixes[prefixes.length - 1], el.org, symbols);
+            }
             pc = el.org;
             out = el.org;
         } else if (el.phase !== undefined) {
@@ -239,7 +242,7 @@ export function assignPCandEQU(ast, symbols) {
     }
 }
 
-export function evaluateExpression(prefix, expr, symbols, evaluated) {
+export function evaluateExpression(prefix = '', expr, symbols, evaluated = []) {
     const variables = expr.vars;
     const subVars = {}; // substitute variables
     for (const variable of variables) {

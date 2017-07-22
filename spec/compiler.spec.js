@@ -198,7 +198,61 @@ describe('compiler', function() {
             {label: 'eight'}
         ]);
     });
-    it('should assign EQU', function() {
+    it('should evaluate ORG expressions where possible', function() {
+        const ast = [
+            {label: 'one'},
+            {org: { 
+                expression: 'one',
+                vars: ['one']
+            }}
+        ];
+        const symbols = {
+            one: null,
+        }
+        compiler.assignPCandEQU(ast, symbols);
+        expect(symbols.one).toBe(0);
+        expect(ast).toEqual([
+            {label: 'one'},
+            {org: 0},
+        ]);
+    });
+    it('should not evaluate ORG expressions where not possible', function() {
+        const ast = [
+            {label: 'one'},
+            {org: { 
+                expression: 'two',
+                vars: ['two']
+            }},
+            {label: 'two'},
+        ];
+        const symbols = {
+            one: null,
+            two: null,
+        }
+        expect(function() {
+            compiler.assignPCandEQU(ast, symbols);
+        }).toThrow();
+    });
+    it('should evaluate ORG expressions where possible', function() {
+        const ast = [
+            {org: { 
+                expression: 'one',
+                vars: ['one']
+            }},
+            {label: 'one'},
+            {equ: 5}
+        ];
+        const symbols = {
+            one: 5,
+        }
+        compiler.assignPCandEQU(ast, symbols);
+        expect(ast).toEqual([
+            {org: 5},
+            {label: 'one'},
+            {equ: 5}
+        ]);
+    });
+    it('should get EQU', function() {
         const ast = [
             {label: 'one'},
             {label: 'two'},
@@ -208,12 +262,7 @@ describe('compiler', function() {
                 expr: 'one'
             }}
         ];
-        const symbols = {
-            one: null,
-            two: null,
-            three: null
-        }
-        compiler.assignPCandEQU(ast, symbols);
+        const symbols = compiler.getSymbols(ast);
         expect(symbols.one).toBe(5);
         expect(symbols.two).toBe(5);
         expect(symbols.three).toEqual({expr:'one'});
