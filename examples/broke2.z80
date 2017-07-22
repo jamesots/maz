@@ -4,6 +4,6 @@ ld a,zero
 ld a,one
 ld a,two
 db 1,2,$
-one: equ 3
-two: equ 45 + 1
+one: equ $
+two: equ $ + 1
 db 0

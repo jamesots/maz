@@ -1206,7 +1206,8 @@ expr = t1:expr1 {
     }
     return {
         expression: text(),
-        vars: t1
+        vars: t1,
+        location: loc()
     }
 }
 expr1 = t1:ternary {

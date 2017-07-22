@@ -259,7 +259,7 @@ export function evaluateExpression(prefix = '', expr, symbols, evaluated = []) {
         const subVar = findVariable(symbols, prefix, variable);
 
         if (symbols[subVar] === undefined) {
-            throw 'Symbol not found: ' + variable;
+            throw `Symbol not found: ${variable} at ${location(expr)}`;
         }
         if (symbols[subVar].expression) {
             evaluateSymbol(subVar, symbols, evaluated);

@@ -78,16 +78,17 @@ describe('parser', function() {
         ['ld bc,$12 + $34 + $2', [0x01, 0x48, 0x00]],
         ['ld bc,$12 + start', [0x01, {
             expression: '$12 + start',
-            vars: ['start']
+            vars: ['start'],
+            location: {line: 1, column: 7}
         }, null]],
         ['ld bc,$1234', [0x01, 0x34, 0x12]],
-        ['ld bc,chr', [0x01, {expression:'chr',vars:['chr']}, null]],
+        ['ld bc,chr', [0x01, {expression:'chr',vars:['chr'], location: {line: 1, column: 7}}, null]],
         ['ld (bc),a', [0x02]],
         ['inc bc', [0x03]],
         ['inc b', [0x04]],
         ['dec b', [0x05]],
         ['ld b,$12', [0x06, 0x12]],
-        ['ld b,chr', [0x06, {expression:'chr',vars:['chr']}]],
+        ['ld b,chr', [0x06, {expression:'chr',vars:['chr'], location: {line: 1, column: 6}}]],
         ['rlca', [0x07]],
         ['ex af,af\'', [0x08]],
         ['add hl,bc', [0x09]],
@@ -96,28 +97,28 @@ describe('parser', function() {
         ['inc c', [0x0c]],
         ['dec c', [0x0d]],
         ['ld c,$12', [0x0e, 0x12]],
-        ['ld c,chr', [0x0e, {expression:'chr',vars:['chr']}]],
+        ['ld c,chr', [0x0e, {expression:'chr',vars:['chr'], location: {line: 1, column: 6}}]],
         ['rrca', [0x0f]],
         ['djnz $100', [0x10, {
             relative: 256
         }]],
         ['djnz chr', [0x10, {
-            relative: {expression: 'chr',vars:['chr']}
+            relative: {expression: 'chr',vars:['chr'], location: {line: 1, column: 6}}
         }]],
         ['ld de,$543F', [0x11, 0x3f, 0x54]],
-        ['ld de,chr', [0x11, {expression:'chr',vars:['chr']}, null]],
+        ['ld de,chr', [0x11, {expression:'chr',vars:['chr'], location: {line: 1, column: 7}}, null]],
         ['ld (de),a', [0x12]],
         ['inc de', [0x13]],
         ['inc d', [0x14]],
         ['dec d', [0x15]],
         ['ld d,$fe', [0x16, 0xfe]],
-        ['ld d,chr', [0x16, {expression:'chr',vars:['chr']}]],
+        ['ld d,chr', [0x16, {expression:'chr',vars:['chr'], location: {line: 1, column: 6}}]],
         ['rla', [0x17]],
         ['jr $100', [0x18, {
             relative: 256
         }]],
         ['jr chr', [0x18, {
-            relative: {expression:'chr',vars:['chr']}
+            relative: {expression:'chr',vars:['chr'], location: {line: 1, column: 4}}
         }]],
         ['add hl,de', [0x19]],
         ['ld a,(de)', [0x1a]],
@@ -125,69 +126,69 @@ describe('parser', function() {
         ['inc e', [0x1c]],
         ['dec e', [0x1d]],
         ['ld e,$01', [0x1e, 0x01]],
-        ['ld e,chr', [0x1e, {expression:'chr',vars:['chr']}]],
+        ['ld e,chr', [0x1e, {expression:'chr',vars:['chr'], location: {line: 1, column: 6}}]],
         ['rra', [0x1f]],
         ['jr nz,$100', [0x20, {
             relative: 256
         }]],
         ['jr nz,chr', [0x20, {
-            relative: {expression:'chr',vars:['chr']}
+            relative: {expression:'chr',vars:['chr'], location: {line: 1, column: 7}}
         }]],
         ['ld hl,$e0f9', [0x21, 0xf9, 0xe0]],
-        ['ld hl,chr', [0x21, {expression:'chr',vars:['chr']}, null]],
+        ['ld hl,chr', [0x21, {expression:'chr',vars:['chr'], location: {line: 1, column: 7}}, null]],
         ['ld ($1234),hl', [0x22, 0x34, 0x12]],
-        ['ld (chr),hl', [0x22, {expression:'chr',vars:['chr']}, null]],
+        ['ld (chr),hl', [0x22, {expression:'chr',vars:['chr'], location: {line: 1, column: 5}}, null]],
         ['inc hl', [0x23]],
         ['inc h', [0x24]],
         ['dec h', [0x25]],
         ['ld h,$9a', [0x26, 0x9a]],
-        ['ld h,chr', [0x26, {expression:'chr',vars:['chr']}]],
+        ['ld h,chr', [0x26, {expression:'chr',vars:['chr'], location: {line: 1, column: 6}}]],
         ['daa', [0x27]],
         ['jr z,$100', [0x28, {
             relative: 256
         }]],
         ['jr z,chr', [0x28, {
-            relative: {expression:'chr',vars:['chr']}
+            relative: {expression:'chr',vars:['chr'], location: {line: 1, column: 6}}
         }]],
         ['add hl,hl', [0x29]],
         ['ld hl,($7Bca)', [0x2a, 0xca, 0x7b]],
-        ['ld hl,(chr)', [0x2a, {expression:'chr',vars:['chr']}, null]],
+        ['ld hl,(chr)', [0x2a, {expression:'chr',vars:['chr'], location: {line: 1, column: 8}}, null]],
         ['dec hl', [0x2b]],
         ['inc l', [0x2c]],
         ['dec l', [0x2d]],
         ['ld l,$42', [0x2e, 0x42]],
-        ['ld l,chr', [0x2e, {expression:'chr',vars:['chr']}]],
+        ['ld l,chr', [0x2e, {expression:'chr',vars:['chr'], location: {line: 1, column: 6}}]],
         ['cpl', [0x2f]],
         ['jr nc,$100', [0x30, {
             relative: 256
         }]],
         ['jr nc,chr', [0x30, {
-            relative: {expression:'chr',vars:['chr']}
+            relative: {expression:'chr',vars:['chr'], location: {line: 1, column: 7}}
         }]],
         ['ld sp,$e0f9', [0x31, 0xf9, 0xe0]],
-        ['ld sp,chr', [0x31, {expression:'chr',vars:['chr']}, null]],
+        ['ld sp,chr', [0x31, {expression:'chr',vars:['chr'], location: {line: 1, column: 7}}, null]],
         ['ld ($1234),a', [0x32, 0x34, 0x12]],
-        ['ld (chr),a', [0x32, {expression:'chr',vars:['chr']}, null]],
+        ['ld (chr),a', [0x32, {expression:'chr',vars:['chr'], location: {line: 1, column: 5}}, null]],
         ['inc sp', [0x33]],
         ['inc (hl)', [0x34]],
         ['dec (hl)', [0x35]],
         ['ld (hl),$9a', [0x36, 0x9a]],
-        ['ld (hl),chr', [0x36, {expression:'chr',vars:['chr']}]],
+        ['ld (hl),chr', [0x36, {expression:'chr',vars:['chr'], location: {line: 1, column: 9}}]],
         ['scf', [0x37]],
         ['jr c,$100', [0x38, {
             relative: 256
         }]],
         ['jr c,chr', [0x38, {
-            relative: {expression:'chr',vars:['chr']}
+            relative: {expression:'chr',vars:['chr'], location: {line: 1, column: 6}}
         }]],
         ['add hl,sp', [0x39]],
         ['ld a,($7Bca)', [0x3a, 0xca, 0x7b]],
-        ['ld a,(chr)', [0x3a, {expression:'chr',vars:['chr']}, null]],
+        ['ld a,(chr)', [0x3a, {expression:'chr',vars:['chr'], location: {line: 1, column: 7}}, null]],
         ['dec sp', [0x3b]],
         ['inc a', [0x3c]],
         ['dec a', [0x3d]],
         ['ld a,$42', [0x3e, 0x42]],
-        ['ld a,chr', [0x3e, {expression:'chr',vars:['chr']}]],
+        ['ld a,chr', [0x3e, {expression:'chr',vars:['chr'], location: {line: 1, column: 6}}]],
         ['ccf', [0x3f]],
 
         ['ld b,b', [0x40]],
@@ -387,115 +388,115 @@ describe('parser', function() {
         ['ret nz', [0xc0]],
         ['pop bc', [0xc1]],
         ['jp nz,$1234', [0xc2, 0x34, 0x12]],
-        ['jp nz,chr', [0xc2, {expression:'chr',vars:['chr']}, null]],
+        ['jp nz,chr', [0xc2, {expression:'chr',vars:['chr'], location: {line: 1, column: 7}}, null]],
         ['jp $1234', [0xc3, 0x34, 0x12]],
-        ['jp chr', [0xc3, {expression:'chr',vars:['chr']}, null]],
+        ['jp chr', [0xc3, {expression:'chr',vars:['chr'], location: {line: 1, column: 4}}, null]],
         ['call nz,$1234', [0xc4, 0x34, 0x12]],
-        ['call nz,chr', [0xc4, {expression:'chr',vars:['chr']}, null]],
+        ['call nz,chr', [0xc4, {expression:'chr',vars:['chr'], location: {line: 1, column: 9}}, null]],
         ['push bc', [0xc5]],
         ['add a,$12', [0xc6, 0x12]],
-        ['add a,chr', [0xc6, {expression:'chr',vars:['chr']}]],
+        ['add a,chr', [0xc6, {expression:'chr',vars:['chr'], location: {line: 1, column: 7}}]],
         ['rst 00h', [0xc7]],
         ['rst $00', [0xc7]],
 
         ['ret z', [0xc8]],
         ['ret', [0xc9]],
         ['jp z,$1234', [0xca, 0x34, 0x12]],
-        ['jp z,chr', [0xca, {expression:'chr',vars:['chr']}, null]],
+        ['jp z,chr', [0xca, {expression:'chr',vars:['chr'], location: {line: 1, column: 6}}, null]],
         ['call z,$1234', [0xcc, 0x34, 0x12]],
-        ['call z,chr', [0xcc, {expression:'chr',vars:['chr']}, null]],
+        ['call z,chr', [0xcc, {expression:'chr',vars:['chr'], location: {line: 1, column: 8}}, null]],
         ['call $1234', [0xcd, 0x34, 0x12]],
-        ['call chr', [0xcd, {expression:'chr',vars:['chr']}, null]],
+        ['call chr', [0xcd, {expression:'chr',vars:['chr'], location: {line: 1, column: 6}}, null]],
         ['adc a,$12', [0xce, 0x12]],
-        ['adc a,chr', [0xce, {expression:'chr',vars:['chr']}]],
+        ['adc a,chr', [0xce, {expression:'chr',vars:['chr'], location: {line: 1, column: 7}}]],
         ['rst 08h', [0xcf]],
         ['rst $08', [0xcf]],
 
         ['ret nc', [0xd0]],
         ['pop de', [0xd1]],
         ['jp nc,$1234', [0xd2, 0x34, 0x12]],
-        ['jp nc,chr', [0xd2, {expression:'chr',vars:['chr']}, null]],
+        ['jp nc,chr', [0xd2, {expression:'chr',vars:['chr'], location: {line: 1, column: 7}}, null]],
         ['out ($12),a', [0xd3, 0x12]],
-        ['out (chr),a', [0xd3, {expression:'chr',vars:['chr']}]],
+        ['out (chr),a', [0xd3, {expression:'chr',vars:['chr'], location: {line: 1, column: 6}}]],
         ['call nc,$1234', [0xd4, 0x34, 0x12]],
-        ['call nc,chr', [0xd4, {expression:'chr',vars:['chr']}, null]],
+        ['call nc,chr', [0xd4, {expression:'chr',vars:['chr'], location: {line: 1, column: 9}}, null]],
         ['push de', [0xd5]],
         ['sub a,$12', [0xd6, 0x12]],
-        ['sub a,chr', [0xd6, {expression:'chr',vars:['chr']}]],
+        ['sub a,chr', [0xd6, {expression:'chr',vars:['chr'], location: {line: 1, column: 7}}]],
         ['sub $12', [0xd6, 0x12]],
-        ['sub chr', [0xd6, {expression:'chr',vars:['chr']}]],
+        ['sub chr', [0xd6, {expression:'chr',vars:['chr'], location: {line: 1, column: 5}}]],
         ['rst 10h', [0xd7]],
         ['rst $10', [0xd7]],
 
         ['ret c', [0xd8]],
         ['exx', [0xd9]],
         ['jp c,$1234', [0xda, 0x34, 0x12]],
-        ['jp c,chr', [0xda, {expression:'chr',vars:['chr']}, null]],
+        ['jp c,chr', [0xda, {expression:'chr',vars:['chr'], location: {line: 1, column: 6}}, null]],
         ['in a,($12)', [0xdb, 0x12]],
-        ['in a,(chr)', [0xdb, {expression:'chr',vars:['chr']}]],
-        ['call c,chr', [0xdc, {expression:'chr',vars:['chr']}, null]],
+        ['in a,(chr)', [0xdb, {expression:'chr',vars:['chr'], location: {line: 1, column: 7}}]],
+        ['call c,chr', [0xdc, {expression:'chr',vars:['chr'], location: {line: 1, column: 8}}, null]],
         ['pfix', [0xdd]],
         ['sbc a,$12', [0xde, 0x12]],
-        ['sbc a,chr', [0xde, {expression:'chr',vars:['chr']}]],
+        ['sbc a,chr', [0xde, {expression:'chr',vars:['chr'], location: {line: 1, column: 7}}]],
         ['rst 18h', [0xdf]],
         ['rst $18', [0xdf]],
 
         ['ret po', [0xe0]],
         ['pop hl', [0xe1]],
         ['jp po,$1234', [0xe2, 0x34, 0x12]],
-        ['jp po,chr', [0xe2, {expression:'chr',vars:['chr']}, null]],
+        ['jp po,chr', [0xe2, {expression:'chr',vars:['chr'], location: {line: 1, column: 7}}, null]],
         ['ex (sp),hl', [0xe3]],
         ['call po,$1234', [0xe4, 0x34, 0x12]],
-        ['call po,chr', [0xe4, {expression:'chr',vars:['chr']}, null]],
+        ['call po,chr', [0xe4, {expression:'chr',vars:['chr'], location: {line: 1, column: 9}}, null]],
         ['push hl', [0xe5]],
         ['and a,$12', [0xe6, 0x12]],
-        ['and a,chr', [0xe6, {expression:'chr',vars:['chr']}]],
+        ['and a,chr', [0xe6, {expression:'chr',vars:['chr'], location: {line: 1, column: 7}}]],
         ['and $12', [0xe6, 0x12]],
-        ['and chr', [0xe6, {expression:'chr',vars:['chr']}]],
+        ['and chr', [0xe6, {expression:'chr',vars:['chr'], location: {line: 1, column: 5}}]],
         ['rst 20h', [0xe7]],
         ['rst $20', [0xe7]],
 
         ['ret pe', [0xe8]],
         ['jp (hl)', [0xe9]],
         ['jp pe,$1234', [0xea, 0x34, 0x12]],
-        ['jp pe,chr', [0xea, {expression:'chr',vars:['chr']}, null]],
+        ['jp pe,chr', [0xea, {expression:'chr',vars:['chr'], location: {line: 1, column: 7}}, null]],
         ['ex de,hl', [0xeb]],
         ['call pe,$1234', [0xec, 0x34, 0x12]],
-        ['call pe,chr', [0xec, {expression:'chr',vars:['chr']}, null]],
+        ['call pe,chr', [0xec, {expression:'chr',vars:['chr'], location: {line: 1, column: 9}}, null]],
         ['xor a,$12', [0xee, 0x12]],
-        ['xor a,chr', [0xee, {expression:'chr',vars:['chr']}]],
+        ['xor a,chr', [0xee, {expression:'chr',vars:['chr'], location: {line: 1, column: 7}}]],
         ['xor $12', [0xee, 0x12]],
-        ['xor chr', [0xee, {expression:'chr',vars:['chr']}]],
+        ['xor chr', [0xee, {expression:'chr',vars:['chr'], location: {line: 1, column: 5}}]],
         ['rst 28h', [0xef]],
         ['rst $28', [0xef]],
 
         ['ret p', [0xf0]],
         ['pop af', [0xf1]],
         ['jp p,$1234', [0xf2, 0x34, 0x12]],
-        ['jp p,chr', [0xf2, {expression:'chr',vars:['chr']}, null]],
+        ['jp p,chr', [0xf2, {expression:'chr',vars:['chr'], location: {line: 1, column: 6}}, null]],
         ['di', [0xf3]],
         ['call p,$1234', [0xf4, 0x34, 0x12]],
-        ['call p,chr', [0xf4, {expression:'chr',vars:['chr']}, null]],
+        ['call p,chr', [0xf4, {expression:'chr',vars:['chr'], location: {line: 1, column: 8}}, null]],
         ['push af', [0xf5]],
         ['or a,$12', [0xf6, 0x12]],
-        ['or a,chr', [0xf6, {expression:'chr',vars:['chr']}]],
+        ['or a,chr', [0xf6, {expression:'chr',vars:['chr'], location: {line: 1, column: 6}}]],
         ['or $12', [0xf6, 0x12]],
-        ['or chr', [0xf6, {expression:'chr',vars:['chr']}]],
+        ['or chr', [0xf6, {expression:'chr',vars:['chr'], location: {line: 1, column: 4}}]],
         ['rst 30h', [0xf7]],
         ['rst $30', [0xf7]],
 
         ['ret m', [0xf8]],
         ['ld sp,hl', [0xf9]],
         ['jp m,$1234', [0xfa, 0x34, 0x12]],
-        ['jp m,chr', [0xfa, {expression:'chr',vars:['chr']}, null]],
+        ['jp m,chr', [0xfa, {expression:'chr',vars:['chr'], location: {line: 1, column: 6}}, null]],
         ['ei', [0xfb]],
         ['call m,$1234', [0xfc, 0x34, 0x12]],
-        ['call m,chr', [0xfc, {expression:'chr',vars:['chr']}, null]],
+        ['call m,chr', [0xfc, {expression:'chr',vars:['chr'], location: {line: 1, column: 8}}, null]],
         ['pfiy', [0xfd]],
         ['cp a,$12', [0xfe, 0x12]],
-        ['cp a,chr', [0xfe, {expression:'chr',vars:['chr']}]],
+        ['cp a,chr', [0xfe, {expression:'chr',vars:['chr'], location: {line: 1, column: 6}}]],
         ['cp $12', [0xfe, 0x12]],
-        ['cp chr', [0xfe, {expression:'chr',vars:['chr']}]],
+        ['cp chr', [0xfe, {expression:'chr',vars:['chr'], location: {line: 1, column: 4}}]],
         ['rst 38h', [0xff]],
         ['rst $38', [0xff]],
 
@@ -505,7 +506,7 @@ describe('parser', function() {
         ['out (c),b', [0xed, 0x41]],
         ['sbc hl,bc', [0xed, 0x42]],
         ['ld ($1234),bc', [0xed, 0x43, 0x34, 0x12]],
-        ['ld (chr),bc', [0xed, 0x43, {expression:'chr',vars:['chr']}, null]],
+        ['ld (chr),bc', [0xed, 0x43, {expression:'chr',vars:['chr'], location: {line: 1, column: 5}}, null]],
         ['neg', [0xed, 0x44]],
         ['retn', [0xed, 0x45]],
         ['im 0', [0xed, 0x46]],
@@ -514,7 +515,7 @@ describe('parser', function() {
         ['out (c),c', [0xed, 0x49]],
         ['adc hl,bc', [0xed, 0x4a]],
         ['ld bc,($1234)', [0xed, 0x4b, 0x34, 0x12]],
-        ['ld bc,(chr)', [0xed, 0x4b, {expression:'chr',vars:['chr']}, null]],
+        ['ld bc,(chr)', [0xed, 0x4b, {expression:'chr',vars:['chr'], location: {line: 1, column: 8}}, null]],
         ['reti', [0xed, 0x4d]],
         ['ld r,a', [0xed, 0x4f]],
 
@@ -1297,7 +1298,7 @@ nop`);
     it('should parse db label', function() {
         const result = parse('db thing');
         expect(result.length).toBe(1);
-        expect(result[0].bytes).toEqual([{expression: 'thing',vars:['thing']}]);
+        expect(result[0].bytes).toEqual([{expression: 'thing',vars:['thing'], location: {line: 1, column: 4}}]);
     });
     it('should parse db complex escaping', function() {
         const result = parse('db "\\"Hey \\0\\r\\n\\x13" ');
@@ -1333,7 +1334,7 @@ nop`);
         const result = parse('thing 1, a, "hello"');
         expect(result[0]).toEqual({
             macrocall: 'thing',
-            args: [1,{expression:'a', vars: ['a']},'hello'],
+            args: [1,{expression:'a', vars: ['a'], location: {line: 1, column: 10}},'hello'],
             location: {
                 line: 1, column: 1
             }
@@ -1381,7 +1382,8 @@ nop`);
         expect(result[0]).toEqual({
             defs: {
                 expression: 'a + 2',
-                vars: ['a']
+                vars: ['a'],
+                location: {line: 1, column: 4}
             },
             location: {
                 line: 1, column: 1
@@ -1398,13 +1400,14 @@ nop`);
             104, 101, 108, 108, 111,
         ]);
     });
-    
+
     it('should parse db $', function() {
         const result = parse('db $');
         expect(result.length).toBe(1);
         expect(result[0].bytes).toEqual([{
             expression: '$',
-            vars: ['$']
+            vars: ['$'],
+            location: {line: 1, column: 4}
         }]);
     });
 });
