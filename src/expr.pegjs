@@ -318,7 +318,10 @@ hex_literal = '$' [0-9a-f]i[0-9a-f_]i* {
     / [0-9][0-9a-f_]i* 'h' {
         return parseInt(text().replace(/[_h]/g,''), 16)
     }
-binary_literal = [01][01_]* 'b' {
+binary_literal = '%' num:([01][01_]*) {
+        return parseInt(text().replace(/[_%]/g,''), 2)
+    }
+    / [01][01_]* 'b' {
         return parseInt(text().replace(/[_b]/g,''), 2)
     }
 octal_literal = [0-7][0-7_]* 'o' {

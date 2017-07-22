@@ -1280,5 +1280,6 @@ number_literal = binary_literal { return []; }
 decimal_literal = [0-9][0-9_]*  { return []; }
 hex_literal = '$' [0-9a-f]i[0-9a-f_]i*  { return []; }
     / [0-9][0-9a-f_]i* 'h'  { return []; }
-binary_literal = [01][01_]* 'b'  { return []; }
+binary_literal = '%' [01][01_]*  { return []; }
+    / [01][01_]* 'b'  { return []; }
 octal_literal = [0-7][0-7_]* 'o'  { return []; }

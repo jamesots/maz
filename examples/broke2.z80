@@ -1,9 +1,10 @@
 size: equ end - $
-zero: equ 100
+zero: equ %1011
 db 1,2,$
 ld a,zero
 ld a,one
 ld a,two
+ld a,$
 db 1,2,$
 one: equ $
 two: equ $ + 1

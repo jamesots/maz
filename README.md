@@ -6,6 +6,24 @@ Macro Assembler for Z80
 
 Maz is a Z80 macro assembler, which is currently under development. I wouldn't advise using it until it's at version 1, or at least until I change this message.
 
+Numbers
+-------
+
+Numbers are decimal unless one of the following applies:
+
+* Numbers which start with $ or end with h are in hex
+* Numbers which end with o are in octal
+* Numbers which end with b are in binary
+
+Numbers can have _ in them to improve readability: eg: 1101_0100_1010_1111b
+
+Labels
+------
+
+Labels contains any of the following: a-z, A-Z, 0-9, _
+
+$ can be used to refer to the address of the current statement. In the case of DBs, it refers to the address of the start of the DBs.
+
 Directives
 ----------
 
