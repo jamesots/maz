@@ -28,7 +28,7 @@ export function compile(code, options) {
 
         for (const symbol in symbols) {
             if (symbols[symbol].expression) {
-                console.log(`${symbol} cannot be calculated`);
+                throw `Symbol '${symbol}' cannot be calculated`;
             }
         }
 
@@ -47,23 +47,34 @@ export function getMacros(ast) {
     const macros = {};
     let macro = undefined;
     let macroName = undefined;
+    let macroLocation = undefined;
     for (let i = 0; i < ast.length; i++) {
         const el = ast[i];
         if (el.macrodef) {
             if (macro) {
-                throw "Cannot nest macros " + location(el);
+                throw {
+                    message: "Cannot nest macros",
+                    location: el.location
+                };
             }
+            macroLocation = el.location;
             macroName = el.macrodef;
             macro = {
                 ast: [],
                 params: el.params || []
             };
             if (macros[macroName]) {
-                throw `Already defined macro ${macroName} at ${location(el)}`;
+                throw {
+                    message: `Already defined macro '${macroName}'`,
+                    location: el.location
+                };
             }
         } else if (el.endmacro) {
             if (!macro) {
-                throw "Not in a macro " + location(el);
+                throw {
+                    message: "Not in a macro",
+                    location: el.location
+                };
             }
             macros[macroName] = macro;
             macro = undefined;
@@ -74,7 +85,10 @@ export function getMacros(ast) {
         }
     }
     if (macro) {
-        throw "Macro doesn't finish";
+        throw {
+            message: `Macro '${macroName}' doesn't finish`,
+            location: macroLocation
+        }
     }
     return macros;
 }
@@ -93,13 +107,19 @@ export function getSymbols(ast) {
         if (el.label && !inMacro) {
             if (blocks.length > 0) {
                 if (typeof symbols[labelName(blocks, el.label)] !== 'undefined') {
-                    throw `Label '${el.label}' already defined at in this block at ${location(el)}`;
+                    throw {
+                        message: `Label '${el.label}' already defined at in this block`,
+                        location: el.location
+                    };
                 }
                 symbols[labelName(blocks, el.label)] = null;
                 el.label = labelName(blocks, el.label);
             } else {
                 if (typeof symbols[el.label] !== 'undefined') {
-                    throw `Label '${el.label}' already defined at ${location(el)}`;
+                    throw {
+                        message: `Label '${el.label}' already defined`,
+                        location: el.location
+                    };
                 }
                 symbols[el.label] = null;
             }
@@ -134,7 +154,10 @@ export function getSymbols(ast) {
                     ii--;
                 }
             } else {
-                console.log("Error: equ has no label " + location(el));
+                throw {
+                    message: "EQU has no label",
+                    location: el.location
+                }
             }
         }
     }
@@ -166,7 +189,10 @@ export function expandMacros(ast, macros) {
         if (el.macrocall) {
             const macro = macros[el.macrocall];
             if (!macro) {
-                throw "Unknown instruction/macro: " + el.macrocall + " " + location(el);
+                throw {
+                    message: `Unknown instruction/macro '${el.macrocall}'`,
+                    location: el.location
+                };
             }
             el.params = JSON.parse(JSON.stringify(macro.params));
             el.expanded = true;
@@ -266,7 +292,10 @@ export function evaluateExpression(prefix = '', expr, symbols, evaluated = []) {
         const subVar = findVariable(symbols, prefix, variable);
 
         if (symbols[subVar] === undefined) {
-            throw `Symbol not found: ${variable} at ${location(expr)}`;
+            throw {
+                message: `Symbol '${variable}' not found`,
+                location: expr.location
+            };
         }
         if (symbols[subVar].expression) {
             evaluateSymbol(subVar, symbols, evaluated);
@@ -278,7 +307,10 @@ export function evaluateExpression(prefix = '', expr, symbols, evaluated = []) {
 
 export function evaluateSymbol(symbol, symbols, evaluated) {
     if (evaluated.indexOf(symbol) !== -1) {
-        throw "Circular symbol dependency";
+        throw {
+            message: `Circular symbol dependency while evaluating '${symbol}'`,
+            location: symbols[symbol].location
+        }
     }
     evaluated.push(symbol);
     const prefix = getWholePrefix(symbol);
@@ -356,10 +388,16 @@ export function updateBytes(ast, symbols) {
                         const subVar = findVariable(symbols, prefix, variable);
 
                         if (symbols[subVar] === undefined) {
-                            throw 'Symbol cannot be found: ' + variable + " " + location(el);
+                            throw {
+                                message: `Symbol '${variable}' cannot be found`,
+                                location: el.location
+                            };
                         }
                         if (symbols[subVar].expression) {
-                            throw 'Symbol not evaluated: ' + variable + " " + location(el);
+                            throw {
+                                message: `Symbol ${variable} not evaluated`,
+                                location: el.location
+                            };
                             // evaluateSymbol(subVar, symbols, evaluated);
                         }
                         subVars[variable] = symbols[subVar];
@@ -510,7 +548,10 @@ export function getBytes(ast) {
                 bytes = bytes.concat(el.bytes);
                 out = el.bytes.length + el.out;
             } else if (el.out < startOut) {
-                throw "Cannot ORG to earlier address than first ORG";
+                throw {
+                    message: "Cannot ORG to earlier address than first ORG",
+                    location: el.location
+                };
             } else if (el.out < end) {
                 for (let i = 0; i < el.bytes.length; i++) {
                     bytes[(el.out - startOut) + i] = el.bytes[i];

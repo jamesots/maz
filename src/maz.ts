@@ -62,10 +62,15 @@ try {
 
 } catch (e) {
     if (e.name === "SyntaxError") {
-        console.log(`Syntax error on line ${e.location.start.line} col ${e.location.start.column}`);
+        console.log(`Syntax error on line ${e.location.start.line}`);
         console.log(e.message);
         console.log('> ' + source.split('\n')[e.location.start.line - 1]);
         console.log('> ' + ' '.repeat(e.location.start.column - 1) + '^');
+    } else if (e.location) {
+        console.log(`Error on on line ${e.location.line}`);
+        console.log(e.message);
+        console.log('> ' + source.split('\n')[e.location.line - 1]);
+        console.log('> ' + ' '.repeat(e.location.column - 1) + '^');
     } else {
         console.log(e);
     }
