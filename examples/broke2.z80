@@ -9,4 +9,12 @@ db 1,2,$
 one: equ $
 two: equ $ + 1
 db 0
+.block
+one: equ 100
+@bob: equ 200
+ld a, one
+
+.endblock
+
+ld a,bob
 end:

@@ -285,10 +285,11 @@ endblock = '.endblock'i {
     };
 }
 
-labeldef = label:label ':' {
+labeldef = at:'@'? label:label ':' {
     return {
         label: label,
-        location: loc()
+        location: loc(),
+        public: at !== null
     }
 }
 

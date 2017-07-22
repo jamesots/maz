@@ -30,6 +30,21 @@ describe('compiler', function() {
         });
         expect(ast[1].prefix).toBe('%0_');
     });
+    it('should get public symbols in a block', function() {
+        const ast = [
+            {label: 'one'},
+            {block: true},
+                {label: 'three', public: true},
+            {endblock: true},
+            {label: 'two'},
+        ];
+        const symbols = compiler.getSymbols(ast);
+        expect(symbols).toEqual({
+            one: null,
+            three: null,
+            two: null
+        });
+    });
     it('should not allow symbol to repeat at top level', function() {
         const ast = [
             {label: 'one'},
@@ -429,7 +444,8 @@ describe('compiler', function() {
         expect(symbols).toEqual({
             one: 1,
             two: 1,
-            three: 1
+            three: 1,
+            $: undefined
         })
     });
     it('should evaluate symbols and detect circular references', function() {
@@ -456,7 +472,8 @@ describe('compiler', function() {
             three: 3,
             '%1_three': 4,
             '%2_%1_three': 5,
-            '%2_%1_bob': 9
+            '%2_%1_bob': 9,
+            $: undefined
         });
     });
     it('should get whole prefix', function() {

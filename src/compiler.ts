@@ -105,7 +105,7 @@ export function getSymbols(ast) {
     for (let i = 0; i < ast.length; i++) {
         const el = ast[i];
         if (el.label && !inMacro) {
-            if (blocks.length > 0) {
+            if (blocks.length > 0 && !el.public) {
                 if (typeof symbols[labelName(blocks, el.label)] !== 'undefined') {
                     throw {
                         message: `Label '${el.label}' already defined at in this block`,
