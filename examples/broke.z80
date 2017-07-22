@@ -1,4 +1,1 @@
-z: equ 5
-ds 10  + a
-a: equ b
-b:
+db "hey!"

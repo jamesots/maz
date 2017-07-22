@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import * as parser from './parser';
 // import * as Tracer from 'pegjs-backtrace';
 import * as Expr from './expr';
@@ -50,9 +51,15 @@ export function parseImports(ast): boolean {
     for (let i = 0; i < ast.length; i++) {
         const el = ast[i];
         if (el.import && !el.imported) {
-            // read file
-            // insert its ast here
-            // set imported and el.imported to true 
+            const source = fs.readFileSync(el.import).toString();
+            const importAst = parser.parse(source, {});
+            console.log(JSON.stringify(importAst, undefined, 2));
+            ast.splice(i + 1, 0, ...importAst);
+            ast.splice(i + 1 + importAst.length, 0, {
+                endimport: true
+            });
+            el.imported = true;
+            imported = true;
         }
     }
     return imported;
