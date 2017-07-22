@@ -1410,4 +1410,12 @@ nop`);
             location: {line: 1, column: 4}
         }]);
     });
+
+    it('should parse import', function() {
+        const result = parse('.import "some/file.z80"');
+        expect(result.length).toBe(1);
+        expect(result[0]).toEqual({
+            import: "some/file.z80"
+        });
+    });
 });

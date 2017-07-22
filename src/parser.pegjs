@@ -72,6 +72,7 @@ statements = stmt:statement [ \t]* comment? stmts:(separator+ statements?)? {
 separator = [ \t]* [\r\n] [ \t]*
 
 statement = labelled_statement
+    / import
     / labeldef
     / unlabelled_statement
 
@@ -104,6 +105,12 @@ comment = ';' comment:([^\n]*) {
     return {
         comment: comment.join(''),
         location: loc()
+    };
+}
+
+import = '.import' ws path:string {
+    return {
+        import: path
     };
 }
 

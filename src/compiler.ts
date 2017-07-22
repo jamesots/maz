@@ -14,7 +14,9 @@ export function compile(code, options) {
     try {
         const ast = parser.parse(code, parserOptions);
         // console.log(JSON.stringify(ast, undefined, 2));
-        
+        while (parseImports(ast)) {};
+
+
         const macros = getMacros(ast);
         expandMacros(ast, macros);
         const symbols = getSymbols(ast);
@@ -41,6 +43,19 @@ export function compile(code, options) {
             throw e;
         // }
     }
+}
+
+export function parseImports(ast): boolean {
+    let imported = false;
+    for (let i = 0; i < ast.length; i++) {
+        const el = ast[i];
+        if (el.import && !el.imported) {
+            // read file
+            // insert its ast here
+            // set imported and el.imported to true 
+        }
+    }
+    return imported;
 }
 
 export function getMacros(ast) {
