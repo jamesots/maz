@@ -599,7 +599,7 @@ date:
     jp nc,bad_date
     cp 0
     jp z,bad_date
-done:
+done2:
     xor a
     cp (hl)
     jp nz,bad_date

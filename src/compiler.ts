@@ -48,10 +48,13 @@ export function compile(code, dir, options) {
 }
 
 export function processImports(ast, dir) {
+    const dirs = [];
     for (let i = 0; i < ast.length; i++) {
         const el = ast[i];
         if (el.import && !el.imported) {
             const filename = path.join(dir, el.import);
+            dir = path.dirname(filename);
+            dirs.push(dir);
             if (!fs.existsSync(filename)) {
                 throw {
                     message: "File does not exist",
@@ -60,12 +63,19 @@ export function processImports(ast, dir) {
             }
             const source = fs.readFileSync(filename).toString();
             const importAst = parser.parse(source, {});
-            // console.log(JSON.stringify(importAst, undefined, 2));
-            ast.splice(i + 1, 0, ...importAst);
-            ast.splice(i + 1 + importAst.length, 0, {
-                endimport: true
-            });
+            if (importAst !== null) {
+                ast.splice(i + 1, 0, ...importAst);
+                ast.splice(i + 1 + importAst.length, 0, {
+                    endimport: true
+                });
+            } else {
+                ast.splice(i + 1, 0, {
+                    endimport: true
+                });
+            }
             el.imported = true;
+        } else if (el.endimport) {
+            dir = dirs.pop();
         }
     }
 }

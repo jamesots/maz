@@ -3,7 +3,7 @@ zero: equ %1011
 db 1,2,$
 ld a,zero
 
-.import "examples/broke.z80"
+.import "another_dir/test.z80"
 
 ld a,one
 ld a,two
