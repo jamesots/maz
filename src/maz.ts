@@ -3,6 +3,7 @@ import * as compiler from './compiler';
 import * as commandLineArgs from 'command-line-args';
 import * as commandLineUsage from 'command-line-usage';
 import * as fs from 'fs';
+import * as path from 'path';
 import * as sourceMapSupport from 'source-map-support';
 
 sourceMapSupport.install();
@@ -37,11 +38,14 @@ console.log("WARNING: maz is under development, and likely to break without");
 console.log("         warning, and future versions will probably be completely");
 console.log("         incompatible.");
 
+
+const dir = path.dirname(options.src);
+
 const source = fs.readFileSync(options.src).toString();
 console.log(`Compiling ${options.src}`);
 
 try {
-    let [ast, symbols] = compiler.compile(source, {trace: false});
+    let [ast, symbols] = compiler.compile(source, dir, {trace: false});
     // console.log(JSON.stringify(ast, undefined, 2));
     // console.log(JSON.stringify(symbols, undefined, 2));
     const bytes = compiler.getBytes(ast);

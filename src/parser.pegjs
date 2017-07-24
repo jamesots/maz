@@ -110,7 +110,8 @@ comment = ';' comment:([^\n]*) {
 
 import = '.import' ws path:string {
     return {
-        import: path
+        import: path,
+        location: loc()
     };
 }
 

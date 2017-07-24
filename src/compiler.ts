@@ -1,9 +1,10 @@
 import * as fs from 'fs';
+import * as path from 'path';
 import * as parser from './parser';
 // import * as Tracer from 'pegjs-backtrace';
 import * as Expr from './expr';
 
-export function compile(code, options) {
+export function compile(code, dir, options) {
     const parserOptions = {} as any;
     // const tracer = new Tracer(code, {
     //     showTrace: true,
@@ -15,7 +16,7 @@ export function compile(code, options) {
     try {
         const ast = parser.parse(code, parserOptions);
         // console.log(JSON.stringify(ast, undefined, 2));
-        processImports(ast);
+        processImports(ast, dir);
 
 
         const macros = getMacros(ast);
@@ -46,11 +47,18 @@ export function compile(code, options) {
     }
 }
 
-export function processImports(ast) {
+export function processImports(ast, dir) {
     for (let i = 0; i < ast.length; i++) {
         const el = ast[i];
         if (el.import && !el.imported) {
-            const source = fs.readFileSync(el.import).toString();
+            const filename = path.join(dir, el.import);
+            if (!fs.existsSync(filename)) {
+                throw {
+                    message: "File does not exist",
+                    location: el.location
+                }
+            }
+            const source = fs.readFileSync(filename).toString();
             const importAst = parser.parse(source, {});
             // console.log(JSON.stringify(importAst, undefined, 2));
             ast.splice(i + 1, 0, ...importAst);
