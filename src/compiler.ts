@@ -4,8 +4,8 @@ import * as parser from './parser';
 // import * as Tracer from 'pegjs-backtrace';
 import * as Expr from './expr';
 
-export function compile(code, dir, options) {
-    const parserOptions = {} as any;
+export function compile(filename, options) {
+    const parserOptions = {source: 0} as any;
     // const tracer = new Tracer(code, {
     //     showTrace: true,
     //     showFullPath: true
@@ -14,9 +14,17 @@ export function compile(code, dir, options) {
     //     parserOptions.tracer = tracer;
     // }
     try {
+        const sources = [];
+        const dir = path.dirname(filename);
+        const code = fs.readFileSync(filename).toString();
+        sources.push({
+            name: filename,
+            source: code.split('\n')
+        })
+
         const ast = parser.parse(code, parserOptions);
         // console.log(JSON.stringify(ast, undefined, 2));
-        processImports(ast, dir);
+        processImports(ast, dir, sources);
 
 
         const macros = getMacros(ast);
@@ -37,7 +45,7 @@ export function compile(code, dir, options) {
         }
 
         updateBytes(ast, symbols);
-        return [ast, symbols];
+        return [ast, symbols, sources];
     } catch (e) {
         // if (options.trace) {
         //     // console.log(tracer.getBacktraceString());
@@ -47,8 +55,10 @@ export function compile(code, dir, options) {
     }
 }
 
-export function processImports(ast, dir) {
+export function processImports(ast, dir, sources) {
     const dirs = [];
+    const sourceIndices = [];
+    let sourceIndex = 0;
     for (let i = 0; i < ast.length; i++) {
         const el = ast[i];
         if (el.import && !el.imported) {
@@ -62,7 +72,13 @@ export function processImports(ast, dir) {
                 }
             }
             const source = fs.readFileSync(filename).toString();
-            const importAst = parser.parse(source, {});
+            sources.push({
+                name: filename,
+                source: source.split('\n')
+            });
+            sourceIndices.push(sourceIndex);
+            sourceIndex = sources.length - 1;
+            const importAst = parser.parse(source, {source: sourceIndex});
             if (importAst !== null) {
                 ast.splice(i + 1, 0, ...importAst);
                 ast.splice(i + 1 + importAst.length, 0, {
@@ -76,6 +92,7 @@ export function processImports(ast, dir) {
             el.imported = true;
         } else if (el.endimport) {
             dir = dirs.pop();
+            sourceIndex = sourceIndices.pop();
         }
     }
 }
@@ -465,10 +482,10 @@ const BYTELEN = 8;
  * Each line should be
  * LLLL ADDR BYTES SRC  - max 8 bytes? - multiple lines if more
  */
-export function getList(code, ast, symbols) {
-    let lines = code.split('\n');
+export function getList(sources, ast, symbols) {
     let list = [];
     let line = 0;
+    let source = 0;
 
     let out = undefined;
     let address = undefined;
@@ -480,8 +497,8 @@ export function getList(code, ast, symbols) {
 
     for (const el of ast) {
         if (el.location) {
-            if (el.location.line != line && line !== 0) {
-                dumpLine(list, lines, line, out, address, bytes, inMacro);
+            if ((el.location.line !== line && line !== 0) || (el.location.source !== source)) {
+                dumpLine(list, sources[source].source, line, out, address, bytes, inMacro);
 
                 if (endingMacro) {
                     inMacro = false;
@@ -498,6 +515,7 @@ export function getList(code, ast, symbols) {
                 bytes = [];
             }
             line = el.location.line;
+            source = el.location.source;
             if (el.out !== undefined) {
                 out = el.out;
                 address = el.address;
@@ -513,8 +531,8 @@ export function getList(code, ast, symbols) {
             endingMacro = true;
         }
     }
-    if (lines[line - 1]) {
-        dumpLine(list, lines, line, out, address, bytes, inMacro);
+    if (sources[source].source[line - 1]) {
+        dumpLine(list, sources[source].source, line, out, address, bytes, inMacro);
     }
 
     list.push('');

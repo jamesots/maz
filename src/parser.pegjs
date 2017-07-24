@@ -40,7 +40,8 @@
     function loc() {
         return {
             line: location().start.line,
-            column: location().start.column
+            column: location().start.column,
+            source: options.source
         };
     }
 

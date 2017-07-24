@@ -39,13 +39,10 @@ console.log("         warning, and future versions will probably be completely")
 console.log("         incompatible.");
 
 
-const dir = path.dirname(options.src);
-
-const source = fs.readFileSync(options.src).toString();
 console.log(`Compiling ${options.src}`);
 
 try {
-    let [ast, symbols] = compiler.compile(source, dir, {trace: false});
+    let [ast, symbols, sources] = compiler.compile(options.src, {trace: false});
     // console.log(JSON.stringify(ast, undefined, 2));
     // console.log(JSON.stringify(symbols, undefined, 2));
     const bytes = compiler.getBytes(ast);
@@ -54,7 +51,7 @@ try {
     fs.writeFileSync(options.out, Buffer.from(bytes));
     console.log(`Written ${bytes.length} ($${bytes.length.toString(16)}) bytes ${options.out}`);
     if (options.list) {
-        const list = compiler.getList(source, ast, symbols);
+        const list = compiler.getList(sources, ast, symbols);
         const file = fs.openSync(options.list, 'w');
         for (const line of list) {
             fs.writeSync(file, line);
@@ -68,11 +65,13 @@ try {
     if (e.name === "SyntaxError") {
         console.log(`Syntax error on line ${e.location.start.line}`);
         console.log(e.message);
+        const source = fs.readFileSync(e.source).toString();
         console.log('> ' + source.split('\n')[e.location.start.line - 1]);
         console.log('> ' + ' '.repeat(e.location.start.column - 1) + '^');
     } else if (e.location) {
         console.log(`Error on on line ${e.location.line}`);
         console.log(e.message);
+        const source = fs.readFileSync(e.source).toString();
         console.log('> ' + source.split('\n')[e.location.line - 1]);
         console.log('> ' + ' '.repeat(e.location.column - 1) + '^');
     } else {
