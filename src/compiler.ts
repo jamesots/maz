@@ -15,7 +15,7 @@ export function compile(code, options) {
     try {
         const ast = parser.parse(code, parserOptions);
         // console.log(JSON.stringify(ast, undefined, 2));
-        while (parseImports(ast)) {};
+        processImports(ast);
 
 
         const macros = getMacros(ast);
@@ -46,23 +46,20 @@ export function compile(code, options) {
     }
 }
 
-export function parseImports(ast): boolean {
-    let imported = false;
+export function processImports(ast) {
     for (let i = 0; i < ast.length; i++) {
         const el = ast[i];
         if (el.import && !el.imported) {
             const source = fs.readFileSync(el.import).toString();
             const importAst = parser.parse(source, {});
-            console.log(JSON.stringify(importAst, undefined, 2));
+            // console.log(JSON.stringify(importAst, undefined, 2));
             ast.splice(i + 1, 0, ...importAst);
             ast.splice(i + 1 + importAst.length, 0, {
                 endimport: true
             });
             el.imported = true;
-            imported = true;
         }
     }
-    return imported;
 }
 
 export function getMacros(ast) {
