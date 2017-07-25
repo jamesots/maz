@@ -514,7 +514,6 @@ export function getList(sources, ast, symbols) {
             if ((el.location.line !== line && line !== 0) || (el.location.source !== source)) {
                 dumpLine(list, sources[source].source, line, out, address, bytes, inMacro);
                 if (endingImport !== false) {
-                    console.log(JSON.stringify(endingImport, undefined, 2));
                     list.push(`${pad(endingImport.line + 1, 4)}                      * end import ${sources[endingImport.source].name}`);
                     endingImport = false;
                 }
@@ -550,7 +549,6 @@ export function getList(sources, ast, symbols) {
             endingMacro = true;
         }
         if (el.endimport !== undefined) {
-            console.log(JSON.stringify(el, undefined, 2));
             endingImport = el.location;
         }
     }
