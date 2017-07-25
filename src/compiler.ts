@@ -27,16 +27,16 @@ export function compile(filename, options) {
         processImports(ast, dir, sources);
 
 
-        const macros = getMacros(ast);
-        expandMacros(ast, macros);
-        const symbols = getSymbols(ast);
+        const macros = getMacros(ast, sources);
+        expandMacros(ast, macros, sources);
+        const symbols = getSymbols(ast, sources);
         // console.log(JSON.stringify(symbols, undefined, 2));
 
-        assignPCandEQU(ast, symbols);
+        assignPCandEQU(ast, symbols, sources);
         // console.log(JSON.stringify(ast, undefined, 2));
         // console.log(JSON.stringify(symbols, undefined, 2));
 
-        evaluateSymbols(symbols);
+        evaluateSymbols(symbols, sources);
 
         for (const symbol in symbols) {
             if (symbols[symbol].expression) {
@@ -44,7 +44,7 @@ export function compile(filename, options) {
             }
         }
 
-        updateBytes(ast, symbols);
+        updateBytes(ast, symbols, sources);
         return [ast, symbols, sources];
     } catch (e) {
         // if (options.trace) {
@@ -68,7 +68,9 @@ export function processImports(ast, dir, sources) {
             if (!fs.existsSync(filename)) {
                 throw {
                     message: "File does not exist",
-                    location: el.location
+                    location: el.location,
+                    source: sources[el.location.source].source[el.location.line - 1],
+                    filename: sources[el.location.source].name
                 }
             }
             const source = fs.readFileSync(filename).toString();
@@ -107,7 +109,7 @@ export function processImports(ast, dir, sources) {
     }
 }
 
-export function getMacros(ast) {
+export function getMacros(ast, sources) {
     const macros = {};
     let macro = undefined;
     let macroName = undefined;
@@ -118,7 +120,9 @@ export function getMacros(ast) {
             if (macro) {
                 throw {
                     message: "Cannot nest macros",
-                    location: el.location
+                    location: el.location,
+                    source: sources[el.location.source].source[el.location.line - 1],
+                    filename: sources[el.location.source].name
                 };
             }
             macroLocation = el.location;
@@ -130,14 +134,18 @@ export function getMacros(ast) {
             if (macros[macroName]) {
                 throw {
                     message: `Already defined macro '${macroName}'`,
-                    location: el.location
+                    location: el.location,
+                    source: sources[el.location.source].source[el.location.line - 1],
+                    filename: sources[el.location.source].name
                 };
             }
         } else if (el.endmacro) {
             if (!macro) {
                 throw {
                     message: "Not in a macro",
-                    location: el.location
+                    location: el.location,
+                    source: sources[el.location.source].source[el.location.line - 1],
+                    filename: sources[el.location.source].name
                 };
             }
             macros[macroName] = macro;
@@ -151,7 +159,9 @@ export function getMacros(ast) {
     if (macro) {
         throw {
             message: `Macro '${macroName}' doesn't finish`,
-            location: macroLocation
+            location: macroLocation,
+            source: sources[macroLocation.source].source[macroLocation.line - 1 ],
+            filename: sources[macroLocation.source].name
         }
     }
     return macros;
@@ -161,7 +171,7 @@ export function getMacros(ast) {
  * Gets a map of symbols, and updates the parsed objects
  * so the block and endblock objects have prefixes
  */
-export function getSymbols(ast) {
+export function getSymbols(ast, sources) {
     const symbols = {};
     let nextBlock = 0;
     let blocks = [];
@@ -173,7 +183,9 @@ export function getSymbols(ast) {
                 if (typeof symbols[labelName(blocks, el.label)] !== 'undefined') {
                     throw {
                         message: `Label '${el.label}' already defined at in this block`,
-                        location: el.location
+                        location: el.location,
+                        source: sources[el.location.source].source[el.location.line - 1],
+                        filename: sources[el.location.source].name
                     };
                 }
                 symbols[labelName(blocks, el.label)] = null;
@@ -182,7 +194,9 @@ export function getSymbols(ast) {
                 if (typeof symbols[el.label] !== 'undefined') {
                     throw {
                         message: `Label '${el.label}' already defined`,
-                        location: el.location
+                        location: el.location,
+                        source: sources[el.location.source].source[el.location.line - 1],
+                        filename: sources[el.location.source].name
                     };
                 }
                 symbols[el.label] = null;
@@ -220,7 +234,9 @@ export function getSymbols(ast) {
             } else {
                 throw {
                     message: "EQU has no label",
-                    location: el.location
+                    location: el.location,
+                    source: sources[el.location.source].source[el.location.line - 1],
+                    filename: sources[el.location.source].name
                 }
             }
         }
@@ -231,7 +247,7 @@ export function getSymbols(ast) {
     return symbols;
 }
 
-function labelPrefix(blocks: string[]) {
+function labelPrefix(blocks: number[]) {
     let result = '';
     for (let i = 0; i < blocks.length; i++) {
         result = `%${blocks[i]}_${result}`;
@@ -239,7 +255,7 @@ function labelPrefix(blocks: string[]) {
     return result;
 }
 
-function labelName(blocks: string[], label) {
+function labelName(blocks: number[], label) {
     return labelPrefix(blocks) + label;
 }
 
@@ -247,7 +263,7 @@ function location(el) {
     return `(${el.location.line}:${el.location.column})`;
 }
 
-export function expandMacros(ast, macros) {
+export function expandMacros(ast, macros, sources) {
     for (let i = 0; i < ast.length; i++) {
         const el = ast[i];
         if (el.macrocall) {
@@ -255,7 +271,9 @@ export function expandMacros(ast, macros) {
             if (!macro) {
                 throw {
                     message: `Unknown instruction/macro '${el.macrocall}'`,
-                    location: el.location
+                    location: el.location,
+                    source: sources[el.location.source].source[el.location.line - 1],
+                    filename: sources[el.location.source].name
                 };
             }
             el.params = JSON.parse(JSON.stringify(macro.params));
@@ -274,7 +292,7 @@ export function expandMacros(ast, macros) {
  * evaluate expressions, it simply put the expression into
  * the symbol
  */
-export function assignPCandEQU(ast, symbols) {
+export function assignPCandEQU(ast, symbols, sources) {
     let pc = 0;
     let out = 0;
     let inMacro = false;
@@ -308,7 +326,7 @@ export function assignPCandEQU(ast, symbols) {
         } else if (el.defs !== undefined) {
             let size = el.defs;
             if (size.expression) {
-                size = evaluateExpression(prefixes[prefixes.length - 1], size, symbols);
+                size = evaluateExpression(prefixes[prefixes.length - 1], size, symbols, sources);
             }
             el.address = pc;
             el.out = out;
@@ -316,20 +334,20 @@ export function assignPCandEQU(ast, symbols) {
             out += size;
         } else if (el.org !== undefined) {
             if (el.org.expression) {
-                el.org = evaluateExpression(prefixes[prefixes.length - 1], el.org, symbols);
+                el.org = evaluateExpression(prefixes[prefixes.length - 1], el.org, symbols, sources);
             }
             pc = el.org;
             out = el.org;
         } else if (el.phase !== undefined) {
             if (el.phase.expression) {
-                el.phase = evaluateExpression(prefixes[prefixes.length - 1], el.phase, symbols);
+                el.phase = evaluateExpression(prefixes[prefixes.length - 1], el.phase, symbols, sources);
             }
             pc = el.phase;
         } else if (el.endphase) {
             pc = out;
         } else if (el.align !== undefined) {
             if (el.align.expression) {
-                el.align = evaluateExpression(prefixes[prefixes.length - 1], el.align, symbols);
+                el.align = evaluateExpression(prefixes[prefixes.length - 1], el.align, symbols, sources);
             }
             let add = el.align - (pc % el.align);
             if (add !== el.align) {
@@ -346,7 +364,7 @@ export function assignPCandEQU(ast, symbols) {
     }
 }
 
-export function evaluateExpression(prefix = '', expr, symbols, evaluated = []) {
+export function evaluateExpression(prefix = '', expr, symbols, sources, evaluated = []) {
     const variables = expr.vars;
     const subVars = {}; // substitute variables
     if (typeof expr.address !== undefined) {
@@ -358,22 +376,26 @@ export function evaluateExpression(prefix = '', expr, symbols, evaluated = []) {
         if (symbols[subVar] === undefined) {
             throw {
                 message: `Symbol '${variable}' not found`,
-                location: expr.location
+                location: expr.location,
+                source: sources[expr.location.source].source[expr.location.line - 1],
+                filename: sources[expr.location.source].name
             };
         }
         if (symbols[subVar].expression) {
-            evaluateSymbol(subVar, symbols, evaluated);
+            evaluateSymbol(subVar, symbols, sources, evaluated);
         }
         subVars[variable] = symbols[subVar];
     }
     return Expr.parse(expr.expression, {variables: subVars});
 }
 
-export function evaluateSymbol(symbol, symbols, evaluated) {
+export function evaluateSymbol(symbol, symbols, sources, evaluated) {
     if (evaluated.indexOf(symbol) !== -1) {
         throw {
             message: `Circular symbol dependency while evaluating '${symbol}'`,
-            location: symbols[symbol].location
+            location: symbols[symbol].location,
+            source: sources[symbols[symbol].location.source].source[symbols[symbol].location.line - 1],
+            filename: sources[symbols[symbol].location.source].name
         }
     }
     evaluated.push(symbol);
@@ -410,7 +432,7 @@ export function getWholePrefix(symbol) {
     return '';
 }
 
-export function evaluateSymbols(symbols) {
+export function evaluateSymbols(symbols, sources) {
     // console.log(`eval symbols ${JSON.stringify(symbols, undefined, 2)}`);
     const evaluated = [];
     for (const symbol in symbols) {
@@ -419,12 +441,12 @@ export function evaluateSymbols(symbols) {
             if (evaluated.indexOf(symbol) !== -1) {
                 continue;
             }
-            evaluateSymbol(symbol, symbols, evaluated);
+            evaluateSymbol(symbol, symbols, sources, evaluated);
         }
     }
 }
 
-export function updateBytes(ast, symbols) {
+export function updateBytes(ast, symbols, sources) {
     const prefixes = [];
     let inMacro = false;
     for (const el of ast) {
@@ -454,13 +476,17 @@ export function updateBytes(ast, symbols) {
                         if (symbols[subVar] === undefined) {
                             throw {
                                 message: `Symbol '${variable}' cannot be found`,
-                                location: el.location
+                                location: el.location,
+                                source: sources[el.location.source].source[el.location.line - 1],
+                                filename: sources[el.location.source].name
                             };
                         }
                         if (symbols[subVar].expression) {
                             throw {
                                 message: `Symbol ${variable} not evaluated`,
-                                location: el.location
+                                location: el.location,
+                                source: sources[el.location.source].source[el.location.line - 1],
+                                filename: sources[el.location.source].name
                             };
                             // evaluateSymbol(subVar, symbols, evaluated);
                         }
@@ -598,7 +624,7 @@ function padr(num, size, chr = ' ') {
     return result + chr.repeat(Math.max(0, size - result.length));
 }
 
-export function getBytes(ast) {
+export function getBytes(ast, sources) {
     let bytes = [];
     let startOut = null;
     let out = null;
@@ -626,7 +652,9 @@ export function getBytes(ast) {
             } else if (el.out < startOut) {
                 throw {
                     message: "Cannot ORG to earlier address than first ORG",
-                    location: el.location
+                    location: el.location,
+                    source: sources[el.location.source].source[el.location.line - 1],
+                    filename: sources[el.location.source].name
                 };
             } else if (el.out < end) {
                 for (let i = 0; i < el.bytes.length; i++) {

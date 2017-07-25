@@ -45,7 +45,7 @@ try {
     let [ast, symbols, sources] = compiler.compile(options.src, {trace: false});
     // console.log(JSON.stringify(ast, undefined, 2));
     // console.log(JSON.stringify(symbols, undefined, 2));
-    const bytes = compiler.getBytes(ast);
+    const bytes = compiler.getBytes(ast, sources);
     // console.log(JSON.stringify(bytes, undefined, 2));
 
     fs.writeFileSync(options.out, Buffer.from(bytes));
@@ -63,16 +63,15 @@ try {
 
 } catch (e) {
     if (e.name === "SyntaxError") {
-        console.log(`Syntax error on line ${e.location.start.line}`);
+        console.log(`Syntax error`);
         console.log(e.message);
-        const source = fs.readFileSync(e.source).toString();
-        console.log('> ' + source.split('\n')[e.location.start.line - 1]);
+        console.log(`${e.filename}:${e.location.start.line}`);
+        console.log('> ' + e.source);
         console.log('> ' + ' '.repeat(e.location.start.column - 1) + '^');
     } else if (e.location) {
-        console.log(`Error on on line ${e.location.line}`);
         console.log(e.message);
-        const source = fs.readFileSync(e.source).toString();
-        console.log('> ' + source.split('\n')[e.location.line - 1]);
+        console.log(`${e.filename}:${e.location.line}`);
+        console.log('> ' + e.source);
         console.log('> ' + ' '.repeat(e.location.column - 1) + '^');
     } else {
         console.log(e);
