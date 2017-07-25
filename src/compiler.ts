@@ -66,12 +66,7 @@ export function processImports(ast, dir, sources) {
             dir = path.dirname(filename);
             dirs.push(dir);
             if (!fs.existsSync(filename)) {
-                throw {
-                    message: "File does not exist",
-                    location: el.location,
-                    source: sources[el.location.source].source[el.location.line - 1],
-                    filename: sources[el.location.source].name
-                }
+                error("File does not exist", el.location, sources);
             }
             const source = fs.readFileSync(filename).toString();
             sources.push({
@@ -118,12 +113,7 @@ export function getMacros(ast, sources) {
         const el = ast[i];
         if (el.macrodef) {
             if (macro) {
-                throw {
-                    message: "Cannot nest macros",
-                    location: el.location,
-                    source: sources[el.location.source].source[el.location.line - 1],
-                    filename: sources[el.location.source].name
-                };
+                error("Cannot nest macros", el.location, sources);
             }
             macroLocation = el.location;
             macroName = el.macrodef;
@@ -132,21 +122,11 @@ export function getMacros(ast, sources) {
                 params: el.params || []
             };
             if (macros[macroName]) {
-                throw {
-                    message: `Already defined macro '${macroName}'`,
-                    location: el.location,
-                    source: sources[el.location.source].source[el.location.line - 1],
-                    filename: sources[el.location.source].name
-                };
+                error(`Already defined macro '${macroName}'`, el.location, sources);
             }
         } else if (el.endmacro) {
             if (!macro) {
-                throw {
-                    message: "Not in a macro",
-                    location: el.location,
-                    source: sources[el.location.source].source[el.location.line - 1],
-                    filename: sources[el.location.source].name
-                };
+                error("Not in a macro", el.location, sources);
             }
             macros[macroName] = macro;
             macro = undefined;
@@ -157,12 +137,7 @@ export function getMacros(ast, sources) {
         }
     }
     if (macro) {
-        throw {
-            message: `Macro '${macroName}' doesn't finish`,
-            location: macroLocation,
-            source: sources[macroLocation.source].source[macroLocation.line - 1 ],
-            filename: sources[macroLocation.source].name
-        }
+        error(`Macro '${macroName}' doesn't finish`, macroLocation, sources);
     }
     return macros;
 }
@@ -181,23 +156,13 @@ export function getSymbols(ast, sources) {
         if (el.label && !inMacro) {
             if (blocks.length > 0 && !el.public) {
                 if (typeof symbols[labelName(blocks, el.label)] !== 'undefined') {
-                    throw {
-                        message: `Label '${el.label}' already defined at in this block`,
-                        location: el.location,
-                        source: sources[el.location.source].source[el.location.line - 1],
-                        filename: sources[el.location.source].name
-                    };
+                    error(`Label '${el.label}' already defined at in this block`, el.location, sources);
                 }
                 symbols[labelName(blocks, el.label)] = null;
                 el.label = labelName(blocks, el.label);
             } else {
                 if (typeof symbols[el.label] !== 'undefined') {
-                    throw {
-                        message: `Label '${el.label}' already defined`,
-                        location: el.location,
-                        source: sources[el.location.source].source[el.location.line - 1],
-                        filename: sources[el.location.source].name
-                    };
+                    error(`Label '${el.label}' already defined`, el.location, sources);
                 }
                 symbols[el.label] = null;
             }
@@ -232,12 +197,7 @@ export function getSymbols(ast, sources) {
                     ii--;
                 }
             } else {
-                throw {
-                    message: "EQU has no label",
-                    location: el.location,
-                    source: sources[el.location.source].source[el.location.line - 1],
-                    filename: sources[el.location.source].name
-                }
+                error("EQU has no label", el.location, sources);
             }
         }
     }
@@ -263,18 +223,22 @@ function location(el) {
     return `(${el.location.line}:${el.location.column})`;
 }
 
+function error(message, location, sources): never {
+    throw {
+        message: message,
+        location: location,
+        source: sources[location.source].source[location.line - 1],
+        filename: sources[location.source].name
+    };
+}
+
 export function expandMacros(ast, macros, sources) {
     for (let i = 0; i < ast.length; i++) {
         const el = ast[i];
         if (el.macrocall) {
             const macro = macros[el.macrocall];
             if (!macro) {
-                throw {
-                    message: `Unknown instruction/macro '${el.macrocall}'`,
-                    location: el.location,
-                    source: sources[el.location.source].source[el.location.line - 1],
-                    filename: sources[el.location.source].name
-                };
+                error(`Unknown instruction/macro '${el.macrocall}'`, el.location, sources);
             }
             el.params = JSON.parse(JSON.stringify(macro.params));
             el.expanded = true;
@@ -374,12 +338,7 @@ export function evaluateExpression(prefix = '', expr, symbols, sources, evaluate
         const subVar = findVariable(symbols, prefix, variable);
 
         if (symbols[subVar] === undefined) {
-            throw {
-                message: `Symbol '${variable}' not found`,
-                location: expr.location,
-                source: sources[expr.location.source].source[expr.location.line - 1],
-                filename: sources[expr.location.source].name
-            };
+            error(`Symbol '${variable}' not found`, expr.location, sources);
         }
         if (symbols[subVar].expression) {
             evaluateSymbol(subVar, symbols, sources, evaluated);
@@ -391,12 +350,7 @@ export function evaluateExpression(prefix = '', expr, symbols, sources, evaluate
 
 export function evaluateSymbol(symbol, symbols, sources, evaluated) {
     if (evaluated.indexOf(symbol) !== -1) {
-        throw {
-            message: `Circular symbol dependency while evaluating '${symbol}'`,
-            location: symbols[symbol].location,
-            source: sources[symbols[symbol].location.source].source[symbols[symbol].location.line - 1],
-            filename: sources[symbols[symbol].location.source].name
-        }
+        error(`Circular symbol dependency while evaluating '${symbol}'`, symbols[symbol].location, sources);
     }
     evaluated.push(symbol);
     const prefix = getWholePrefix(symbol);
@@ -474,20 +428,10 @@ export function updateBytes(ast, symbols, sources) {
                         const subVar = findVariable(symbols, prefix, variable);
 
                         if (symbols[subVar] === undefined) {
-                            throw {
-                                message: `Symbol '${variable}' cannot be found`,
-                                location: el.location,
-                                source: sources[el.location.source].source[el.location.line - 1],
-                                filename: sources[el.location.source].name
-                            };
+                            error(`Symbol '${variable}' cannot be found`, el.location, sources);
                         }
                         if (symbols[subVar].expression) {
-                            throw {
-                                message: `Symbol ${variable} not evaluated`,
-                                location: el.location,
-                                source: sources[el.location.source].source[el.location.line - 1],
-                                filename: sources[el.location.source].name
-                            };
+                            error(`Symbol ${variable} not evaluated`, el.location, sources);
                             // evaluateSymbol(subVar, symbols, evaluated);
                         }
                         subVars[variable] = symbols[subVar];
@@ -650,12 +594,7 @@ export function getBytes(ast, sources) {
                 bytes = bytes.concat(el.bytes);
                 out = el.bytes.length + el.out;
             } else if (el.out < startOut) {
-                throw {
-                    message: "Cannot ORG to earlier address than first ORG",
-                    location: el.location,
-                    source: sources[el.location.source].source[el.location.line - 1],
-                    filename: sources[el.location.source].name
-                };
+                error("Cannot ORG to earlier address than first ORG", el.location, sources);
             } else if (el.out < end) {
                 for (let i = 0; i < el.bytes.length; i++) {
                     bytes[(el.out - startOut) + i] = el.bytes[i];
