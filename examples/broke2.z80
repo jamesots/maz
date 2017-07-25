@@ -20,4 +20,6 @@ ld a, one
 .endblock
 
 ld a,bob
+
+bob 2
 end:

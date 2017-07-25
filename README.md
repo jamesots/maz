@@ -26,6 +26,8 @@ $ can be used to refer to the address of the current statement. In the case of D
 
 When defining a label in a block, you can prefix it with an at symbol (@) to make it public. This makes it get declared at the top level instead of in the block's scope.
 
+Macros may have the same name as a label.
+
 Addresses
 ---------
 
@@ -86,4 +88,9 @@ Any directive shown below without a leading full stop (period) may also be writt
 <dd>End a block.</dd>
 <dt>.align <i>expression</i></dt>
 <dd>Align the next byte so that its address modulo <i>expression</i> is zero. (If we're in phased compilation, the phase address is aligned.)</dd>
+<dt>.import <i>filename</i></dt>
+<dd>Import a file and process it as if it were in the current file. The filename is relative to the current file. If you import a file from an imported file, that filename will also be relative to the file the import statement is in.
+
+    .import "something/routines.z80"
+</dd>
 </dl>

@@ -1,1 +1,5 @@
 db 'yo'
+
+macro bob x
+    db x
+endm
