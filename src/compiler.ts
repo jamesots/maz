@@ -82,15 +82,25 @@ export function processImports(ast, dir, sources) {
             if (importAst !== null) {
                 ast.splice(i + 1, 0, ...importAst);
                 ast.splice(i + 1 + importAst.length, 0, {
-                    endimport: true
+                    endimport: sourceIndex,
+                    location: {
+                        line: importAst.length,
+                        column: 0,
+                        source: sourceIndex
+                    }
                 });
             } else {
                 ast.splice(i + 1, 0, {
-                    endimport: true
+                    endimport: sourceIndex,
+                    location: {
+                        line: 0,
+                        column: 0,
+                        source: sourceIndex
+                    }
                 });
             }
             el.imported = true;
-        } else if (el.endimport) {
+        } else if (el.endimport !== undefined) {
             dir = dirs.pop();
             sourceIndex = sourceIndices.pop();
         }
@@ -494,11 +504,20 @@ export function getList(sources, ast, symbols) {
     let inMacro = false;
     let startingMacro = false;
     let endingMacro = false;
+    let endingImport : {
+        line: number,
+        source: number
+    } | false = false;
 
     for (const el of ast) {
         if (el.location) {
             if ((el.location.line !== line && line !== 0) || (el.location.source !== source)) {
                 dumpLine(list, sources[source].source, line, out, address, bytes, inMacro);
+                if (endingImport !== false) {
+                    console.log(JSON.stringify(endingImport, undefined, 2));
+                    list.push(`${pad(endingImport.line + 1, 4)}                      * end import ${sources[endingImport.source].name}`);
+                    endingImport = false;
+                }
 
                 if (endingMacro) {
                     inMacro = false;
@@ -529,6 +548,10 @@ export function getList(sources, ast, symbols) {
         }
         if (el.endmacrocall) {
             endingMacro = true;
+        }
+        if (el.endimport !== undefined) {
+            console.log(JSON.stringify(el, undefined, 2));
+            endingImport = el.location;
         }
     }
     if (sources[source].source[line - 1]) {
