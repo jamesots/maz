@@ -1,5 +1,5 @@
 db 'hey'
-.import "test2.z80"
+.include "test2.z80"
 db 'ho'
 
 asdf

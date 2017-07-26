@@ -24,7 +24,7 @@ export function compile(filename, options) {
 
         const ast = parser.parse(code, parserOptions);
         // console.log(JSON.stringify(ast, undefined, 2));
-        processImports(ast, dir, sources);
+        processIncludes(ast, dir, sources);
 
 
         const macros = getMacros(ast, sources);
@@ -55,14 +55,14 @@ export function compile(filename, options) {
     }
 }
 
-export function processImports(ast, dir, sources) {
+export function processIncludes(ast, dir, sources) {
     const dirs = [];
     const sourceIndices = [];
     let sourceIndex = 0;
     for (let i = 0; i < ast.length; i++) {
         const el = ast[i];
-        if (el.import && !el.imported) {
-            const filename = path.join(dir, el.import);
+        if (el.include && !el.included) {
+            const filename = path.join(dir, el.include);
             dir = path.dirname(filename);
             dirs.push(dir);
             if (!fs.existsSync(filename)) {
@@ -75,20 +75,20 @@ export function processImports(ast, dir, sources) {
             });
             sourceIndices.push(sourceIndex);
             sourceIndex = sources.length - 1;
-            const importAst = parser.parse(source, {source: sourceIndex});
-            if (importAst !== null) {
-                ast.splice(i + 1, 0, ...importAst);
-                ast.splice(i + 1 + importAst.length, 0, {
-                    endimport: sourceIndex,
+            const includeAst = parser.parse(source, {source: sourceIndex});
+            if (includeAst !== null) {
+                ast.splice(i + 1, 0, ...includeAst);
+                ast.splice(i + 1 + includeAst.length, 0, {
+                    endinclude: sourceIndex,
                     location: {
-                        line: importAst.length,
+                        line: includeAst.length,
                         column: 0,
                         source: sourceIndex
                     }
                 });
             } else {
                 ast.splice(i + 1, 0, {
-                    endimport: sourceIndex,
+                    endinclude: sourceIndex,
                     location: {
                         line: 0,
                         column: 0,
@@ -96,8 +96,8 @@ export function processImports(ast, dir, sources) {
                     }
                 });
             }
-            el.imported = true;
-        } else if (el.endimport !== undefined) {
+            el.included = true;
+        } else if (el.endinclude !== undefined) {
             dir = dirs.pop();
             sourceIndex = sourceIndices.pop();
         }
@@ -474,7 +474,7 @@ export function getList(sources, ast, symbols) {
     let inMacro = false;
     let startingMacro = false;
     let endingMacro = false;
-    let endingImport : {
+    let endingInclude : {
         line: number,
         source: number
     } | false = false;
@@ -483,9 +483,9 @@ export function getList(sources, ast, symbols) {
         if (el.location) {
             if ((el.location.line !== line && line !== 0) || (el.location.source !== source)) {
                 dumpLine(list, sources[source].source, line, out, address, bytes, inMacro);
-                if (endingImport !== false) {
-                    list.push(`${pad(endingImport.line + 1, 4)}                      * end import ${sources[endingImport.source].name}`);
-                    endingImport = false;
+                if (endingInclude !== false) {
+                    list.push(`${pad(endingInclude.line + 1, 4)}                      * end include ${sources[endingInclude.source].name}`);
+                    endingInclude = false;
                 }
 
                 if (endingMacro) {
@@ -518,8 +518,8 @@ export function getList(sources, ast, symbols) {
         if (el.endmacrocall) {
             endingMacro = true;
         }
-        if (el.endimport !== undefined) {
-            endingImport = el.location;
+        if (el.endinclude !== undefined) {
+            endingInclude = el.location;
         }
     }
     if (sources[source].source[line - 1]) {

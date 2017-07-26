@@ -73,7 +73,7 @@ statements = stmt:statement [ \t]* comment? stmts:(separator+ statements?)? {
 separator = [ \t]* [\r\n] [ \t]*
 
 statement = labelled_statement
-    / import
+    / include
     / labeldef
     / unlabelled_statement
 
@@ -109,9 +109,9 @@ comment = ';' comment:([^\n]*) {
     };
 }
 
-import = '.import' ws path:string {
+include = '.include' ws path:string {
     return {
-        import: path,
+        include: path,
         location: loc()
     };
 }
