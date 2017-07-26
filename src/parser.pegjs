@@ -100,13 +100,38 @@ directive = org
     / endm
     / block
     / endblock
-    // etc
+    / if
+    / endif
+    / else
+    // / ifdef
+    // / ifndef
 
 comment = ';' comment:([^\n]*) {
     return {
         comment: comment.join(''),
         location: loc()
     };
+}
+
+if = '.if' ws expr:expr {
+    return {
+        if: expr,
+        location: loc()
+    }
+}
+
+endif = '.endif' {
+    return {
+        endif: true,
+        location: loc()
+    }
+}
+
+else = '.else' {
+    return {
+        else: true,
+        location: loc()
+    }
 }
 
 include = '.include' ws path:string {

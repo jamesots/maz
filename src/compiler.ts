@@ -55,9 +55,10 @@ export function compile(filename, options) {
     }
 }
 
-export function iterateAst(func, ast, symbols, sources) {
+export function iterateAst(func, ast, symbols, sources, ignoreIf = false) {
     let inMacro = false;
-    let prefixes = [];
+    const prefixes = [];
+    const ifStack = [true];
     for (let i = 0; i < ast.length; i++) {
         const el = ast[i];
         if (el.prefix) {
@@ -72,7 +73,23 @@ export function iterateAst(func, ast, symbols, sources) {
         } else if (el.endmacro) {
             inMacro = false;
         }
-        func(el, i, prefixes[prefixes.length - 1] || '', inMacro);
+
+        if (el.if !== undefined) {
+            if (el.if.expression) {
+                el.if = evaluateExpression(prefixes[prefixes.length - 1], el.if, symbols, sources);
+            }
+            ifStack.push(el.if !== 0);
+        }
+        if (el.else) {
+            ifStack.push(!ifStack.pop());
+        }
+        if (el.endIf) {
+            ifStack.pop();
+        }
+
+        if (ignoreIf || ifStack[ifStack.length - 1]) {
+            func(el, i, prefixes[prefixes.length - 1] || '', inMacro, ifStack[ifStack.length - 1]);
+        }
     }    
 }
 
@@ -357,7 +374,7 @@ export function evaluateSymbol(symbol, symbols, sources, evaluated) {
     }
     evaluated.push(symbol);
     const prefix = getWholePrefix(symbol);
-    symbols[symbol] = evaluateExpression(prefix, symbols[symbol], symbols, evaluated)
+    symbols[symbol] = evaluateExpression(prefix, symbols[symbol], symbols, sources, evaluated)
 }
 
 export function findVariable(symbols, prefix, variable) {
@@ -468,7 +485,7 @@ export function getList(sources, ast, symbols) {
         source: number
     } | false = false;
 
-    iterateAst(function(el, i, prefix, inMacro) {
+    iterateAst(function(el, i, prefix, inMacro, ifTrue) {
         if (el.location) {
             if ((el.location.line !== line && line !== 0) || (el.location.source !== source)) {
                 dumpLine(list, sources[source].source, line, out, address, bytes, inMacro);
@@ -497,7 +514,7 @@ export function getList(sources, ast, symbols) {
                 out = el.out;
                 address = el.address;
             }
-            if (el.bytes) {
+            if (el.bytes && ifTrue) {
                 bytes = el.bytes;
             }
         }
@@ -510,7 +527,7 @@ export function getList(sources, ast, symbols) {
         if (el.endinclude !== undefined) {
             endingInclude = el.location;
         }
-    }, ast, symbols, sources);
+    }, ast, symbols, sources, true);
     if (sources[source].source[line - 1]) {
         dumpLine(list, sources[source].source, line, out, address, bytes, inMacro);
     }
