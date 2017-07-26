@@ -55,12 +55,38 @@ export function compile(filename, options) {
     }
 }
 
+export function iterateAst(func, ast, symbols, sources) {
+    let inMacro = false;
+    let prefixes = [];
+    for (let i = 0; i < ast.length; i++) {
+        const el = ast[i];
+        if (el.prefix) {
+            prefixes.push(el.prefix);
+        }
+        if (el.endmacro || el.endblock) {
+            prefixes.pop();
+        }
+
+        if (el.macrodef) {
+            inMacro = true;
+        } else if (el.endmacro) {
+            inMacro = false;
+        }
+        func(el, i, prefixes[prefixes.length - 1] || '', inMacro);
+    }    
+}
+
 export function processIncludes(ast, dir, sources) {
     const dirs = [];
     const sourceIndices = [];
     let sourceIndex = 0;
-    for (let i = 0; i < ast.length; i++) {
-        const el = ast[i];
+
+    iterateAst(function(el, i, prefix, inMacro) {
+        // if (el.if) {
+        //     if (size.expression) {
+        //         size = evaluateExpression(prefix, size, symbols, sources);
+        //     }
+        // }
         if (el.include && !el.included) {
             const filename = path.join(dir, el.include);
             dir = path.dirname(filename);
@@ -101,7 +127,7 @@ export function processIncludes(ast, dir, sources) {
             dir = dirs.pop();
             sourceIndex = sourceIndices.pop();
         }
-    }
+    }, ast, {}, sources);
 }
 
 export function getMacros(ast, sources) {
@@ -109,8 +135,7 @@ export function getMacros(ast, sources) {
     let macro = undefined;
     let macroName = undefined;
     let macroLocation = undefined;
-    for (let i = 0; i < ast.length; i++) {
-        const el = ast[i];
+    iterateAst(function(el, i, prefix, inMacro) {
         if (el.macrodef) {
             if (macro) {
                 error("Cannot nest macros", el.location, sources);
@@ -135,7 +160,7 @@ export function getMacros(ast, sources) {
         if (macro && !el.macrodef && !el.endmacro) {
             macro.ast.push(el);
         }
-    }
+    }, ast, {}, sources);
     if (macro) {
         error(`Macro '${macroName}' doesn't finish`, macroLocation, sources);
     }
@@ -150,9 +175,7 @@ export function getSymbols(ast, sources) {
     const symbols = {};
     let nextBlock = 0;
     let blocks = [];
-    let inMacro = false;
-    for (let i = 0; i < ast.length; i++) {
-        const el = ast[i];
+    iterateAst(function(el, i, prefix, inMacro) {
         if (el.label && !inMacro) {
             if (blocks.length > 0 && !el.public) {
                 if (typeof symbols[labelName(blocks, el.label)] !== 'undefined') {
@@ -185,10 +208,6 @@ export function getSymbols(ast, sources) {
                     symbols[param] = null;
                 }
             }
-        } else if (el.macrodef) {
-            inMacro = true;
-        } else if (el.endmacro) {
-            inMacro = false;
         } else if (el.equ) {
             if (i > 0 && ast[i - 1].label) {
                 let ii = i - 1;
@@ -200,7 +219,7 @@ export function getSymbols(ast, sources) {
                 error("EQU has no label", el.location, sources);
             }
         }
-    }
+    }, ast, symbols, sources);
     if (blocks.length !== 0) {
         throw "Mismatch between .block and .endblock statements";
     }
@@ -233,8 +252,7 @@ function error(message, location, sources): never {
 }
 
 export function expandMacros(ast, macros, sources) {
-    for (let i = 0; i < ast.length; i++) {
-        const el = ast[i];
+    iterateAst(function(el, i, prefix, inMacro) {
         if (el.macrocall) {
             const macro = macros[el.macrocall];
             if (!macro) {
@@ -246,7 +264,7 @@ export function expandMacros(ast, macros, sources) {
             ast.splice(i + 1 + macro.ast.length, 0, { endmacrocall: true });
             i += macro.ast.length + 1;
         }
-    }
+    }, ast, {}, sources);
 }
 
 /**
@@ -259,30 +277,15 @@ export function expandMacros(ast, macros, sources) {
 export function assignPCandEQU(ast, symbols, sources) {
     let pc = 0;
     let out = 0;
-    let inMacro = false;
-    let prefixes = [];
-    for (let i = 0; i < ast.length; i++) {
-        const el = ast[i];
-        if (el.prefix) {
-            prefixes.push(el.prefix);
-        }
-        if (el.endmacro || el.endblock) {
-            prefixes.pop();
-        }
-
-        if (el.macrodef) {
-            inMacro = true;
-        } else if (el.endmacro) {
-            inMacro = false;
-        }
+    iterateAst(function(el, i, prefix, inMacro) {
         if (inMacro) {
-            continue;
+            return;
         }
         if (el.label) {
             if (symbols[el.label] === null) {
                 symbols[el.label] = pc;
             }
-            continue;
+            return;
         } else if (el.equ) {
             if (el.equ.expression) {
                 el.equ.address = pc;
@@ -290,7 +293,7 @@ export function assignPCandEQU(ast, symbols, sources) {
         } else if (el.defs !== undefined) {
             let size = el.defs;
             if (size.expression) {
-                size = evaluateExpression(prefixes[prefixes.length - 1], size, symbols, sources);
+                size = evaluateExpression(prefix, size, symbols, sources);
             }
             el.address = pc;
             el.out = out;
@@ -298,20 +301,20 @@ export function assignPCandEQU(ast, symbols, sources) {
             out += size;
         } else if (el.org !== undefined) {
             if (el.org.expression) {
-                el.org = evaluateExpression(prefixes[prefixes.length - 1], el.org, symbols, sources);
+                el.org = evaluateExpression(prefix, el.org, symbols, sources);
             }
             pc = el.org;
             out = el.org;
         } else if (el.phase !== undefined) {
             if (el.phase.expression) {
-                el.phase = evaluateExpression(prefixes[prefixes.length - 1], el.phase, symbols, sources);
+                el.phase = evaluateExpression(prefix, el.phase, symbols, sources);
             }
             pc = el.phase;
         } else if (el.endphase) {
             pc = out;
         } else if (el.align !== undefined) {
             if (el.align.expression) {
-                el.align = evaluateExpression(prefixes[prefixes.length - 1], el.align, symbols, sources);
+                el.align = evaluateExpression(prefix, el.align, symbols, sources);
             }
             let add = el.align - (pc % el.align);
             if (add !== el.align) {
@@ -325,7 +328,7 @@ export function assignPCandEQU(ast, symbols, sources) {
             pc += el.bytes.length;
             out += el.bytes.length;
         }
-    }
+    }, ast, symbols, sources);
 }
 
 export function evaluateExpression(prefix = '', expr, symbols, sources, evaluated = []) {
@@ -401,20 +404,7 @@ export function evaluateSymbols(symbols, sources) {
 }
 
 export function updateBytes(ast, symbols, sources) {
-    const prefixes = [];
-    let inMacro = false;
-    for (const el of ast) {
-        if (el.prefix) {
-            prefixes.push(el.prefix);
-        }
-        if (el.endblock || el.endmacrocall) {
-            prefixes.pop();
-        }
-        if (el.macrodef) {
-            inMacro = true;
-        } else if (el.endmacro) {
-            inMacro = false;
-        }
+    iterateAst(function(el, i, prefix, inMacro) {
         if (el.references && !inMacro) {
             symbols['$'] = el.address;
             for (let i = 0; i < el.bytes.length; i++) {
@@ -423,7 +413,6 @@ export function updateBytes(ast, symbols, sources) {
                     const variables = byte.vars;
 
                     const subVars = {}; // substitute variables
-                    const prefix = prefixes[prefixes.length - 1] || '';
                     for (const variable of variables) {
                         const subVar = findVariable(symbols, prefix, variable);
 
@@ -453,7 +442,7 @@ export function updateBytes(ast, symbols, sources) {
                 }
             }
         }
-    }    
+    }, ast, symbols, sources);
 }
 
 const BYTELEN = 8;
@@ -479,7 +468,7 @@ export function getList(sources, ast, symbols) {
         source: number
     } | false = false;
 
-    for (const el of ast) {
+    iterateAst(function(el, i, prefix, inMacro) {
         if (el.location) {
             if ((el.location.line !== line && line !== 0) || (el.location.source !== source)) {
                 dumpLine(list, sources[source].source, line, out, address, bytes, inMacro);
@@ -521,7 +510,7 @@ export function getList(sources, ast, symbols) {
         if (el.endinclude !== undefined) {
             endingInclude = el.location;
         }
-    }
+    }, ast, symbols, sources);
     if (sources[source].source[line - 1]) {
         dumpLine(list, sources[source].source, line, out, address, bytes, inMacro);
     }
@@ -572,13 +561,8 @@ export function getBytes(ast, sources) {
     let bytes = [];
     let startOut = null;
     let out = null;
-    let inMacro = false;
-    for (const el of ast) {
-        if (el.macrodef) {
-            inMacro = true;
-        } else if (el.endmacro) {
-            inMacro = false;
-        }
+
+    iterateAst(function(el, i, prefix, inMacro) {
         if (el.bytes && !inMacro) {
             const end = bytes.length + startOut;
             if (out === null || el.out === end) {
@@ -602,6 +586,6 @@ export function getBytes(ast, sources) {
                 out = el.bytes.length + el.out;
             }
         }
-    }
+    }, ast, {}, sources);
     return bytes;
 }
