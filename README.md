@@ -61,10 +61,10 @@ Any directive shown below without a leading full stop (period) may also be writt
 
     ds 12
 </dd>
-<dt>equ</dt>
-<dd></dd>
+<dt>equ <i>expression</i></dt>
+<dd>Sets the value of a label. This must be prefixed with a label (or more than one label).</dd>
 <dt>org <i>expression</i></dt>
-<dd>Set origin. Sets the address where the next instructions will be compiled to, or bytes will be stored.
+<dd>Set origin. Sets the address where the next instructions will be assembled to, or bytes will be stored.
 
     org $100
 </dd>
@@ -93,4 +93,13 @@ Any directive shown below without a leading full stop (period) may also be writt
 
     .include "something/routines.z80"
 </dd>
+<dt>.if <i>expression</i></dt>
+<dd>Assembles the code following the .if statement if the expression evaluates to true, up the next .endif or .else statement.
+
+Note that the if expression must be evaluable on the first pass of assembly. Also, weird things might happen if an .if-.else-.endif block crosses a macro boundary.
+</dd>
+<dt>.else</dt>
+<dd>If an .if statement's expression evaluted to false, the code following the .else statement is assembled isntead, up to the next .endif statement.</dd>
+<dt>.endif</dt>
+<dd>Marks the end of a conditiona assembly block.</dd>
 </dl>
