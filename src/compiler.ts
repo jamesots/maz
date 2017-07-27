@@ -79,12 +79,15 @@ export function iterateAst(func, ast, symbols, sources, ignoreIf = false) {
                 el.if = evaluateExpression(prefixes[prefixes.length - 1], el.if, symbols, sources);
             }
             ifStack.push(el.if !== 0);
+            console.log(` push ${el.if} ${JSON.stringify(ifStack, undefined, 2)}`);
         }
         if (el.else) {
             ifStack.push(!ifStack.pop());
+            console.log(` pop push ${JSON.stringify(ifStack, undefined, 2)}`);
         }
-        if (el.endIf) {
+        if (el.endif) {
             ifStack.pop();
+            console.log(` pop ${JSON.stringify(ifStack, undefined, 2)}`);
         }
 
         if (ignoreIf || ifStack[ifStack.length - 1]) {
@@ -480,6 +483,7 @@ export function getList(sources, ast, symbols) {
     let inMacro = false;
     let startingMacro = false;
     let endingMacro = false;
+    let currentIfTrue = true;
     let endingInclude : {
         line: number,
         source: number
@@ -488,7 +492,7 @@ export function getList(sources, ast, symbols) {
     iterateAst(function(el, i, prefix, inMacro, ifTrue) {
         if (el.location) {
             if ((el.location.line !== line && line !== 0) || (el.location.source !== source)) {
-                dumpLine(list, sources[source].source, line, out, address, bytes, inMacro);
+                dumpLine(list, sources[source].source, line, out, address, bytes, inMacro, currentIfTrue);
                 if (endingInclude !== false) {
                     list.push(`${pad(endingInclude.line + 1, 4)}                      * end include ${sources[endingInclude.source].name}`);
                     endingInclude = false;
@@ -517,6 +521,7 @@ export function getList(sources, ast, symbols) {
             if (el.bytes && ifTrue) {
                 bytes = el.bytes;
             }
+            currentIfTrue = ifTrue;
         }
         if (el.macrocall) {
             startingMacro = true;
@@ -529,7 +534,7 @@ export function getList(sources, ast, symbols) {
         }
     }, ast, symbols, sources, true);
     if (sources[source].source[line - 1]) {
-        dumpLine(list, sources[source].source, line, out, address, bytes, inMacro);
+        dumpLine(list, sources[source].source, line, out, address, bytes, inMacro, currentIfTrue);
     }
 
     list.push('');
@@ -543,7 +548,7 @@ export function getList(sources, ast, symbols) {
     return list;    
 }
 
-function dumpLine(list, lines, line, out, address, bytes, inMacro) {
+function dumpLine(list, lines, line, out, address, bytes, inMacro, ifTrue) {
     let byteString = '';
     if (bytes) {
         for (const byte of bytes) {
@@ -557,6 +562,10 @@ function dumpLine(list, lines, line, out, address, bytes, inMacro) {
     let addressString = '    ';
     if (address !== undefined) {
         addressString = pad(address.toString(16), 4, '0');
+    }
+    if (!ifTrue) {
+        addressString = 'x   ';
+        outString = 'x   ';
     }
     list.push(`${pad(line, 4)} ${address !== out?addressString + '@':''}${outString} ${padr(byteString, BYTELEN * 2).substring(0, BYTELEN * 2)} ${inMacro ? '*' : ' '}${lines[line - 1]}`);
     for (let i = BYTELEN * 2; i < byteString.length; i += BYTELEN * 2) {

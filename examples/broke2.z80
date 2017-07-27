@@ -5,10 +5,14 @@ ld a,zero
 
 .include "another_dir/test.z80"
 
+.if 0
 ld a,one
 ld a,two
 ld a,$
 db 1,2,$
+.else
+db 123
+.endif
 one: equ $
 two: equ $ + 1
 db 0
