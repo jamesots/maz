@@ -120,7 +120,7 @@ logicaland = t1:bitwiseor t2:(ws? '&&' ws? bitwiseor)* {
         return result;
     }
 
-bitwiseor = t1:bitwisexor t2:(ws? ('|'/'or'i) ws? bitwisexor)* {
+bitwiseor = t1:bitwisexor t2:(ws? ('|'/('or'i &(ws/'('))) ws? bitwisexor)* {
         let result = lookupVar(t1);
         for (const group of t2) {
             const operator = group[1];
@@ -131,7 +131,7 @@ bitwiseor = t1:bitwisexor t2:(ws? ('|'/'or'i) ws? bitwisexor)* {
         return result;
     }
 
-bitwisexor = t1:bitwiseand t2:(ws? ('^'/'xor'i) ws? bitwiseand)* {
+bitwisexor = t1:bitwiseand t2:(ws? ('^'/('xor'i &(ws/'('))) ws? bitwiseand)* {
         let result = lookupVar(t1);
         for (const group of t2) {
             const operator = group[1];
@@ -142,7 +142,7 @@ bitwisexor = t1:bitwiseand t2:(ws? ('^'/'xor'i) ws? bitwiseand)* {
         return result;
     }
 
-bitwiseand = t1:equal t2:(ws? ('&'/'and'i) ws? equal)* {
+bitwiseand = t1:equal t2:(ws? ('&'/('and'i &(ws/'('))) ws? equal)* {
         let result = lookupVar(t1);
         for (const group of t2) {
             const operator = group[1];
@@ -153,7 +153,7 @@ bitwiseand = t1:equal t2:(ws? ('&'/'and'i) ws? equal)* {
         return result;
     }
 
-equal = t1:greaterless t2:(ws? ('=='/'='/'!='/'<>'/'eq'i/'ne'i) ws? greaterless)* {
+equal = t1:greaterless t2:(ws? ('=='/'='/'!='/'<>'/('eq'i &(ws/'('))/('ne'i &(ws/'('))) ws? greaterless)* {
         let result = lookupVar(t1);
         for (const group of t2) {
             const operator = group[1];
@@ -175,7 +175,7 @@ equal = t1:greaterless t2:(ws? ('=='/'='/'!='/'<>'/'eq'i/'ne'i) ws? greaterless)
         return result;
     }
 
-greaterless = t1:shift t2:(ws? ('<='/'>='/'<'/'>'/'le'i/'lt'i/'ge'i/'gt'i) ws? shift)* {
+greaterless = t1:shift t2:(ws? ('<='/'>='/'<'/'>'/('le'i &(ws/'('))/('lt'i &(ws/'('))/('ge'i &(ws/'('))/('gt'i &(ws/'('))) ws? shift)* {
         let result = lookupVar(t1);
         for (const group of t2) {
             const operator = group[1];
@@ -203,7 +203,7 @@ greaterless = t1:shift t2:(ws? ('<='/'>='/'<'/'>'/'le'i/'lt'i/'ge'i/'gt'i) ws? s
         return result;
     }
 
-shift = t1:plusminus t2:(ws? ('<<'/'>>'/'shl'i/'shr'i) ws? plusminus)* {
+shift = t1:plusminus t2:(ws? ('<<'/'>>'/('shl'i &(ws/'('))/('shr'i &(ws/'('))) ws? plusminus)* {
         let result = lookupVar(t1);
         for (const group of t2) {
             const operator = group[1];
@@ -247,7 +247,7 @@ term = t1:unary t2:(ws? [*/%] ws? unary)* {
         return result;
     }
 
-unary = operator:([!~+-]/'not'i)? ws? expr:factor {
+unary = operator:([!~+-]/('not'i &(ws/'(')))? ws? expr:factor  { 
     expr = lookupVar(expr);
     if (operator && isString(expr)) {
         throw `Cannot ${operator} a string (${expr})`;

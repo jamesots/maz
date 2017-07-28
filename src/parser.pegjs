@@ -1257,22 +1257,22 @@ logicalor = t1:logicaland t2:(ws? '||' ws? logicaland)*  {
 logicaland = t1:bitwiseor t2:(ws? '&&' ws? bitwiseor)*  {
     return  t1.concat(exprVars(t2, [3]));
 }
-bitwiseor = t1:bitwisexor t2:(ws? ('|'/'or'i) ws? bitwisexor)*  { 
+bitwiseor = t1:bitwisexor t2:(ws? ('|'/('or'i &(ws/'('))) ws? bitwisexor)*  { 
     return  t1.concat(exprVars(t2, [3]));
 }
-bitwisexor = t1:bitwiseand t2:(ws? ('^'/'xor'i) ws? bitwiseand)* { 
+bitwisexor = t1:bitwiseand t2:(ws? ('^'/('xor'i &(ws/'('))) ws? bitwiseand)* { 
     return  t1.concat(exprVars(t2, [3]));
 }
-bitwiseand = t1:equal t2:(ws? ('&'/'and'i) ws? equal)*  { 
+bitwiseand = t1:equal t2:(ws? ('&'/('and'i &(ws/'('))) ws? equal)*  { 
     return  t1.concat(exprVars(t2, [3]));
 }
-equal = t1:greaterless t2:(ws? ('=='/'='/'!='/'<>'/'eq'i/'ne'i) ws? greaterless)*  { 
+equal = t1:greaterless t2:(ws? ('=='/'='/'!='/'<>'/('eq'i &(ws/'('))/('ne'i &(ws/'('))) ws? greaterless)*  { 
     return  t1.concat(exprVars(t2, [3]));
 }
-greaterless = t1:shift t2:(ws? ('<='/'>='/'<'/'>'/'le'i/'lt'i/'ge'i/'gt'i) ws? shift)*  { 
+greaterless = t1:shift t2:(ws? ('<='/'>='/'<'/'>'/('le'i &(ws/'('))/('lt'i &(ws/'('))/('ge'i &(ws/'('))/('gt'i &(ws/'('))) ws? shift)*  { 
     return  t1.concat(exprVars(t2, [3]));
 }
-shift = t1:plusminus t2:(ws? ('<<'/'>>'/'shl'i/'shr'i) ws? plusminus)*  { 
+shift = t1:plusminus t2:(ws? ('<<'/'>>'/('shl'i &(ws/'('))/('shr'i &(ws/'('))) ws? plusminus)*  { 
     return  t1.concat(exprVars(t2, [3]));
 }
 plusminus = t1:term t2:(ws? [+-] ws? term)*  { 
@@ -1281,7 +1281,7 @@ plusminus = t1:term t2:(ws? [+-] ws? term)*  {
 term = t1:unary t2:(ws? [*/%] ws? unary)*  { 
     return  t1.concat(exprVars(t2, [3]));
 }
-unary = operator:([!~+-]/'not'i)? ws? expr:factor  { 
+unary = operator:([!~+-]/('not'i &(ws/'(')))? ws? expr:factor  { 
     return expr;
 }
 factor = '(' expr:expr1 ')'  { 

@@ -37,8 +37,10 @@ export function compile(filename, options) {
         // console.log(JSON.stringify(symbols, undefined, 2));
 
         evaluateSymbols(symbols, sources);
+        // console.log(JSON.stringify(symbols, undefined, 2));
 
         for (const symbol in symbols) {
+            // console.log(symbol);
             if (symbols[symbol].expression) {
                 throw `Symbol '${symbol}' cannot be calculated`;
             }
@@ -99,11 +101,6 @@ export function processIncludes(ast, dir, sources) {
     let sourceIndex = 0;
 
     iterateAst(function(el, i, prefix, inMacro) {
-        // if (el.if) {
-        //     if (size.expression) {
-        //         size = evaluateExpression(prefix, size, symbols, sources);
-        //     }
-        // }
         if (el.include && !el.included) {
             const filename = path.join(dir, el.include);
             dir = path.dirname(filename);
@@ -351,7 +348,7 @@ export function assignPCandEQU(ast, symbols, sources) {
 export function evaluateExpression(prefix = '', expr, symbols, sources, evaluated = []) {
     const variables = expr.vars;
     const subVars = {}; // substitute variables
-    if (typeof expr.address !== undefined) {
+    if (expr.address !== undefined) {
         symbols['$'] = expr.address;
     }
     for (const variable of variables) {
@@ -410,8 +407,8 @@ export function evaluateSymbols(symbols, sources) {
     // console.log(`eval symbols ${JSON.stringify(symbols, undefined, 2)}`);
     const evaluated = [];
     for (const symbol in symbols) {
-        // console.log('evaluate ' + symbol);
         if (symbols[symbol].expression) {
+            // console.log('evaluate ' + symbol);
             if (evaluated.indexOf(symbol) !== -1) {
                 continue;
             }

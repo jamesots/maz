@@ -124,6 +124,8 @@ Maz supports expressions with proper precedence, and various different syntaxes 
 | \|\| | \|\| → logical or |
 | ?: | ?: → ternary operator |
 
+Textual operators must be followed by either some whitespace or an open bracket.
+
 Functions
 ---------
 
