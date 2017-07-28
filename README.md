@@ -111,7 +111,7 @@ Maz supports expressions with proper precedence, and various different syntaxes 
 
 | Operators | Description |
 |-----------|-------------|
-| ( ) | ( ) → brackets |
+| ( ) function() | ( ) → brackets<br>function() → various functions (see below) |
 | ! ~ + -   | *Unary operators*<br>! → logical not<br>~ → bitwise not <br>+ → unary plus<br>- → unary minus
 | * / % mod | * → multiply<br>/ → divide<br>% or mod → modulus |
 | + - | + → add<br>- → subtract |
@@ -123,3 +123,13 @@ Maz supports expressions with proper precedence, and various different syntaxes 
 | && | && → logical and |
 | \|\| | \|\| → logical or |
 | ?: | ?: → ternary operator |
+
+Functions
+---------
+
+There are some functions which you can use in expressions:
+
+| Function | Description |
+|----------|-------------|
+| min(x, y) | Returns the smallest of x and y |
+| max(x, y) | Returns the largest of x and y |
