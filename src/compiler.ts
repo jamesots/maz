@@ -119,7 +119,7 @@ export class Programme {
                     this.ast.splice(i + 1 + includeAst.length, 0, {
                         endinclude: sourceIndex,
                         location: {
-                            line: includeAst.length,
+                            line: includeAst.length + 1,
                             column: 0,
                             source: sourceIndex
                         }
@@ -416,74 +416,52 @@ export class Programme {
         });
     }
 
-    /**
-     * Each line should be
-     * LLLL ADDR BYTES SRC  - max 8 bytes? - multiple lines if more
-     */
-    public getList() {
-        let list = [];
+    public collectAst() {
+        const collectedAst = [];
         let line = 0;
         let source = 0;
-
-        let out = undefined;
-        let address = undefined;
-        let bytes = [];
-
-        let inMacro = false;
-        let startingMacro = false;
-        let endingMacro = false;
-        let currentIfTrue = true;
-        let endingInclude : {
-            line: number,
-            source: number
-        } | false = false;
-
+        let ast: any = {};
         this.iterateAst((el, i, prefix, inMacro, ifTrue) => {
             if (el.location) {
                 if ((el.location.line !== line && line !== 0) || (el.location.source !== source)) {
-                    this.dumpLine(list, this.sources[source].source, line, out, address, bytes, inMacro, currentIfTrue);
-                    if (endingInclude !== false) {
-                        list.push(`${pad(endingInclude.line + 1, 4)}                      * end include ${this.sources[endingInclude.source].name}`);
-                        endingInclude = false;
-                    }
-
-                    if (endingMacro) {
-                        inMacro = false;
-                        endingMacro = false;
-                    }
-                    if (startingMacro) {
-                        list.push('          ' + ' '.repeat(BYTELEN * 2) + '* UNROLL MACRO')
-                        inMacro = true;
-                        startingMacro = false;
-                    }
-
-                    out = undefined;
-                    address = undefined;
-                    bytes = [];
+                    collectedAst.push(ast);                
+                    ast = {};
                 }
                 line = el.location.line;
                 source = el.location.source;
-                if (el.out !== undefined) {
-                    out = el.out;
-                    address = el.address;
-                }
-                if (el.bytes) {
-                    bytes = el.bytes;
-                }
-                currentIfTrue = ifTrue;
             }
-            if (el.macrocall) {
-                startingMacro = true;
-            }
-            if (el.endmacrocall) {
-                endingMacro = true;
-            }
-            if (el.endinclude !== undefined) {
-                endingInclude = el.location;
-            }
+  
+            Object.assign(ast, el);
+            ast.inMacro = inMacro;
+            ast.ifTrue = ifTrue;
+            ast.prefix = prefix;
         }, true);
-        if (this.sources[source].source[line - 1]) {
-            this.dumpLine(list, this.sources[source].source, line, out, address, bytes, inMacro, currentIfTrue);
+        if (Object.keys(ast).length !== 0) {
+            collectedAst.push(ast);
+        }
+        return collectedAst;
+    }
+
+    public getList() {
+        const list = [];
+        const ast = this.collectAst();
+        for (const el of ast) {
+            if (el.macrocall) {
+                list.push('          ' + ' '.repeat(BYTELEN * 2) + '* UNROLL MACRO')
+            }
+
+            this.dumpLine(list, 
+                this.sources[el.location.source].source, 
+                el.location.line, 
+                el.out, 
+                el.address, 
+                el.bytes, 
+                el.inMacro, 
+                el.ifTrue);
+
+            if (el.endinclude) {
+                list.push(`${pad(el.location.line + 1, 4)}                      * END INCLUDE ${this.sources[el.location.source].name}`);
+            }
         }
 
         list.push('');
@@ -494,7 +472,7 @@ export class Programme {
             }
         }
 
-        return list;    
+        return list;
     }
 
     private dumpLine(list, lines, line, out, address, bytes, inMacro, ifTrue) {
