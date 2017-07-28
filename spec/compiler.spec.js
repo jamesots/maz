@@ -444,8 +444,7 @@ describe('compiler', function() {
         expect(symbols).toEqual({
             one: 1,
             two: 1,
-            three: 1,
-            $: undefined
+            three: 1
         })
     });
     it('should evaluate symbols and detect circular references', function() {
@@ -472,8 +471,7 @@ describe('compiler', function() {
             three: 3,
             '%1_three': 4,
             '%2_%1_three': 5,
-            '%2_%1_bob': 9,
-            $: undefined
+            '%2_%1_bob': 9
         });
     });
     it('should get whole prefix', function() {
