@@ -175,7 +175,7 @@ equal = t1:greaterless t2:(ws? ('=='/'='/'!='/'<>'/'eq'i/'ne'i) ws? greaterless)
         return result;
     }
 
-greaterless = t1:shift t2:(ws? ('<='/'>='/'<'/'>'/'lte'i/'lt'i/'gte'i/'gt'i) ws? shift)* {
+greaterless = t1:shift t2:(ws? ('<='/'>='/'<'/'>'/'le'i/'lt'i/'ge'i/'gt'i) ws? shift)* {
         let result = lookupVar(t1);
         for (const group of t2) {
             const operator = group[1];

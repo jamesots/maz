@@ -1269,7 +1269,7 @@ bitwiseand = t1:equal t2:(ws? ('&'/'and'i) ws? equal)*  {
 equal = t1:greaterless t2:(ws? ('=='/'='/'!='/'<>'/'eq'i/'ne'i) ws? greaterless)*  { 
     return  t1.concat(exprVars(t2, [3]));
 }
-greaterless = t1:shift t2:(ws? ('<='/'>='/'<'/'>'/'lte'i/'lt'i/'gte'i/'gt'i) ws? shift)*  { 
+greaterless = t1:shift t2:(ws? ('<='/'>='/'<'/'>'/'le'i/'lt'i/'ge'i/'gt'i) ws? shift)*  { 
     return  t1.concat(exprVars(t2, [3]));
 }
 shift = t1:plusminus t2:(ws? ('<<'/'>>'/'shl'i/'shr'i) ws? plusminus)*  { 
