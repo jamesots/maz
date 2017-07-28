@@ -153,7 +153,7 @@ bitwiseand = t1:equal t2:(ws? ('&'/'and'i) ws? equal)* {
         return result;
     }
 
-equal = t1:greaterless t2:(ws? ('=='/'='/'!='/'<>'/'eq'/'ne') ws? greaterless)* {
+equal = t1:greaterless t2:(ws? ('=='/'='/'!='/'<>'/'eq'i/'ne'i) ws? greaterless)* {
         let result = lookupVar(t1);
         for (const group of t2) {
             const operator = group[1];
@@ -175,7 +175,7 @@ equal = t1:greaterless t2:(ws? ('=='/'='/'!='/'<>'/'eq'/'ne') ws? greaterless)* 
         return result;
     }
 
-greaterless = t1:shift t2:(ws? ('<='/'>='/'<'/'>'/'lte'/'lt'/'gte'/'gt') ws? shift)* {
+greaterless = t1:shift t2:(ws? ('<='/'>='/'<'/'>'/'lte'i/'lt'i/'gte'i/'gt'i) ws? shift)* {
         let result = lookupVar(t1);
         for (const group of t2) {
             const operator = group[1];
@@ -203,7 +203,7 @@ greaterless = t1:shift t2:(ws? ('<='/'>='/'<'/'>'/'lte'/'lt'/'gte'/'gt') ws? shi
         return result;
     }
 
-shift = t1:plusminus t2:(ws? ('<<'/'>>'/'shl'/'shr') ws? plusminus)* {
+shift = t1:plusminus t2:(ws? ('<<'/'>>'/'shl'i/'shr'i) ws? plusminus)* {
         let result = lookupVar(t1);
         for (const group of t2) {
             const operator = group[1];

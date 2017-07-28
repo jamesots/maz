@@ -1266,13 +1266,13 @@ bitwisexor = t1:bitwiseand t2:(ws? ('^'/'xor'i) ws? bitwiseand)* {
 bitwiseand = t1:equal t2:(ws? ('&'/'and'i) ws? equal)*  { 
     return  t1.concat(exprVars(t2, [3]));
 }
-equal = t1:greaterless t2:(ws? ('=='/'='/'!='/'<>'/'eq'/'ne') ws? greaterless)*  { 
+equal = t1:greaterless t2:(ws? ('=='/'='/'!='/'<>'/'eq'i/'ne'i) ws? greaterless)*  { 
     return  t1.concat(exprVars(t2, [3]));
 }
-greaterless = t1:shift t2:(ws? ('<='/'>='/'<'/'>'/'lte'/'lt'/'gte'/'gt') ws? shift)*  { 
+greaterless = t1:shift t2:(ws? ('<='/'>='/'<'/'>'/'lte'i/'lt'i/'gte'i/'gt'i) ws? shift)*  { 
     return  t1.concat(exprVars(t2, [3]));
 }
-shift = t1:plusminus t2:(ws? ('<<'/'>>'/'shl'/'shr') ws? plusminus)*  { 
+shift = t1:plusminus t2:(ws? ('<<'/'>>'/'shl'i/'shr'i) ws? plusminus)*  { 
     return  t1.concat(exprVars(t2, [3]));
 }
 plusminus = t1:term t2:(ws? [+-] ws? term)*  { 

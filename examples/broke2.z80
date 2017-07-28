@@ -1,29 +1,31 @@
 size: equ end - $
 zero: equ %1011
-db 1,2,$
-ld a,zero
+    db 1,2,$
+    ld a,zero
 
 .include "another_dir/test.z80"
 
-.if 0
-ld a,one
-ld a,two
-ld a,$
-db 1,2,$
+.if "a" gte "b"
+    ld a,one
+something:
+    ld a,two
+    ld b,something
+    ld a,$
+    db 1,2,$
 .else
-db 123
+    db 123
 .endif
 one: equ $
 two: equ $ + 1
-db 0
+    db 0
 .block
 one: equ 100
 @bob: equ 200
-ld a, one
+    ld a, one
 
 .endblock
 
-ld a,bob
+    ld a,bob
 
-bob 2
+    bob 2
 end:

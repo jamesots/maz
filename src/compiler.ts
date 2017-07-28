@@ -503,7 +503,7 @@ export function getList(sources, ast, symbols) {
                     endingMacro = false;
                 }
                 if (startingMacro) {
-                    list.push('           ' + ' '.repeat(BYTELEN * 2) + '* UNROLL MACRO')
+                    list.push('          ' + ' '.repeat(BYTELEN * 2) + '* UNROLL MACRO')
                     inMacro = true;
                     startingMacro = false;
                 }
@@ -518,7 +518,7 @@ export function getList(sources, ast, symbols) {
                 out = el.out;
                 address = el.address;
             }
-            if (el.bytes && ifTrue) {
+            if (el.bytes) {
                 bytes = el.bytes;
             }
             currentIfTrue = ifTrue;
@@ -564,8 +564,8 @@ function dumpLine(list, lines, line, out, address, bytes, inMacro, ifTrue) {
         addressString = pad(address.toString(16), 4, '0');
     }
     if (!ifTrue) {
-        addressString = 'x   ';
-        outString = 'x   ';
+        addressString = 'xxxx';
+        outString = 'xxxx';
     }
     list.push(`${pad(line, 4)} ${address !== out?addressString + '@':''}${outString} ${padr(byteString, BYTELEN * 2).substring(0, BYTELEN * 2)} ${inMacro ? '*' : ' '}${lines[line - 1]}`);
     for (let i = BYTELEN * 2; i < byteString.length; i += BYTELEN * 2) {
