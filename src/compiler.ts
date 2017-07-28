@@ -396,23 +396,8 @@ export class Programme {
                 for (let i = 0; i < el.bytes.length; i++) {
                     const byte = el.bytes[i];
                     if (byte && byte.expression) {
-                        const variables = byte.vars;
+                        const value = this.evaluateExpression(prefix, byte);
 
-                        const subVars = {}; // substitute variables
-                        for (const variable of variables) {
-                            const subVar = this.findVariable(prefix, variable);
-
-                            if (this.symbols[subVar] === undefined) {
-                                this.error(`Symbol '${variable}' cannot be found`, el.location);
-                            }
-                            if (this.symbols[subVar].expression) {
-                                this.error(`Symbol ${variable} not evaluated`, el.location);
-                                // this.evaluateSymbol(subVar, symbols, evaluated);
-                            }
-                            subVars[variable] = this.symbols[subVar];
-                        }
-
-                        const value = Expr.parse(byte.expression, {variables: subVars})
                         if (typeof value === 'string') {
                             let bytes = [];
                             for (let i = 0; i < value.length; i++) {
