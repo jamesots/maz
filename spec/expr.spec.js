@@ -328,6 +328,11 @@ describe('expr', function() {
         expect(result).toBe(0b11101110);
         result = expr.parse(`10101100b | 11001010b or 10000001b`);
         expect(result).toBe(0b11101111);
+        expect(function() {
+            expr.parse(`100101001b or101110101b`);
+        }).toThrow();
+        result = expr.parse(`10101100b | 11001010b or(10000001b)`);
+        expect(result).toBe(0b11101111);
     });
 
     it('should logical and things', function() {
