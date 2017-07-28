@@ -79,15 +79,12 @@ export function iterateAst(func, ast, symbols, sources, ignoreIf = false) {
                 el.if = evaluateExpression(prefixes[prefixes.length - 1], el.if, symbols, sources);
             }
             ifStack.push(el.if !== 0);
-            console.log(` push ${el.if} ${JSON.stringify(ifStack, undefined, 2)}`);
         }
         if (el.else) {
             ifStack.push(!ifStack.pop());
-            console.log(` pop push ${JSON.stringify(ifStack, undefined, 2)}`);
         }
         if (el.endif) {
             ifStack.pop();
-            console.log(` pop ${JSON.stringify(ifStack, undefined, 2)}`);
         }
 
         if (ignoreIf || ifStack[ifStack.length - 1]) {
