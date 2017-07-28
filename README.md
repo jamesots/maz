@@ -103,3 +103,23 @@ Note that the if expression must be evaluable on the first pass of assembly. Als
 <dt>.endif</dt>
 <dd>Marks the end of a conditiona assembly block.</dd>
 </dl>
+
+Expressions
+-----------
+
+Maz supports expressions with proper precedence, and various different syntaxes for operators. The operators are, in order of precedence (highest first):
+
+| Operators | Description |
+|-----------|-------------|
+| ( ) | ( ) → brackets |
+| ! ~ + -   | *Unary operators*<br>! → logical not<br>~ → bitwise not <br>+ → unary plus<br>- → unary minus
+| * / % mod | * → multiply<br>/ → divide<br>% or mod → modulus |
+| + - | + → add<br>- → subtract |
+| << shl >> shr | << or shl → shift left<br>>> or shr → shift right |
+| < lt > gt <= le >= ge | < or lt → less than<br>> or gt → greater than<br><= or le → less than or equal<br>>= or ge → greater than or equal |
+| & and | & or and → bitwise and |
+| ^ xor | ^ or xor → bitwise xor |
+| \| or | \| or or → bitwise or |
+| && | && → logical and |
+| \|\| | \|\| → logical or |
+| ?: | ?: → ternary operator |

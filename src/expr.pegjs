@@ -247,14 +247,14 @@ term = t1:unary t2:(ws? [*/%] ws? unary)* {
         return result;
     }
 
-unary = operator:[!~+-]? expr:factor {
+unary = operator:([!~+-]/'not'i)? ws? expr:factor {
     expr = lookupVar(expr);
     if (operator && isString(expr)) {
         throw `Cannot ${operator} a string (${expr})`;
     }
     if (operator === '!') {
         return toNumber(expr) === 0 ? 1 : 0;
-    } else if (operator === '~') {
+    } else if (operator === '~' || operator === 'not') {
         return ~toNumber(expr);
     } else if (operator === '+') {
         return toNumber(expr);

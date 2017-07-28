@@ -1281,7 +1281,7 @@ plusminus = t1:term t2:(ws? [+-] ws? term)*  {
 term = t1:unary t2:(ws? [*/%] ws? unary)*  { 
     return  t1.concat(exprVars(t2, [3]));
 }
-unary = operator:[!~+-]? expr:factor  { 
+unary = operator:([!~+-]/'not'i)? ws? expr:factor  { 
     return expr;
 }
 factor = '(' expr:expr1 ')'  { 

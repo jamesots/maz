@@ -5,7 +5,7 @@ zero: equ %1011
 
 .include "another_dir/test.z80"
 
-.if "a" gte "b"
+.if "a" ge "b"
     ld a,one
 something:
     ld a,two
@@ -27,5 +27,5 @@ one: equ 100
 
     ld a,bob
 
-    bob 2
+    bob not 2
 end:
