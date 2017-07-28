@@ -446,10 +446,6 @@ export class Programme {
         const list = [];
         const ast = this.collectAst();
         for (const el of ast) {
-            if (el.macrocall) {
-                list.push('          ' + ' '.repeat(BYTELEN * 2) + '* UNROLL MACRO')
-            }
-
             this.dumpLine(list, 
                 this.sources[el.location.source].source, 
                 el.location.line, 
@@ -458,6 +454,10 @@ export class Programme {
                 el.bytes, 
                 el.inMacro, 
                 el.ifTrue);
+                
+            if (el.macrocall) {
+                list.push('          ' + ' '.repeat(BYTELEN * 2) + '* UNROLL MACRO')
+            }
 
             if (el.endinclude) {
                 list.push(`${pad(el.location.line + 1, 4)}                      * END INCLUDE ${this.sources[el.location.source].name}`);
