@@ -42,16 +42,16 @@ console.log("         incompatible.");
 console.log(`Compiling ${options.src}`);
 
 try {
-    let [ast, symbols, sources] = compiler.compile(options.src, {trace: false});
+    let prog = compiler.compile(options.src, {trace: false});
     // console.log(JSON.stringify(ast, undefined, 2));
     // console.log(JSON.stringify(symbols, undefined, 2));
-    const bytes = compiler.getBytes(ast, sources);
+    const bytes = prog.getBytes();
     // console.log(JSON.stringify(bytes, undefined, 2));
 
     fs.writeFileSync(options.out, Buffer.from(bytes));
     console.log(`Written ${bytes.length} ($${bytes.length.toString(16)}) bytes ${options.out}`);
     if (options.list) {
-        const list = compiler.getList(sources, ast, symbols);
+        const list = prog.getList();
         const file = fs.openSync(options.list, 'w');
         for (const line of list) {
             fs.writeSync(file, line);

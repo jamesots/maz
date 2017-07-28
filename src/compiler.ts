@@ -4,6 +4,8 @@ import * as parser from './parser';
 // import * as Tracer from 'pegjs-backtrace';
 import * as Expr from './expr';
 
+const BYTELEN = 8;
+
 export function compile(filename, options) {
     const parserOptions = {source: 0} as any;
     // const tracer = new Tracer(code, {
@@ -14,40 +16,17 @@ export function compile(filename, options) {
     //     parserOptions.tracer = tracer;
     // }
     try {
-        const sources = [];
-        const dir = path.dirname(filename);
-        const code = fs.readFileSync(filename).toString();
-        sources.push({
-            name: filename,
-            source: code.split('\n')
-        })
-
-        const ast = parser.parse(code, parserOptions);
-        // console.log(JSON.stringify(ast, undefined, 2));
-        processIncludes(ast, dir, sources);
-
-
-        const macros = getMacros(ast, sources);
-        expandMacros(ast, macros, sources);
-        const symbols = getSymbols(ast, sources);
-        // console.log(JSON.stringify(symbols, undefined, 2));
-
-        assignPCandEQU(ast, symbols, sources);
-        // console.log(JSON.stringify(ast, undefined, 2));
-        // console.log(JSON.stringify(symbols, undefined, 2));
-
-        evaluateSymbols(symbols, sources);
-        // console.log(JSON.stringify(symbols, undefined, 2));
-
-        for (const symbol in symbols) {
-            // console.log(symbol);
-            if (symbols[symbol].expression) {
-                throw `Symbol '${symbol}' cannot be calculated`;
-            }
-        }
-
-        updateBytes(ast, symbols, sources);
-        return [ast, symbols, sources];
+        const prog = new Programme();
+        prog.parse(filename);
+        prog.processIncludes();
+        prog.getMacros();
+        prog.expandMacros();
+        prog.getSymbols();
+        prog.assignPCandEQU();
+        prog.evaluateSymbols();
+        prog.checkSymbols();
+        prog.updateBytes();
+        return prog;
     } catch (e) {
         // if (options.trace) {
         //     // console.log(tracer.getBacktraceString());
@@ -57,187 +36,549 @@ export function compile(filename, options) {
     }
 }
 
-export function iterateAst(func, ast, symbols, sources, ignoreIf = false) {
-    let inMacro = false;
-    const prefixes = [];
-    const ifStack = [true];
-    for (let i = 0; i < ast.length; i++) {
-        const el = ast[i];
-        if (el.prefix) {
-            prefixes.push(el.prefix);
-        }
-        if (el.endmacro || el.endblock) {
-            prefixes.pop();
-        }
+export class Programme {
+    public ast;
+    public symbols = {};
+    public sources = [];
+    public dir: string;
+    public macros = {};
 
-        if (el.macrodef) {
-            inMacro = true;
-        } else if (el.endmacro) {
-            inMacro = false;
-        }
+    public parse(filename) {
+        this.dir = path.dirname(filename);
+        const code = fs.readFileSync(filename).toString();
+        this.sources.push({
+            name: filename,
+            source: code.split('\n')
+        })
 
-        if (el.if !== undefined) {
-            if (el.if.expression) {
-                el.if = evaluateExpression(prefixes[prefixes.length - 1], el.if, symbols, sources);
-            }
-            ifStack.push(el.if !== 0);
-        }
-        if (el.else) {
-            ifStack.push(!ifStack.pop());
-        }
-        if (el.endif) {
-            ifStack.pop();
-        }
-
-        if (ignoreIf || ifStack[ifStack.length - 1]) {
-            func(el, i, prefixes[prefixes.length - 1] || '', inMacro, ifStack[ifStack.length - 1]);
-        }
-    }    
-}
-
-export function processIncludes(ast, dir, sources) {
-    const dirs = [];
-    const sourceIndices = [];
-    let sourceIndex = 0;
-
-    iterateAst(function(el, i, prefix, inMacro) {
-        if (el.include && !el.included) {
-            const filename = path.join(dir, el.include);
-            dir = path.dirname(filename);
-            dirs.push(dir);
-            if (!fs.existsSync(filename)) {
-                error("File does not exist", el.location, sources);
-            }
-            const source = fs.readFileSync(filename).toString();
-            sources.push({
-                name: filename,
-                source: source.split('\n')
-            });
-            sourceIndices.push(sourceIndex);
-            sourceIndex = sources.length - 1;
-            const includeAst = parser.parse(source, {source: sourceIndex});
-            if (includeAst !== null) {
-                ast.splice(i + 1, 0, ...includeAst);
-                ast.splice(i + 1 + includeAst.length, 0, {
-                    endinclude: sourceIndex,
-                    location: {
-                        line: includeAst.length,
-                        column: 0,
-                        source: sourceIndex
-                    }
-                });
-            } else {
-                ast.splice(i + 1, 0, {
-                    endinclude: sourceIndex,
-                    location: {
-                        line: 0,
-                        column: 0,
-                        source: sourceIndex
-                    }
-                });
-            }
-            el.included = true;
-        } else if (el.endinclude !== undefined) {
-            dir = dirs.pop();
-            sourceIndex = sourceIndices.pop();
-        }
-    }, ast, {}, sources);
-}
-
-export function getMacros(ast, sources) {
-    const macros = {};
-    let macro = undefined;
-    let macroName = undefined;
-    let macroLocation = undefined;
-    iterateAst(function(el, i, prefix, inMacro) {
-        if (el.macrodef) {
-            if (macro) {
-                error("Cannot nest macros", el.location, sources);
-            }
-            macroLocation = el.location;
-            macroName = el.macrodef;
-            macro = {
-                ast: [],
-                params: el.params || []
-            };
-            if (macros[macroName]) {
-                error(`Already defined macro '${macroName}'`, el.location, sources);
-            }
-        } else if (el.endmacro) {
-            if (!macro) {
-                error("Not in a macro", el.location, sources);
-            }
-            macros[macroName] = macro;
-            macro = undefined;
-            macroName = undefined;
-        }
-        if (macro && !el.macrodef && !el.endmacro) {
-            macro.ast.push(el);
-        }
-    }, ast, {}, sources);
-    if (macro) {
-        error(`Macro '${macroName}' doesn't finish`, macroLocation, sources);
+        this.ast = parser.parse(code, {source: 0});        
     }
-    return macros;
-}
 
-/**
- * Gets a map of symbols, and updates the parsed objects
- * so the block and endblock objects have prefixes
- */
-export function getSymbols(ast, sources) {
-    const symbols = {};
-    let nextBlock = 0;
-    let blocks = [];
-    iterateAst(function(el, i, prefix, inMacro) {
-        if (el.label && !inMacro) {
-            if (blocks.length > 0 && !el.public) {
-                if (typeof symbols[labelName(blocks, el.label)] !== 'undefined') {
-                    error(`Label '${el.label}' already defined at in this block`, el.location, sources);
-                }
-                symbols[labelName(blocks, el.label)] = null;
-                el.label = labelName(blocks, el.label);
-            } else {
-                if (typeof symbols[el.label] !== 'undefined') {
-                    error(`Label '${el.label}' already defined`, el.location, sources);
-                }
-                symbols[el.label] = null;
+    private iterateAst(func, ignoreIf = false) {
+        let inMacro = false;
+        const prefixes = [];
+        const ifStack = [true];
+        for (let i = 0; i < this.ast.length; i++) {
+            const el = this.ast[i];
+            if (el.prefix) {
+                prefixes.push(el.prefix);
             }
-        } else if (el.block) {
-            blocks.push(nextBlock);
-            el.prefix = labelPrefix(blocks);
-            nextBlock++;
-        } else if (el.endblock || el.endmacrocall) {
-            blocks.pop();
-        } else if (el.macrocall) {
-            blocks.push(nextBlock);
-            el.prefix = labelPrefix(blocks);
-            nextBlock++;
-            for (let j = 0; j < el.params.length; j++) {
-                const param = el.params[j];
-                if (blocks.length > 0) {
-                    symbols[labelName(blocks, param)] = el.args[j];
-                    el.params[j] = labelName(blocks, param);
+            if (el.endmacro || el.endblock) {
+                prefixes.pop();
+            }
+
+            if (el.macrodef) {
+                inMacro = true;
+            } else if (el.endmacro) {
+                inMacro = false;
+            }
+
+            if (el.if !== undefined) {
+                if (el.if.expression) {
+                    el.if = this.evaluateExpression(prefixes[prefixes.length - 1], el.if);
+                }
+                ifStack.push(el.if !== 0);
+            }
+            if (el.else) {
+                ifStack.push(!ifStack.pop());
+            }
+            if (el.endif) {
+                ifStack.pop();
+            }
+
+            if (ignoreIf || ifStack[ifStack.length - 1]) {
+                func(el, i, prefixes[prefixes.length - 1] || '', inMacro, ifStack[ifStack.length - 1]);
+            }
+        }    
+    }
+
+    public processIncludes() {
+        const dirs = [];
+        const sourceIndices = [];
+        let sourceIndex = 0;
+
+        let dir = this.dir;
+        this.iterateAst((el, i, prefix, inMacro) => {
+            if (el.include && !el.included) {
+                const filename = path.join(dir, el.include);
+                dir = path.dirname(filename);
+                dirs.push(dir);
+                if (!fs.existsSync(filename)) {
+                    this.error("File does not exist", el.location);
+                }
+                const source = fs.readFileSync(filename).toString();
+                this.sources.push({
+                    name: filename,
+                    source: source.split('\n')
+                });
+                sourceIndices.push(sourceIndex);
+                sourceIndex = this.sources.length - 1;
+                const includeAst = parser.parse(source, {source: sourceIndex});
+                if (includeAst !== null) {
+                    this.ast.splice(i + 1, 0, ...includeAst);
+                    this.ast.splice(i + 1 + includeAst.length, 0, {
+                        endinclude: sourceIndex,
+                        location: {
+                            line: includeAst.length,
+                            column: 0,
+                            source: sourceIndex
+                        }
+                    });
                 } else {
-                    symbols[param] = null;
+                    this.ast.splice(i + 1, 0, {
+                        endinclude: sourceIndex,
+                        location: {
+                            line: 0,
+                            column: 0,
+                            source: sourceIndex
+                        }
+                    });
+                }
+                el.included = true;
+            } else if (el.endinclude !== undefined) {
+                dir = dirs.pop();
+                sourceIndex = sourceIndices.pop();
+            }
+        });
+    }
+
+    public getMacros() {
+        let macro = undefined;
+        let macroName = undefined;
+        let macroLocation = undefined;
+        this.iterateAst((el, i, prefix, inMacro) => {
+            if (el.macrodef) {
+                if (macro) {
+                    this.error("Cannot nest macros", el.location);
+                }
+                macroLocation = el.location;
+                macroName = el.macrodef;
+                macro = {
+                    ast: [],
+                    params: el.params || []
+                };
+                if (this.macros[macroName]) {
+                    this.error(`Already defined macro '${macroName}'`, el.location);
+                }
+            } else if (el.endmacro) {
+                if (!macro) {
+                    this.error("Not in a macro", el.location);
+                }
+                this.macros[macroName] = macro;
+                macro = undefined;
+                macroName = undefined;
+            }
+            if (macro && !el.macrodef && !el.endmacro) {
+                macro.ast.push(el);
+            }
+        });
+        if (macro) {
+            this.error(`Macro '${macroName}' doesn't finish`, macroLocation);
+        }
+        return this.macros;
+    }
+
+    /**
+     * Gets a map of symbols, and updates the parsed objects
+     * so the block and endblock objects have prefixes
+     */
+    public getSymbols() {
+        let nextBlock = 0;
+        let blocks = [];
+        this.iterateAst((el, i, prefix, inMacro) => {
+            if (el.label && !inMacro) {
+                if (blocks.length > 0 && !el.public) {
+                    if (typeof this.symbols[labelName(blocks, el.label)] !== 'undefined') {
+                        this.error(`Label '${el.label}' already defined at in this block`, el.location);
+                    }
+                    this.symbols[labelName(blocks, el.label)] = null;
+                    el.label = labelName(blocks, el.label);
+                } else {
+                    if (typeof this.symbols[el.label] !== 'undefined') {
+                        this.error(`Label '${el.label}' already defined`, el.location);
+                    }
+                    this.symbols[el.label] = null;
+                }
+            } else if (el.block) {
+                blocks.push(nextBlock);
+                el.prefix = labelPrefix(blocks);
+                nextBlock++;
+            } else if (el.endblock || el.endmacrocall) {
+                blocks.pop();
+            } else if (el.macrocall) {
+                blocks.push(nextBlock);
+                el.prefix = labelPrefix(blocks);
+                nextBlock++;
+                for (let j = 0; j < el.params.length; j++) {
+                    const param = el.params[j];
+                    if (blocks.length > 0) {
+                        this.symbols[labelName(blocks, param)] = el.args[j];
+                        el.params[j] = labelName(blocks, param);
+                    } else {
+                        this.symbols[param] = null;
+                    }
+                }
+            } else if (el.equ) {
+                if (i > 0 && this.ast[i - 1].label) {
+                    let ii = i - 1;
+                    while (this.ast[ii] && this.ast[ii].label) {
+                        this.symbols[this.ast[ii].label] = el.equ;
+                        ii--;
+                    }
+                } else {
+                    this.error("EQU has no label", el.location);
                 }
             }
-        } else if (el.equ) {
-            if (i > 0 && ast[i - 1].label) {
-                let ii = i - 1;
-                while (ast[ii] && ast[ii].label) {
-                    symbols[ast[ii].label] = el.equ;
-                    ii--;
+        });
+        if (blocks.length !== 0) {
+            throw "Mismatch between .block and .endblock statements";
+        }
+        return this.symbols;
+    }
+
+    private error(message, location): never {
+        throw {
+            message: message,
+            location: location,
+            source: this.sources[location.source].source[location.line - 1],
+            filename: this.sources[location.source].name
+        };
+    }
+
+    public expandMacros() {
+        this.iterateAst((el, i, prefix, inMacro) => {
+            if (el.macrocall) {
+                const macro = this.macros[el.macrocall];
+                if (!macro) {
+                    this.error(`Unknown instruction/macro '${el.macrocall}'`, el.location);
                 }
-            } else {
-                error("EQU has no label", el.location, sources);
+                el.params = JSON.parse(JSON.stringify(macro.params));
+                el.expanded = true;
+                this.ast.splice(i + 1, 0, ...(JSON.parse(JSON.stringify(macro.ast))));
+                this.ast.splice(i + 1 + macro.ast.length, 0, { endmacrocall: true });
+                i += macro.ast.length + 1;
+            }
+        });
+    }
+
+    /**
+     * Assign correct value to labels, based on PC. Starts at
+     * 0, increments by bytes in ast or set by org.
+     * Assign correct value to equs, although it does not
+     * evaluate expressions, it simply put the expression into
+     * the symbol
+     */
+    public assignPCandEQU() {
+        let pc = 0;
+        let out = 0;
+        this.iterateAst((el, i, prefix, inMacro) => {
+            if (inMacro) {
+                return;
+            }
+            if (el.label) {
+                if (this.symbols[el.label] === null) {
+                    this.symbols[el.label] = pc;
+                }
+                return;
+            } else if (el.equ) {
+                if (el.equ.expression) {
+                    el.equ.address = pc;
+                }
+            } else if (el.defs !== undefined) {
+                let size = el.defs;
+                if (size.expression) {
+                    size = this.evaluateExpression(prefix, size);
+                }
+                el.address = pc;
+                el.out = out;
+                pc += size;
+                out += size;
+            } else if (el.org !== undefined) {
+                if (el.org.expression) {
+                    el.org = this.evaluateExpression(prefix, el.org);
+                }
+                pc = el.org;
+                out = el.org;
+            } else if (el.phase !== undefined) {
+                if (el.phase.expression) {
+                    el.phase = this.evaluateExpression(prefix, el.phase);
+                }
+                pc = el.phase;
+            } else if (el.endphase) {
+                pc = out;
+            } else if (el.align !== undefined) {
+                if (el.align.expression) {
+                    el.align = this.evaluateExpression(prefix, el.align);
+                }
+                let add = el.align - (pc % el.align);
+                if (add !== el.align) {
+                    pc += add;
+                    out += add;
+                }
+            } else if (el.bytes) {
+                el.address = pc;
+                el.out = out;
+                
+                pc += el.bytes.length;
+                out += el.bytes.length;
+            }
+        });
+    }
+
+    private evaluateExpression(prefix = '', expr, evaluated = []) {
+        const variables = expr.vars;
+        const subVars = {}; // substitute variables
+        if (expr.address !== undefined) {
+            this.symbols['$'] = expr.address;
+        }
+        for (const variable of variables) {
+            const subVar = this.findVariable(prefix, variable);
+
+            if (this.symbols[subVar] === undefined) {
+                this.error(`Symbol '${variable}' not found`, expr.location);
+            }
+            if (this.symbols[subVar].expression) {
+                this.evaluateSymbol(subVar, evaluated);
+            }
+            subVars[variable] = this.symbols[subVar];
+        }
+        return Expr.parse(expr.expression, {variables: subVars});
+    }
+
+    private evaluateSymbol(symbol, evaluated) {
+        if (evaluated.indexOf(symbol) !== -1) {
+            this.error(`Circular symbol dependency while evaluating '${symbol}'`, this.symbols[symbol].location);
+        }
+        evaluated.push(symbol);
+        const prefix = getWholePrefix(symbol);
+        this.symbols[symbol] = this.evaluateExpression(prefix, this.symbols[symbol], evaluated)
+    }
+
+    private findVariable(prefix, variable) {
+        while (true) {
+            const subVar = this.symbols[prefix + variable];
+            if (subVar !== undefined) {
+                return prefix + variable;
+            }
+            if (prefix === '') {
+                break;
+            }
+            prefix = getReducedPrefix(prefix);
+        }
+    }
+
+    public evaluateSymbols() {
+        // console.log(`eval symbols ${JSON.stringify(symbols, undefined, 2)}`);
+        const evaluated = [];
+        for (const symbol in this.symbols) {
+            if (this.symbols[symbol].expression) {
+                // console.log('evaluate ' + symbol);
+                if (evaluated.indexOf(symbol) !== -1) {
+                    continue;
+                }
+                this.evaluateSymbol(symbol, evaluated);
             }
         }
-    }, ast, symbols, sources);
-    if (blocks.length !== 0) {
-        throw "Mismatch between .block and .endblock statements";
     }
-    return symbols;
+
+    public checkSymbols() {
+        for (const symbol in this.symbols) {
+            if (this.symbols[symbol].expression) {
+                throw `Symbol '${symbol}' cannot be calculated`;
+            }
+        }
+    }
+
+    public updateBytes() {
+        this.iterateAst((el, i, prefix, inMacro) => {
+            if (el.references && !inMacro) {
+                this.symbols['$'] = el.address;
+                for (let i = 0; i < el.bytes.length; i++) {
+                    const byte = el.bytes[i];
+                    if (byte && byte.expression) {
+                        const variables = byte.vars;
+
+                        const subVars = {}; // substitute variables
+                        for (const variable of variables) {
+                            const subVar = this.findVariable(prefix, variable);
+
+                            if (this.symbols[subVar] === undefined) {
+                                this.error(`Symbol '${variable}' cannot be found`, el.location);
+                            }
+                            if (this.symbols[subVar].expression) {
+                                this.error(`Symbol ${variable} not evaluated`, el.location);
+                                // this.evaluateSymbol(subVar, symbols, evaluated);
+                            }
+                            subVars[variable] = this.symbols[subVar];
+                        }
+
+                        const value = Expr.parse(byte.expression, {variables: subVars})
+                        if (typeof value === 'string') {
+                            let bytes = [];
+                            for (let i = 0; i < value.length; i++) {
+                                bytes.push(value.charCodeAt(i));
+                            }
+                            el.bytes.splice(i, 1, ...bytes);
+                        } else {
+                            el.bytes[i] = value & 0xFF;
+                            if (el.bytes[i + 1] === null) {
+                                el.bytes[i + 1] = (value & 0xFF00) >> 8;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    /**
+     * Each line should be
+     * LLLL ADDR BYTES SRC  - max 8 bytes? - multiple lines if more
+     */
+    public getList() {
+        let list = [];
+        let line = 0;
+        let source = 0;
+
+        let out = undefined;
+        let address = undefined;
+        let bytes = [];
+
+        let inMacro = false;
+        let startingMacro = false;
+        let endingMacro = false;
+        let currentIfTrue = true;
+        let endingInclude : {
+            line: number,
+            source: number
+        } | false = false;
+
+        this.iterateAst((el, i, prefix, inMacro, ifTrue) => {
+            if (el.location) {
+                if ((el.location.line !== line && line !== 0) || (el.location.source !== source)) {
+                    this.dumpLine(list, this.sources[source].source, line, out, address, bytes, inMacro, currentIfTrue);
+                    if (endingInclude !== false) {
+                        list.push(`${pad(endingInclude.line + 1, 4)}                      * end include ${this.sources[endingInclude.source].name}`);
+                        endingInclude = false;
+                    }
+
+                    if (endingMacro) {
+                        inMacro = false;
+                        endingMacro = false;
+                    }
+                    if (startingMacro) {
+                        list.push('          ' + ' '.repeat(BYTELEN * 2) + '* UNROLL MACRO')
+                        inMacro = true;
+                        startingMacro = false;
+                    }
+
+                    out = undefined;
+                    address = undefined;
+                    bytes = [];
+                }
+                line = el.location.line;
+                source = el.location.source;
+                if (el.out !== undefined) {
+                    out = el.out;
+                    address = el.address;
+                }
+                if (el.bytes) {
+                    bytes = el.bytes;
+                }
+                currentIfTrue = ifTrue;
+            }
+            if (el.macrocall) {
+                startingMacro = true;
+            }
+            if (el.endmacrocall) {
+                endingMacro = true;
+            }
+            if (el.endinclude !== undefined) {
+                endingInclude = el.location;
+            }
+        }, true);
+        if (this.sources[source].source[line - 1]) {
+            this.dumpLine(list, this.sources[source].source, line, out, address, bytes, inMacro, currentIfTrue);
+        }
+
+        list.push('');
+
+        for (const symbol in this.symbols) {
+            if (!symbol.startsWith('%')) {
+                list.push(`${padr(symbol, 20)} ${pad(this.symbols[symbol].toString(16), 4, '0')}`);
+            }
+        }
+
+        return list;    
+    }
+
+    private dumpLine(list, lines, line, out, address, bytes, inMacro, ifTrue) {
+        let byteString = '';
+        if (bytes) {
+            for (const byte of bytes) {
+                byteString += pad((byte & 0xFF).toString(16), 2, '0');
+            }
+        }
+        let outString = '    ';
+        if (out !== undefined) {
+            outString = pad(out.toString(16), 4, '0');
+        }
+        let addressString = '    ';
+        if (address !== undefined) {
+            addressString = pad(address.toString(16), 4, '0');
+        }
+        if (!ifTrue) {
+            addressString = 'xxxx';
+            outString = 'xxxx';
+        }
+        list.push(`${pad(line, 4)} ${address !== out?addressString + '@':''}${outString} ${padr(byteString, BYTELEN * 2).substring(0, BYTELEN * 2)} ${inMacro ? '*' : ' '}${lines[line - 1]}`);
+        for (let i = BYTELEN * 2; i < byteString.length; i += BYTELEN * 2) {
+            list.push(`          ${padr(byteString.substring(i, i + BYTELEN * 2), BYTELEN * 2).substring(0,BYTELEN * 2)}`)
+        }
+    }
+
+    public getBytes() {
+        let bytes = [];
+        let startOut = null;
+        let out = null;
+
+        this.iterateAst((el, i, prefix, inMacro) => {
+            if (el.bytes && !inMacro) {
+                const end = bytes.length + startOut;
+                if (out === null || el.out === end) {
+                    if (startOut === null) {
+                        startOut = el.out;
+                    }
+                    out = el.bytes.length + el.out;
+                    bytes = bytes.concat(el.bytes);
+                } else if (el.out > end) {
+                    for (let i = out; i < el.out; i++) {
+                        bytes.push(0);
+                    }
+                    bytes = bytes.concat(el.bytes);
+                    out = el.bytes.length + el.out;
+                } else if (el.out < startOut) {
+                    this.error("Cannot ORG to earlier address than first ORG", el.location);
+                } else if (el.out < end) {
+                    for (let i = 0; i < el.bytes.length; i++) {
+                        bytes[(el.out - startOut) + i] = el.bytes[i];
+                    }
+                    out = el.bytes.length + el.out;
+                }
+            }
+        });
+        return bytes;
+    }
+}
+
+function pad(num, size, chr = ' ') {
+    let result = '' + num;
+    return chr.repeat(Math.max(0, size - result.length)) + result;
+}
+
+function padr(num, size, chr = ' ') {
+    let result = '' + num;
+    return result + chr.repeat(Math.max(0, size - result.length));
 }
 
 function labelPrefix(blocks: number[]) {
@@ -250,141 +591,6 @@ function labelPrefix(blocks: number[]) {
 
 function labelName(blocks: number[], label) {
     return labelPrefix(blocks) + label;
-}
-
-function location(el) {
-    return `(${el.location.line}:${el.location.column})`;
-}
-
-function error(message, location, sources): never {
-    throw {
-        message: message,
-        location: location,
-        source: sources[location.source].source[location.line - 1],
-        filename: sources[location.source].name
-    };
-}
-
-export function expandMacros(ast, macros, sources) {
-    iterateAst(function(el, i, prefix, inMacro) {
-        if (el.macrocall) {
-            const macro = macros[el.macrocall];
-            if (!macro) {
-                error(`Unknown instruction/macro '${el.macrocall}'`, el.location, sources);
-            }
-            el.params = JSON.parse(JSON.stringify(macro.params));
-            el.expanded = true;
-            ast.splice(i + 1, 0, ...(JSON.parse(JSON.stringify(macro.ast))));
-            ast.splice(i + 1 + macro.ast.length, 0, { endmacrocall: true });
-            i += macro.ast.length + 1;
-        }
-    }, ast, {}, sources);
-}
-
-/**
- * Assign correct value to labels, based on PC. Starts at
- * 0, increments by bytes in ast or set by org.
- * Assign correct value to equs, although it does not
- * evaluate expressions, it simply put the expression into
- * the symbol
- */
-export function assignPCandEQU(ast, symbols, sources) {
-    let pc = 0;
-    let out = 0;
-    iterateAst(function(el, i, prefix, inMacro) {
-        if (inMacro) {
-            return;
-        }
-        if (el.label) {
-            if (symbols[el.label] === null) {
-                symbols[el.label] = pc;
-            }
-            return;
-        } else if (el.equ) {
-            if (el.equ.expression) {
-                el.equ.address = pc;
-            }
-        } else if (el.defs !== undefined) {
-            let size = el.defs;
-            if (size.expression) {
-                size = evaluateExpression(prefix, size, symbols, sources);
-            }
-            el.address = pc;
-            el.out = out;
-            pc += size;
-            out += size;
-        } else if (el.org !== undefined) {
-            if (el.org.expression) {
-                el.org = evaluateExpression(prefix, el.org, symbols, sources);
-            }
-            pc = el.org;
-            out = el.org;
-        } else if (el.phase !== undefined) {
-            if (el.phase.expression) {
-                el.phase = evaluateExpression(prefix, el.phase, symbols, sources);
-            }
-            pc = el.phase;
-        } else if (el.endphase) {
-            pc = out;
-        } else if (el.align !== undefined) {
-            if (el.align.expression) {
-                el.align = evaluateExpression(prefix, el.align, symbols, sources);
-            }
-            let add = el.align - (pc % el.align);
-            if (add !== el.align) {
-                pc += add;
-                out += add;
-            }
-        } else if (el.bytes) {
-            el.address = pc;
-            el.out = out;
-            
-            pc += el.bytes.length;
-            out += el.bytes.length;
-        }
-    }, ast, symbols, sources);
-}
-
-export function evaluateExpression(prefix = '', expr, symbols, sources, evaluated = []) {
-    const variables = expr.vars;
-    const subVars = {}; // substitute variables
-    if (expr.address !== undefined) {
-        symbols['$'] = expr.address;
-    }
-    for (const variable of variables) {
-        const subVar = findVariable(symbols, prefix, variable);
-
-        if (symbols[subVar] === undefined) {
-            error(`Symbol '${variable}' not found`, expr.location, sources);
-        }
-        if (symbols[subVar].expression) {
-            evaluateSymbol(subVar, symbols, sources, evaluated);
-        }
-        subVars[variable] = symbols[subVar];
-    }
-    return Expr.parse(expr.expression, {variables: subVars});
-}
-
-export function evaluateSymbol(symbol, symbols, sources, evaluated) {
-    if (evaluated.indexOf(symbol) !== -1) {
-        error(`Circular symbol dependency while evaluating '${symbol}'`, symbols[symbol].location, sources);
-    }
-    evaluated.push(symbol);
-    const prefix = getWholePrefix(symbol);
-    symbols[symbol] = evaluateExpression(prefix, symbols[symbol], symbols, sources, evaluated)
-}
-
-export function findVariable(symbols, prefix, variable) {
-    while (true) {
-        const subVar = symbols[prefix + variable];
-        if (subVar !== undefined) {
-            return prefix + variable;
-        }
-        if (prefix === '') {
-            break;
-        }
-        prefix = getReducedPrefix(prefix);
-    }
 }
 
 export function getReducedPrefix(prefix) {
@@ -403,209 +609,3 @@ export function getWholePrefix(symbol) {
     return '';
 }
 
-export function evaluateSymbols(symbols, sources) {
-    // console.log(`eval symbols ${JSON.stringify(symbols, undefined, 2)}`);
-    const evaluated = [];
-    for (const symbol in symbols) {
-        if (symbols[symbol].expression) {
-            // console.log('evaluate ' + symbol);
-            if (evaluated.indexOf(symbol) !== -1) {
-                continue;
-            }
-            evaluateSymbol(symbol, symbols, sources, evaluated);
-        }
-    }
-}
-
-export function updateBytes(ast, symbols, sources) {
-    iterateAst(function(el, i, prefix, inMacro) {
-        if (el.references && !inMacro) {
-            symbols['$'] = el.address;
-            for (let i = 0; i < el.bytes.length; i++) {
-                const byte = el.bytes[i];
-                if (byte && byte.expression) {
-                    const variables = byte.vars;
-
-                    const subVars = {}; // substitute variables
-                    for (const variable of variables) {
-                        const subVar = findVariable(symbols, prefix, variable);
-
-                        if (symbols[subVar] === undefined) {
-                            error(`Symbol '${variable}' cannot be found`, el.location, sources);
-                        }
-                        if (symbols[subVar].expression) {
-                            error(`Symbol ${variable} not evaluated`, el.location, sources);
-                            // evaluateSymbol(subVar, symbols, evaluated);
-                        }
-                        subVars[variable] = symbols[subVar];
-                    }
-
-                    const value = Expr.parse(byte.expression, {variables: subVars})
-                    if (typeof value === 'string') {
-                        let bytes = [];
-                        for (let i = 0; i < value.length; i++) {
-                            bytes.push(value.charCodeAt(i));
-                        }
-                        el.bytes.splice(i, 1, ...bytes);
-                    } else {
-                        el.bytes[i] = value & 0xFF;
-                        if (el.bytes[i + 1] === null) {
-                            el.bytes[i + 1] = (value & 0xFF00) >> 8;
-                        }
-                    }
-                }
-            }
-        }
-    }, ast, symbols, sources);
-}
-
-const BYTELEN = 8;
-
-/**
- * Each line should be
- * LLLL ADDR BYTES SRC  - max 8 bytes? - multiple lines if more
- */
-export function getList(sources, ast, symbols) {
-    let list = [];
-    let line = 0;
-    let source = 0;
-
-    let out = undefined;
-    let address = undefined;
-    let bytes = [];
-
-    let inMacro = false;
-    let startingMacro = false;
-    let endingMacro = false;
-    let currentIfTrue = true;
-    let endingInclude : {
-        line: number,
-        source: number
-    } | false = false;
-
-    iterateAst(function(el, i, prefix, inMacro, ifTrue) {
-        if (el.location) {
-            if ((el.location.line !== line && line !== 0) || (el.location.source !== source)) {
-                dumpLine(list, sources[source].source, line, out, address, bytes, inMacro, currentIfTrue);
-                if (endingInclude !== false) {
-                    list.push(`${pad(endingInclude.line + 1, 4)}                      * end include ${sources[endingInclude.source].name}`);
-                    endingInclude = false;
-                }
-
-                if (endingMacro) {
-                    inMacro = false;
-                    endingMacro = false;
-                }
-                if (startingMacro) {
-                    list.push('          ' + ' '.repeat(BYTELEN * 2) + '* UNROLL MACRO')
-                    inMacro = true;
-                    startingMacro = false;
-                }
-
-                out = undefined;
-                address = undefined;
-                bytes = [];
-            }
-            line = el.location.line;
-            source = el.location.source;
-            if (el.out !== undefined) {
-                out = el.out;
-                address = el.address;
-            }
-            if (el.bytes) {
-                bytes = el.bytes;
-            }
-            currentIfTrue = ifTrue;
-        }
-        if (el.macrocall) {
-            startingMacro = true;
-        }
-        if (el.endmacrocall) {
-            endingMacro = true;
-        }
-        if (el.endinclude !== undefined) {
-            endingInclude = el.location;
-        }
-    }, ast, symbols, sources, true);
-    if (sources[source].source[line - 1]) {
-        dumpLine(list, sources[source].source, line, out, address, bytes, inMacro, currentIfTrue);
-    }
-
-    list.push('');
-
-    for (const symbol in symbols) {
-        if (!symbol.startsWith('%')) {
-            list.push(`${padr(symbol, 20)} ${pad(symbols[symbol].toString(16), 4, '0')}`);
-        }
-    }
-
-    return list;    
-}
-
-function dumpLine(list, lines, line, out, address, bytes, inMacro, ifTrue) {
-    let byteString = '';
-    if (bytes) {
-        for (const byte of bytes) {
-            byteString += pad((byte & 0xFF).toString(16), 2, '0');
-        }
-    }
-    let outString = '    ';
-    if (out !== undefined) {
-        outString = pad(out.toString(16), 4, '0');
-    }
-    let addressString = '    ';
-    if (address !== undefined) {
-        addressString = pad(address.toString(16), 4, '0');
-    }
-    if (!ifTrue) {
-        addressString = 'xxxx';
-        outString = 'xxxx';
-    }
-    list.push(`${pad(line, 4)} ${address !== out?addressString + '@':''}${outString} ${padr(byteString, BYTELEN * 2).substring(0, BYTELEN * 2)} ${inMacro ? '*' : ' '}${lines[line - 1]}`);
-    for (let i = BYTELEN * 2; i < byteString.length; i += BYTELEN * 2) {
-        list.push(`          ${padr(byteString.substring(i, i + BYTELEN * 2), BYTELEN * 2).substring(0,BYTELEN * 2)}`)
-    }
-}
-
-function pad(num, size, chr = ' ') {
-    let result = '' + num;
-    return chr.repeat(Math.max(0, size - result.length)) + result;
-}
-
-function padr(num, size, chr = ' ') {
-    let result = '' + num;
-    return result + chr.repeat(Math.max(0, size - result.length));
-}
-
-export function getBytes(ast, sources) {
-    let bytes = [];
-    let startOut = null;
-    let out = null;
-
-    iterateAst(function(el, i, prefix, inMacro) {
-        if (el.bytes && !inMacro) {
-            const end = bytes.length + startOut;
-            if (out === null || el.out === end) {
-                if (startOut === null) {
-                    startOut = el.out;
-                }
-                out = el.bytes.length + el.out;
-                bytes = bytes.concat(el.bytes);
-            } else if (el.out > end) {
-                for (let i = out; i < el.out; i++) {
-                    bytes.push(0);
-                }
-                bytes = bytes.concat(el.bytes);
-                out = el.bytes.length + el.out;
-            } else if (el.out < startOut) {
-                error("Cannot ORG to earlier address than first ORG", el.location, sources);
-            } else if (el.out < end) {
-                for (let i = 0; i < el.bytes.length; i++) {
-                    bytes[(el.out - startOut) + i] = el.bytes[i];
-                }
-                out = el.bytes.length + el.out;
-            }
-        }
-    }, ast, {}, sources);
-    return bytes;
-}
