@@ -135,3 +135,10 @@ There are some functions which you can use in expressions:
 |----------|-------------|
 | min(x, y) | Returns the smallest of x and y |
 | max(x, y) | Returns the largest of x and y |
+
+Instructions
+------------
+
+Maz supports all undocumented Z80 instructions. See this webiste for a list of undocumented instructions: http://clrhome.org/table/
+
+The Z80 instruction syntax is a little inconsitent around some 8-bit instructions, for example ADD A,B includes the accumulator, but SUB B doesn't. When using Maz the "A," is optional for all of the following instructions: ADD, ADC, SUB, SBC, AND, XOR, OR, CP.
