@@ -111,27 +111,16 @@ export class Programme {
                 dirs.push(this.dir);
                 sourceIndices.push(sourceIndex);
                 sourceIndex = this.sources.length - 1;
-                const includeAst = parser.parse(source, {source: sourceIndex});
-                if (includeAst !== null) {
-                    this.ast.splice(i + 1, 0, ...includeAst);
-                    this.ast.splice(i + 1 + includeAst.length, 0, {
-                        endinclude: sourceIndex,
-                        location: {
-                            line: includeAst.length + 1,
-                            column: 0,
-                            source: sourceIndex
-                        }
-                    });
-                } else {
-                    this.ast.splice(i + 1, 0, {
-                        endinclude: sourceIndex,
-                        location: {
-                            line: 0,
-                            column: 0,
-                            source: sourceIndex
-                        }
-                    });
-                }
+                const includeAst = parser.parse(source, {source: sourceIndex}) || [];
+                this.ast.splice(i + 1, 0, ...includeAst);
+                this.ast.splice(i + 1 + includeAst.length, 0, {
+                    endinclude: sourceIndex,
+                    location: {
+                        line: includeAst.length + 1,
+                        column: 0,
+                        source: sourceIndex
+                    }
+                });
                 el.included = true;
             } else if (el.endinclude !== undefined) {
                 this.dir = dirs.pop();
