@@ -452,44 +452,66 @@ code = ldir
     / halt
     / add_a_ixyhl
     / add_a_ixy
+    / add_ixyhl
+    / add_ixy
     / add_a_reg
     / add_a_n
+    / add_reg
+    / add_n
     / adc_a_ixyhl
     / adc_a_ixy
+    / adc_ixyhl
+    / adc_ixy
     / adc_a_reg
     / adc_a_n
+    / adc_reg
+    / adc_n
     / adc_hl_bcdehlsp
     / sub_a_ixyhl
     / sub_a_ixy
+    / sub_ixyhl
+    / sub_ixy
     / sub_a_reg
     / sub_a_n
     / sub_reg
     / sub_n
     / sbc_a_ixyhl
     / sbc_a_ixy
+    / sbc_ixyhl
+    / sbc_ixy
     / sbc_a_reg
     / sbc_a_n
+    / sbc_reg
+    / sbc_n
     / sbc_hl_bcdehlsp
     / and_a_ixyhl
     / and_a_ixy
+    / and_ixyhl
+    / and_ixy
     / and_a_reg
     / and_a_n
     / and_reg
     / and_n
     / xor_a_ixyhl
     / xor_a_ixy
+    / xor_ixyhl
+    / xor_ixy
     / xor_a_reg
     / xor_a_n
     / xor_reg
     / xor_n
     / or_a_ixyhl
     / or_a_ixy
+    / or_ixyhl
+    / or_ixy
     / or_a_reg
     / or_a_n
     / or_reg
     / or_n
     / cp_a_ixyhl
     / cp_a_ixy
+    / cp_ixyhl
+    / cp_ixy
     / cp_a_reg
     / cp_a_n
     / cp_reg
@@ -555,10 +577,22 @@ add_a_ixyhl = 'add'i ws 'a' ws? ',' ws? xy:ixyhl {
 add_a_ixy = 'add'i ws 'a' ws? ',' ws? '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
     return res([xy, 0x86].concat(expr8(expr)));
 }
+add_ixyhl = 'add'i ws ws? xy:ixyhl {
+    return res([xy[0], 0x84 + xy[1]]);
+}
+add_ixy = 'add'i ws '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
+    return res([xy, 0x86].concat(expr8(expr)));
+}
 adc_a_ixyhl = 'adc'i ws 'a' ws? ',' ws? xy:ixyhl {
     return res([xy[0], 0x8c + xy[1]]);
 }
 adc_a_ixy = 'adc'i ws 'a' ws? ',' ws? '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
+    return res([xy, 0x8e].concat(expr8(expr)));
+}
+adc_ixyhl = 'adc'i ws xy:ixyhl {
+    return res([xy[0], 0x8c + xy[1]]);
+}
+adc_ixy = 'adc'i ws '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
     return res([xy, 0x8e].concat(expr8(expr)));
 }
 sub_a_ixyhl = 'sub'i ws 'a' ws? ',' ws? xy:ixyhl {
@@ -567,10 +601,22 @@ sub_a_ixyhl = 'sub'i ws 'a' ws? ',' ws? xy:ixyhl {
 sub_a_ixy = 'sub'i ws 'a' ws? ',' ws? '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
     return res([xy, 0x96].concat(expr8(expr)));
 }
+sub_ixyhl = 'sub'i ws  ws? xy:ixyhl {
+    return res([xy[0], 0x94 + xy[1]]);
+}
+sub_ixy = 'sub'i ws '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
+    return res([xy, 0x96].concat(expr8(expr)));
+}
 sbc_a_ixyhl = 'sbc'i ws 'a' ws? ',' ws? xy:ixyhl {
     return res([xy[0], 0x9c + xy[1]]);
 }
 sbc_a_ixy = 'sbc'i ws 'a' ws? ',' ws? '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
+    return res([xy, 0x9e].concat(expr8(expr)));
+}
+sbc_ixyhl = 'sbc'i ws ws? xy:ixyhl {
+    return res([xy[0], 0x9c + xy[1]]);
+}
+sbc_ixy = 'sbc'i ws '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
     return res([xy, 0x9e].concat(expr8(expr)));
 }
 and_a_ixyhl = 'and'i ws 'a' ws? ',' ws? xy:ixyhl {
@@ -579,10 +625,22 @@ and_a_ixyhl = 'and'i ws 'a' ws? ',' ws? xy:ixyhl {
 and_a_ixy = 'and'i ws 'a' ws? ',' ws? '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
     return res([xy, 0xa6].concat(expr8(expr)));
 }
+and_ixyhl = 'and'i ws ws? xy:ixyhl {
+    return res([xy[0], 0xa4 + xy[1]]);
+}
+and_ixy = 'and'i ws '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
+    return res([xy, 0xa6].concat(expr8(expr)));
+}
 xor_a_ixyhl = 'xor'i ws 'a' ws? ',' ws? xy:ixyhl {
     return res([xy[0], 0xac + xy[1]]);
 }
 xor_a_ixy = 'xor'i ws 'a' ws? ',' ws? '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
+    return res([xy, 0xae].concat(expr8(expr)));
+}
+xor_ixyhl = 'xor'i ws xy:ixyhl {
+    return res([xy[0], 0xac + xy[1]]);
+}
+xor_ixy = 'xor'i ws '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
     return res([xy, 0xae].concat(expr8(expr)));
 }
 or_a_ixyhl = 'or'i ws 'a' ws? ',' ws? xy:ixyhl {
@@ -591,10 +649,22 @@ or_a_ixyhl = 'or'i ws 'a' ws? ',' ws? xy:ixyhl {
 or_a_ixy = 'or'i ws 'a' ws? ',' ws? '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
     return res([xy, 0xb6].concat(expr8(expr)));
 }
+or_ixyhl = 'or'i ws ws? xy:ixyhl {
+    return res([xy[0], 0xb4 + xy[1]]);
+}
+or_ixy = 'or'i ws '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
+    return res([xy, 0xb6].concat(expr8(expr)));
+}
 cp_a_ixyhl = 'cp'i ws 'a' ws? ',' ws? xy:ixyhl {
     return res([xy[0], 0xbc + xy[1]]);
 }
 cp_a_ixy = 'cp'i ws 'a' ws? ',' ws? '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
+    return res([xy, 0xbe].concat(expr8(expr)));
+}
+cp_ixyhl = 'cp'i ws xy:ixyhl {
+    return res([xy[0], 0xbc + xy[1]]);
+}
+cp_ixy = 'cp'i ws '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
     return res([xy, 0xbe].concat(expr8(expr)));
 }
 ld_bd_ixyhl = 'ld'i ws reg:bd ws? ',' ws? xy:ixyhl {
@@ -921,7 +991,13 @@ in_cela_c = 'in'i ws reg:cela ws? ',' ws? '(' ws? 'c'i ws? ')' {
 add_a_n = 'add'i ws 'a'i ws? ',' ws? expr:expr {
     return res([0xc6].concat(expr8(expr)));
 }
+add_n = 'add'i ws expr:expr {
+    return res([0xc6].concat(expr8(expr)));
+}
 adc_a_n = 'adc'i ws 'a'i ws? ',' ws? expr:expr {
+    return res([0xce].concat(expr8(expr)));
+}
+adc_n = 'adc'i ws ws? expr:expr {
     return res([0xce].concat(expr8(expr)));
 }
 adc_hl_bcdehlsp = 'adc'i ws 'hl'i ws? ',' ws? reg:bcdehlsp {
@@ -960,13 +1036,22 @@ xor_n = 'xor'i ws expr:expr {
 sbc_a_n = 'sbc'i ws 'a'i ws? ',' ws? expr:expr {
     return res([0xde].concat(expr8(expr)));
 }
+sbc_n = 'sbc'i ws ws? expr:expr {
+    return res([0xde].concat(expr8(expr)));
+}
 sbc_hl_bcdehlsp = 'sbc'i ws 'hl'i ws? ',' ws? reg:bcdehlsp {
     return res([0xed, 0x42 | (reg << 4)])
 }
 add_a_reg = 'add'i ws 'a'i ws? ',' ws? reg:reg ![a-z0-9_]i {
     return res([0x80 | reg]);
 }
+add_reg = 'add'i ws reg:reg ![a-z0-9_]i {
+    return res([0x80 | reg]);
+}
 adc_a_reg = 'adc'i ws 'a'i ws? ',' ws? reg:reg ![a-z0-9_]i {
+    return res([0x88 | reg]);
+}
+adc_reg = 'adc'i ws reg:reg ![a-z0-9_]i {
     return res([0x88 | reg]);
 }
 sub_a_reg = 'sub'i ws 'a'i ws? ',' ws? reg:reg ![a-z0-9_]i {
@@ -976,6 +1061,9 @@ sub_reg = 'sub'i ws reg:reg ![a-z0-9_]i {
         return res([0x90 | reg]);
     }
 sbc_a_reg = 'sbc'i ws 'a'i ws? ',' ws? reg:reg ![a-z0-9_]i {
+    return res([0x98 | reg]);
+}
+sbc_reg = 'sbc'i ws reg:reg ![a-z0-9_]i {
     return res([0x98 | reg]);
 }
 and_a_reg = 'and'i ws 'a'i ws? ',' ws? reg:reg ![a-z0-9_]i {

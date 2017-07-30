@@ -263,6 +263,16 @@ describe('parser', function() {
         ['ld a,(hl)', [0x7e]],
         ['ld a,a', [0x7f]],
 
+        // alternative syntax
+        ['add b', [0x80]],
+        ['add c', [0x81]],
+        ['add d', [0x82]],
+        ['add e', [0x83]],
+        ['add h', [0x84]],
+        ['add l', [0x85]],
+        ['add (hl)', [0x86]],
+        ['add a', [0x87]],
+
         ['add a,b', [0x80]],
         ['add a,c', [0x81]],
         ['add a,d', [0x82]],
@@ -271,6 +281,16 @@ describe('parser', function() {
         ['add a,l', [0x85]],
         ['add a,(hl)', [0x86]],
         ['add a,a', [0x87]],
+
+        // alternative syntax
+        ['adc b', [0x88]],
+        ['adc c', [0x89]],
+        ['adc d', [0x8a]],
+        ['adc e', [0x8b]],
+        ['adc h', [0x8c]],
+        ['adc l', [0x8d]],
+        ['adc (hl)', [0x8e]],
+        ['adc a', [0x8f]],
 
         ['adc a,b', [0x88]],
         ['adc a,c', [0x89]],
@@ -299,6 +319,16 @@ describe('parser', function() {
         ['sub a,l', [0x95]],
         ['sub a,(hl)', [0x96]],
         ['sub a,a', [0x97]],
+
+        // alternative syntax
+        ['sbc b', [0x98]],
+        ['sbc c', [0x99]],
+        ['sbc d', [0x9a]],
+        ['sbc e', [0x9b]],
+        ['sbc h', [0x9c]],
+        ['sbc l', [0x9d]],
+        ['sbc (hl)', [0x9e]],
+        ['sbc a', [0x9f]],
 
         ['sbc a,b', [0x98]],
         ['sbc a,c', [0x99]],
@@ -394,7 +424,9 @@ describe('parser', function() {
         ['call nz,$1234', [0xc4, 0x34, 0x12]],
         ['call nz,chr', [0xc4, {expression:'chr',vars:['chr'], location: {line: 1, column: 9, source: 0}}, null]],
         ['push bc', [0xc5]],
+        ['add $12', [0xc6, 0x12]], // alternative syntax
         ['add a,$12', [0xc6, 0x12]],
+        ['add chr', [0xc6, {expression:'chr',vars:['chr'], location: {line: 1, column: 5, source: 0}}]], // alternative syntax
         ['add a,chr', [0xc6, {expression:'chr',vars:['chr'], location: {line: 1, column: 7, source: 0}}]],
         ['rst 00h', [0xc7]],
         ['rst $00', [0xc7]],
@@ -407,7 +439,9 @@ describe('parser', function() {
         ['call z,chr', [0xcc, {expression:'chr',vars:['chr'], location: {line: 1, column: 8, source: 0}}, null]],
         ['call $1234', [0xcd, 0x34, 0x12]],
         ['call chr', [0xcd, {expression:'chr',vars:['chr'], location: {line: 1, column: 6, source: 0}}, null]],
+        ['adc $12', [0xce, 0x12]], // alternative syntax
         ['adc a,$12', [0xce, 0x12]],
+        ['adc chr', [0xce, {expression:'chr',vars:['chr'], location: {line: 1, column: 5, source: 0}}]], // alternative syntax
         ['adc a,chr', [0xce, {expression:'chr',vars:['chr'], location: {line: 1, column: 7, source: 0}}]],
         ['rst 08h', [0xcf]],
         ['rst $08', [0xcf]],
@@ -436,7 +470,9 @@ describe('parser', function() {
         ['in a,(chr)', [0xdb, {expression:'chr',vars:['chr'], location: {line: 1, column: 7, source: 0}}]],
         ['call c,chr', [0xdc, {expression:'chr',vars:['chr'], location: {line: 1, column: 8, source: 0}}, null]],
         ['pfix', [0xdd]],
+        ['sbc $12', [0xde, 0x12]], // alternative syntax
         ['sbc a,$12', [0xde, 0x12]],
+        ['sbc chr', [0xde, {expression:'chr',vars:['chr'], location: {line: 1, column: 5, source: 0}}]], // alternative syntax
         ['sbc a,chr', [0xde, {expression:'chr',vars:['chr'], location: {line: 1, column: 7, source: 0}}]],
         ['rst 18h', [0xdf]],
         ['rst $18', [0xdf]],
@@ -1146,6 +1182,32 @@ describe('parser', function() {
         ['cp a,ixl', [0xdd, 0xbd]],
         ['cp a,(ix+$12)', [0xdd, 0xbe, 0x12]],
 
+        // alternative syntax
+        ['add ixh', [0xdd, 0x84]],
+        ['add ixl', [0xdd, 0x85]],
+        ['add (ix+$12)', [0xdd, 0x86, 0x12]],
+        ['adc ixh', [0xdd, 0x8c]],
+        ['adc ixl', [0xdd, 0x8d]],
+        ['adc (ix+$12)', [0xdd, 0x8e, 0x12]],
+        ['sub ixh', [0xdd, 0x94]],
+        ['sub ixl', [0xdd, 0x95]],
+        ['sub (ix+$12)', [0xdd, 0x96, 0x12]],
+        ['sbc ixh', [0xdd, 0x9c]],
+        ['sbc ixl', [0xdd, 0x9d]],
+        ['sbc (ix+$12)', [0xdd, 0x9e, 0x12]],
+        ['and ixh', [0xdd, 0xa4]],
+        ['and ixl', [0xdd, 0xa5]],
+        ['and (ix+$12)', [0xdd, 0xa6, 0x12]],
+        ['xor ixh', [0xdd, 0xac]],
+        ['xor ixl', [0xdd, 0xad]],
+        ['xor (ix+$12)', [0xdd, 0xae, 0x12]],
+        ['or ixh', [0xdd, 0xb4]],
+        ['or ixl', [0xdd, 0xb5]],
+        ['or (ix+$12)', [0xdd, 0xb6, 0x12]],
+        ['cp ixh', [0xdd, 0xbc]],
+        ['cp ixl', [0xdd, 0xbd]],
+        ['cp (ix+$12)', [0xdd, 0xbe, 0x12]],
+
         ['pop ix', [0xdd, 0xe1]],
         ['ex (sp),ix', [0xdd, 0xe3]],
         ['push ix', [0xdd, 0xe5]],
@@ -1239,6 +1301,32 @@ describe('parser', function() {
         ['cp a,iyh', [0xfd, 0xbc]],
         ['cp a,iyl', [0xfd, 0xbd]],
         ['cp a,(iy+$12)', [0xfd, 0xbe, 0x12]],
+
+        // alternative syntax
+        ['add iyh', [0xfd, 0x84]],
+        ['add iyl', [0xfd, 0x85]],
+        ['add (iy+$12)', [0xfd, 0x86, 0x12]],
+        ['adc iyh', [0xfd, 0x8c]],
+        ['adc iyl', [0xfd, 0x8d]],
+        ['adc (iy+$12)', [0xfd, 0x8e, 0x12]],
+        ['sub iyh', [0xfd, 0x94]],
+        ['sub iyl', [0xfd, 0x95]],
+        ['sub (iy+$12)', [0xfd, 0x96, 0x12]],
+        ['sbc iyh', [0xfd, 0x9c]],
+        ['sbc iyl', [0xfd, 0x9d]],
+        ['sbc (iy+$12)', [0xfd, 0x9e, 0x12]],
+        ['and iyh', [0xfd, 0xa4]],
+        ['and iyl', [0xfd, 0xa5]],
+        ['and (iy+$12)', [0xfd, 0xa6, 0x12]],
+        ['xor iyh', [0xfd, 0xac]],
+        ['xor iyl', [0xfd, 0xad]],
+        ['xor (iy+$12)', [0xfd, 0xae, 0x12]],
+        ['or iyh', [0xfd, 0xb4]],
+        ['or iyl', [0xfd, 0xb5]],
+        ['or (iy+$12)', [0xfd, 0xb6, 0x12]],
+        ['cp iyh', [0xfd, 0xbc]],
+        ['cp iyl', [0xfd, 0xbd]],
+        ['cp (iy+$12)', [0xfd, 0xbe, 0x12]],
 
         ['pop iy', [0xfd, 0xe1]],
         ['ex (sp),iy', [0xfd, 0xe3]],

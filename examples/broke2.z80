@@ -10,6 +10,9 @@ zero: equ %1011
 something:
     ld a,two
     ld b,something
+
+; just a comment
+
     ld a,$
     db 1,2,$
 .else
