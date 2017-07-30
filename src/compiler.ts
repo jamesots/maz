@@ -44,14 +44,18 @@ export class Programme {
     public macros = {};
 
     public parse(filename) {
+        const code = this.readSource(filename);
+        this.ast = parser.parse(code, {source: 0});        
+    }
+
+    private readSource(filename) {
         this.dir = path.dirname(filename);
-        const code = fs.readFileSync(filename).toString();
+        const source = fs.readFileSync(filename).toString();
         this.sources.push({
             name: filename,
-            source: code.split('\n')
-        })
-
-        this.ast = parser.parse(code, {source: 0});        
+            source: source.split('\n')
+        });
+        return source;
     }
 
     private iterateAst(func, ignoreIf = false) {
@@ -97,20 +101,14 @@ export class Programme {
         const sourceIndices = [];
         let sourceIndex = 0;
 
-        let dir = this.dir;
         this.iterateAst((el, i, prefix, inMacro) => {
             if (el.include && !el.included) {
-                const filename = path.join(dir, el.include);
-                dir = path.dirname(filename);
-                dirs.push(dir);
+                const filename = path.join(this.dir, el.include);
                 if (!fs.existsSync(filename)) {
                     this.error("File does not exist", el.location);
                 }
-                const source = fs.readFileSync(filename).toString();
-                this.sources.push({
-                    name: filename,
-                    source: source.split('\n')
-                });
+                const source = this.readSource(filename);
+                dirs.push(this.dir);
                 sourceIndices.push(sourceIndex);
                 sourceIndex = this.sources.length - 1;
                 const includeAst = parser.parse(source, {source: sourceIndex});
@@ -136,7 +134,7 @@ export class Programme {
                 }
                 el.included = true;
             } else if (el.endinclude !== undefined) {
-                dir = dirs.pop();
+                this.dir = dirs.pop();
                 sourceIndex = sourceIndices.pop();
             }
         });
