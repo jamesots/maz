@@ -80,9 +80,19 @@ Any directive shown below without a leading full stop (period) may also be writt
 <dl>
 <dt>db <i>bytes</i></dt>
 <dt>defb <i>bytes</i></dt>
-<dd>Declare bytes. Strings are converted into their ASCII values.
+<dd>Declare bytes. Strings are converted into their UTF-8 values.
+Only the low byte of any value is used.
 
-    db 0,1,100,$12,"hello\n"
+    db 0,1,100,$12,"hello\n",$1234
+    00 01 64 12 68 65 6c 6c 6f 0a 34
+</dd>
+<dt>dw <i>words</i></dt>
+<dt>defw <i>words</i></dt>
+<dd>Declare words. Strings are converted into their UTF-8 values.
+Words are stored low-byte first. Each pair of characters in a string is stored in reverse. If the string has an odd length, an extra zero is stored.
+
+    db 0,$1234,"hello",$12345
+    00 00 34 12 65 68 6c 6c 00 6f 45 23
 </dd>
 <dt>ds <i>expression</i></dt>
 <dt>defs <i>expression</i></dt>
