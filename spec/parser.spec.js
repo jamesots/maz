@@ -1497,10 +1497,20 @@ describe('parser', function() {
         expect(result.length).toBe(1);
         expect(result[0].bytes).toEqual([12]);
     });
+    it('should parse db big number', function() {
+        const result = parse('db $1234');
+        expect(result.length).toBe(1);
+        expect(result[0].bytes).toEqual([0x34]);
+    });
     it('should parse db multiple numbers', function() {
         const result = parse('db 12,13');
         expect(result.length).toBe(1);
         expect(result[0].bytes).toEqual([12, 13]);
+    });
+    it('should parse db big multiple numbers', function() {
+        const result = parse('db $1234,$5432');
+        expect(result.length).toBe(1);
+        expect(result[0].bytes).toEqual([0x34, 0x32]);
     });
     it('should parse db numbers and strings', function() {
         const result = parse('db "he",108,108,"o"');
@@ -1642,5 +1652,32 @@ nop`);
             include: "some/file.z80",
             location: {line: 1, column: 1, source: 0}
         });
+    });
+
+    it('should parse dw string', function() {
+        const result = parse('dw "hello"');
+        expect(result.length).toBe(1);
+        expect(result[0].bytes).toEqual([
+            101, 104, 108, 108, 0, 111
+        ]);
+    });
+
+    it('should parse dw number', function() {
+        const result = parse('dw $1234');
+        expect(result.length).toBe(1);
+        expect(result[0].bytes).toEqual([
+            0x34, 0x12
+        ]);
+    });
+
+    it('should parse dw things', function() {
+        const result = parse('dw $1234,$99f0,"hel",$11');
+        expect(result.length).toBe(1);
+        expect(result[0].bytes).toEqual([
+            0x34, 0x12,
+            0xf0, 0x99,
+            101, 104, 0, 108,
+            0x11, 0x00
+        ]);
     });
 });

@@ -99,6 +99,7 @@ directive = org
     / endphase
     / align
     / db
+    / dw
     / ds
     / equ
     / macro
@@ -251,6 +252,10 @@ db = '.'? ('db'i / 'defb'i) ws? dbytes:dbytes {
     return res(dbytes);
 }
 
+dw = '.'? ('dw'i / 'defw'i) ws? dwords:dwords {
+    return res(dwords);
+}
+
 dbytes = db1:dbyte db2:(ws? ',' ws? dbytes)? {
     if (!Array.isArray(db1)) {
         db1 = [db1];
@@ -270,9 +275,57 @@ dbyte = ex:expr {
         }
         return bytes;
     } else if (!Array.isArray(ex)) {
+        if (typeof ex === 'number') {
+            return [ex & 0xff];
+        }
+        return ex;
+    }
+    const bytes = [];
+    for (let i = 0; i < ex.length; i++) {
+        if (typeof ex[i] === 'number') {
+            bytes.push(ex[i] & 0xff);
+        } else {
+            bytes.push(ex[i]);
+        }
+    }
+    return bytes;
+}
+
+dwords = dw1:dword dw2:(ws? ',' ws? dwords)? {
+    if (!Array.isArray(dw1)) {
+        dw1 = [dw1];
+    }
+    if (dw2) {
+        dw1 = dw1.concat(dw2[3]);
+    }
+    return dw1;
+}
+
+dword = ex:expr {
+    if (typeof ex === 'string') {
+        const bytes = [];
+        const utf8 = toUtf8(ex);
+        for (let i = 0; i < utf8.length; i += 2) {
+            bytes.push(utf8.charCodeAt(i + 1) || 0);
+            bytes.push(utf8.charCodeAt(i));
+        }
+        return bytes;
+    } else if (!Array.isArray(ex)) {
+        if (typeof ex === 'number') {
+            return [ex & 0xff, (ex >> 8) & 0xff];
+        }
         return [ex];
     } 
-    return ex;
+    const bytes = [];
+    for (let i = 0; i < ex.length; i++) {
+        if (typeof ex[i] === 'number') {
+            bytes.push(ex[i] & 0xff);
+            bytes.push((ex[i] >> 8) & 0xff);
+        } else {
+            bytes.push(ex[i]);
+        }
+    }
+    return bytes;
 }
 
 string = '"' str:(double_string_char*) '"' { return str.join(''); }
