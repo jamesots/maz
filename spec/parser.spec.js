@@ -577,6 +577,9 @@ describe('parser', function() {
         ['adc hl,hl', [0xed, 0x6a]],
         ['rld', [0xed, 0x6f]],
 
+        ['in (c)', [0xed, 0x70]],
+        ['in f,(c)', [0xed, 0x70]],
+        ['out (c),0', [0xed, 0x71]],
         ['sbc hl,sp', [0xed, 0x72]],
         ['ld ($1234),sp', [0xed, 0x73, 0x34, 0x12]],
         ['in a,(c)', [0xed, 0x78]],

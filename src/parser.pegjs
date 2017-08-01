@@ -536,9 +536,11 @@ code = ldir
     / out_c_cela
     / out_n_a
     / out_c_bdh
+    / out_c_0
     / in_cela_c
     / in_a_n
     / in_bdh_c
+    / in_c
     / exx
     / pfix
     / pfiy
@@ -983,11 +985,17 @@ jp_hl = 'jp'i ws '(' ws? 'hl'i ws? ')' {
 out_n_a = 'out'i ws '(' ws? expr:expr ws? ')' ws? ',' ws? 'a' {
     return res([0xd3].concat(expr8(expr)));
 }
-out_c_bdh = 'out'i ws '(' ws? 'c' ws? ')' ws? ',' ws? reg:bdh {
+out_c_bdh = 'out'i ws '(' ws? 'c'i ws? ')' ws? ',' ws? reg:bdh {
     return res([0xed, 0x41 | (reg << 4)]);
 }
-out_c_cela = 'out'i ws '(' ws? 'c' ws? ')' ws? ',' ws? reg:cela {
+out_c_cela = 'out'i ws '(' ws? 'c'i ws? ')' ws? ',' ws? reg:cela {
     return res([0xed, 0x49 | (reg << 4)]);
+}
+in_c = 'in'i ws ('f'? ws? ',' ws?)? '(' ws? 'c'i ws? ')' {
+    return res([0xed, 0x70]);
+}
+out_c_0 = 'out'i ws '(' ws? 'c'i ws? ')' ws? ',' ws? '0' {
+    return res([0xed, 0x71]);
 }
 in_a_n = 'in'i ws 'a' ws? ',' ws? '(' ws? expr:expr ws? ')' {
     return res([0xdb].concat(expr8(expr)));
