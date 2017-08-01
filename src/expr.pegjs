@@ -322,16 +322,16 @@ decimal_literal = [0-9][0-9_]* {
 hex_literal = '$' [0-9a-f]i[0-9a-f_]i* {
         return parseInt(text().replace(/[_\$]/g,''), 16);
     }
-    / [0-9][0-9a-f_]i* 'h' {
+    / [0-9][0-9a-f_]i* 'h'i {
         return parseInt(text().replace(/[_h]/g,''), 16)
     }
 binary_literal = '%' num:([01][01_]*) {
         return parseInt(text().replace(/[_%]/g,''), 2)
     }
-    / [01][01_]* 'b' {
+    / [01][01_]* 'b'i {
         return parseInt(text().replace(/[_b]/g,''), 2)
     }
-octal_literal = [0-7][0-7_]* 'o' {
+octal_literal = [0-7][0-7_]* 'o'i {
         return parseInt(text().replace(/[_o]/g,''), 8)
     }
 
@@ -377,7 +377,7 @@ unicode_escape_sequence = "u" digits:$([0-9a-f]i [0-9a-f]i [0-9a-f]i [0-9a-f]i) 
     }
 
 label = text1:[a-zA-Z] text2:[a-zA-Z0-9_]* !{
-        const text = text1 + text2.join('');
+        const text = (text1 + text2.join('')).toLowerCase();
         return (text === 'bc' || text === 'de' || text === 'hl' || text === 'sp');
     } {
         return text();
