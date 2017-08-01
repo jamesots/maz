@@ -286,6 +286,7 @@ single_string_char = !("'" / "\\" / "\n") . { return text(); }
 escape_sequence = char_escape_sequence
     / "0" ![0-9] { return "\0"; }
     / hex_escape_sequence
+    / unicode_escape_sequence
 
 char_escape_sequence = single_esc_char
     / non_escape_char
@@ -309,6 +310,10 @@ escape_char = single_esc_char
 hex_escape_sequence = "x" digits:$([0-9a-f]i [0-9a-f]i) {
         return String.fromCharCode(parseInt(digits, 16));
     }
+
+unicode_escape_sequence = "u" digits:$([0-9a-f]i [0-9a-f]i [0-9a-f]i [0-9a-f]i) {
+    return String.fromCodePoint(parseInt(digits, 16));
+}
 
 block = '.block'i {
     return {

@@ -27,6 +27,25 @@ Source files are expected to be encoded in UTF-8, and so all strings are process
     e2 84 a2     db "™"
     f0 9f 98 81  db "😁"
 
+Strings can be entered just like JavaScript strings. They can be enclosed in double or single quotes, and support the following escape sequences:
+
+|Code   |Output   |
+|-------|---------|
+|\0     | a NULL character (0) |
+|\'     | a single quote |
+|\"     | a double quote |
+|\\     | a backslash |
+|\n     | a newline (10) |
+|\r     | a carriage return (13) |
+|\v     | a vertical tab (11) |
+|\t     | a tab (9) |
+|\b     | a backspace (8) |
+|\f     | a formfeed (12) |
+|\xXX   | a Latin-1 character |
+|\uXXXX | a Unicode character |
+
+Note that although you can enter a latin character such as \xFF, because the string is encoded at UTF-8 it will actually be made up of two bytes: C3 BF.
+
 Labels
 ------
 

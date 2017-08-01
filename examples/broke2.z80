@@ -37,4 +37,10 @@ one: equ 100
     db "ß"
     db "™"
     db "😁"
+    db "\x00"
+    db "\x01"
+    db "\x7F"
+    db "\x80"
+    db "\xFF"
+    db "\uC3BF"
 end:
