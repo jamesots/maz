@@ -12,6 +12,7 @@ something:
     ld b,something
 
 ; just a comment
+    in f,(c)
 
     ld a,$
     db 1,2,$
@@ -25,6 +26,8 @@ two: equ $ + 1
 one: equ 100
 @bob: equ 200
     ld a, one
+
+    in f,(c)
 
 .endblock
 

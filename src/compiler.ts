@@ -28,6 +28,9 @@ export function compile(filename, options) {
         prog.evaluateSymbols();
         prog.checkSymbols();
         prog.updateBytes();
+        if (options.warnUndocumented) {
+            prog.warnUndocumented();
+        }
         return prog;
     } catch (e) {
         // if (options.trace) {
@@ -432,9 +435,10 @@ export class Programme {
         return collectedAst;
     }
 
-    public getList() {
+    public getList(warnUndoc: boolean) {
         const list = [];
         const ast = this.collectAst();
+        let undoc = false;
         for (const el of ast) {
             this.dumpLine(list, 
                 this.sources[el.location.source].source, 
@@ -443,18 +447,26 @@ export class Programme {
                 el.address, 
                 el.bytes, 
                 el.inMacro, 
-                el.ifTrue);
+                el.ifTrue,
+                warnUndoc && el.undoc);
+
+            undoc = undoc || el.undoc;
                 
             if (el.macrocall) {
-                list.push('          ' + ' '.repeat(BYTELEN * 2) + '* UNROLL MACRO')
+                list.push('          ' + ' '.repeat(BYTELEN * 2) + '  *UNROLL MACRO')
             }
 
             if (el.endinclude) {
-                list.push(`${pad(el.location.line + 1, 4)}                      * END INCLUDE ${this.sources[el.location.source].name}`);
+                list.push(`${pad(el.location.line + 1, 4)}                        *END INCLUDE ${this.sources[el.location.source].name}`);
             }
         }
 
         list.push('');
+
+        if (warnUndoc && undoc) {
+            list.push('Found undocumented instructions, marked with U')
+            list.push('');
+        }
 
         for (const symbol in this.symbols) {
             if (!symbol.startsWith('%')) {
@@ -465,7 +477,7 @@ export class Programme {
         return list;
     }
 
-    private dumpLine(list, lines, line, out, address, bytes, inMacro, ifTrue) {
+    private dumpLine(list, lines, line, out, address, bytes, inMacro, ifTrue, undoc) {
         let byteString = '';
         if (bytes) {
             for (const byte of bytes) {
@@ -484,9 +496,22 @@ export class Programme {
             addressString = 'xxxx';
             outString = 'xxxx';
         }
-        list.push(`${pad(line, 4)} ${address !== out?addressString + '@':''}${outString} ${padr(byteString, BYTELEN * 2).substring(0, BYTELEN * 2)} ${inMacro ? '*' : ' '}${lines[line - 1]}`);
+        list.push(`${pad(line, 4)} ${address !== out?addressString + '@':''}${outString} ${padr(byteString, BYTELEN * 2).substring(0, BYTELEN * 2)} ${undoc ? 'U' : ' '}${inMacro ? '*' : ' '}${lines[line - 1]}`);
         for (let i = BYTELEN * 2; i < byteString.length; i += BYTELEN * 2) {
             list.push(`          ${padr(byteString.substring(i, i + BYTELEN * 2), BYTELEN * 2).substring(0,BYTELEN * 2)}`)
+        }
+    }
+
+    public warnUndocumented() {
+        let lines = [];
+        this.iterateAst((el) => {
+            if (el.undoc) {
+                lines.push(el.location.line);
+            }
+        });
+        if (lines.length > 0) {
+            console.log("Undocumented instructions used on line" + (lines.length > 1 ? "s" : "") + " "
+                + lines.join(', '));
         }
     }
 

@@ -11,7 +11,8 @@ sourceMapSupport.install();
 const optionDefinitions = [
     { name: 'src', alias: 's', type: String, multiple: false, defaultOption: true },
     { name: 'out', alias: 'o', type: String, multiple: false },
-    { name: 'list', alias: 'l', type: String, multiple: false },
+    { name: 'list', alias: 'l', type: String, multiple: false},
+    { name: 'undoc', alias: 'u', type: Boolean, mutliple: false, description: 'Warn about undocumented instructions'},
     { name: 'help', alias: 'h', type: Boolean, multiple: false }
 ];
 const options = commandLineArgs(optionDefinitions);
@@ -42,7 +43,10 @@ console.log("         incompatible.");
 console.log(`Compiling ${options.src}`);
 
 try {
-    let prog = compiler.compile(options.src, {trace: false});
+    let prog = compiler.compile(options.src, {
+        trace: false,
+        warnUndocumented: options.undoc
+    });
     // console.log(JSON.stringify(ast, undefined, 2));
     // console.log(JSON.stringify(symbols, undefined, 2));
     const bytes = prog.getBytes();
@@ -51,7 +55,7 @@ try {
     fs.writeFileSync(options.out, Buffer.from(bytes));
     console.log(`Written ${bytes.length} ($${bytes.length.toString(16)}) bytes ${options.out}`);
     if (options.list) {
-        const list = prog.getList();
+        const list = prog.getList(options.undoc);
         const file = fs.openSync(options.list, 'w');
         for (const line of list) {
             fs.writeSync(file, line);
