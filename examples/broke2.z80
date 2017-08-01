@@ -37,6 +37,9 @@ one: equ 100
 
     db "ß™—hi¡😁"
 
+    jr one
+    jr end
+
     db "ß"
     db "™"
     db "😁"
