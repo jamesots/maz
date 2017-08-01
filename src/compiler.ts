@@ -437,9 +437,23 @@ export class Programme {
 
     public getList(warnUndoc: boolean) {
         const list = [];
+        const lastLines = [];
+        const sources = [];
+        let lastSource = 0;
+        let lastLine = 0;
         const ast = this.collectAst();
         let undoc = false;
         for (const el of ast) {
+            if (el.location.source !== lastSource) {
+                lastLines.push(lastLine);
+                sources.push(lastSource);
+            } else {
+                while (lastLine < el.location.line - 1) {
+                    lastLine++;
+                    list.push(pad(lastLine, 4));
+                }
+            }
+
             this.dumpLine(list, 
                 this.sources[el.location.source].source, 
                 el.location.line, 
@@ -458,6 +472,11 @@ export class Programme {
 
             if (el.endinclude) {
                 list.push(`${pad(el.location.line + 1, 4)}                        *END INCLUDE ${this.sources[el.location.source].name}`);
+                lastLine = lastLines.pop();
+                lastSource = sources.pop();
+            } else {
+                lastLine = el.location.line;
+                lastSource = el.location.source;
             }
         }
 
