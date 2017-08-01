@@ -1342,6 +1342,11 @@ describe('parser', function() {
             const result = parse(opcode[0]);
             expect(result[0].bytes).toEqual(opcode[1]);
         });
+        let caps = opcode[0].toUpperCase().replace('CHR', 'chr').replace('START', 'start');
+        it('should parse ' + caps, function() {;
+            const result = parse(caps);
+            expect(result[0].bytes).toEqual(opcode[1]);
+        });
     }
 
     it('should not parse ld (hl),(hl)', function() {
