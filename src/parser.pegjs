@@ -49,10 +49,11 @@
         };
     }
 
-    function res(bytes) {
+    function res(bytes, undocumented) {
         const result = {
             bytes: bytes,
-            location: loc()
+            location: loc(),
+            undoc: undocumented
         };
         const references = bytes.filter(byte => byte && byte.expression).map(byte => byte.expression);
         if (references.length > 0) {
@@ -555,8 +556,10 @@ code = ldir
     / bit_n_reg
     / bit_n_ixy
     / res_n_reg
+    / res_n_ixy_reg
     / res_n_ixy
     / set_n_reg
+    / set_n_ixy_reg
     / set_n_ixy
 
 push_ixy = 'push'i ws xy:ixiy {
@@ -584,109 +587,109 @@ ld_ixy_nn = 'ld'i ws xy:ixiy ws? ',' ws? expr:expr {
     return res([xy, 0x21].concat(expr16(expr)));
 }
 add_a_ixyhl = 'add'i ws 'a'i ws? ',' ws? xy:ixyhl {
-    return res([xy[0], 0x84 + xy[1]]);
+    return res([xy[0], 0x84 + xy[1]], true);
 }
 add_a_ixy = 'add'i ws 'a'i ws? ',' ws? '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
     return res([xy, 0x86].concat(expr8(expr)));
 }
 add_ixyhl = 'add'i ws ws? xy:ixyhl {
-    return res([xy[0], 0x84 + xy[1]]);
+    return res([xy[0], 0x84 + xy[1]], true);
 }
 add_ixy = 'add'i ws '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
     return res([xy, 0x86].concat(expr8(expr)));
 }
 adc_a_ixyhl = 'adc'i ws 'a'i ws? ',' ws? xy:ixyhl {
-    return res([xy[0], 0x8c + xy[1]]);
+    return res([xy[0], 0x8c + xy[1]], true);
 }
 adc_a_ixy = 'adc'i ws 'a'i ws? ',' ws? '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
     return res([xy, 0x8e].concat(expr8(expr)));
 }
 adc_ixyhl = 'adc'i ws xy:ixyhl {
-    return res([xy[0], 0x8c + xy[1]]);
+    return res([xy[0], 0x8c + xy[1]], true);
 }
 adc_ixy = 'adc'i ws '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
     return res([xy, 0x8e].concat(expr8(expr)));
 }
 sub_a_ixyhl = 'sub'i ws 'a'i ws? ',' ws? xy:ixyhl {
-    return res([xy[0], 0x94 + xy[1]]);
+    return res([xy[0], 0x94 + xy[1]], true);
 }
 sub_a_ixy = 'sub'i ws 'a'i ws? ',' ws? '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
     return res([xy, 0x96].concat(expr8(expr)));
 }
 sub_ixyhl = 'sub'i ws  ws? xy:ixyhl {
-    return res([xy[0], 0x94 + xy[1]]);
+    return res([xy[0], 0x94 + xy[1]], true);
 }
 sub_ixy = 'sub'i ws '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
     return res([xy, 0x96].concat(expr8(expr)));
 }
 sbc_a_ixyhl = 'sbc'i ws 'a'i ws? ',' ws? xy:ixyhl {
-    return res([xy[0], 0x9c + xy[1]]);
+    return res([xy[0], 0x9c + xy[1]], true);
 }
 sbc_a_ixy = 'sbc'i ws 'a'i ws? ',' ws? '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
     return res([xy, 0x9e].concat(expr8(expr)));
 }
 sbc_ixyhl = 'sbc'i ws ws? xy:ixyhl {
-    return res([xy[0], 0x9c + xy[1]]);
+    return res([xy[0], 0x9c + xy[1]], true);
 }
 sbc_ixy = 'sbc'i ws '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
     return res([xy, 0x9e].concat(expr8(expr)));
 }
 and_a_ixyhl = 'and'i ws 'a'i ws? ',' ws? xy:ixyhl {
-    return res([xy[0], 0xa4 + xy[1]]);
+    return res([xy[0], 0xa4 + xy[1]], true);
 }
 and_a_ixy = 'and'i ws 'a'i ws? ',' ws? '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
     return res([xy, 0xa6].concat(expr8(expr)));
 }
 and_ixyhl = 'and'i ws ws? xy:ixyhl {
-    return res([xy[0], 0xa4 + xy[1]]);
+    return res([xy[0], 0xa4 + xy[1]], true);
 }
 and_ixy = 'and'i ws '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
     return res([xy, 0xa6].concat(expr8(expr)));
 }
 xor_a_ixyhl = 'xor'i ws 'a'i ws? ',' ws? xy:ixyhl {
-    return res([xy[0], 0xac + xy[1]]);
+    return res([xy[0], 0xac + xy[1]], true);
 }
 xor_a_ixy = 'xor'i ws 'a'i ws? ',' ws? '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
     return res([xy, 0xae].concat(expr8(expr)));
 }
 xor_ixyhl = 'xor'i ws xy:ixyhl {
-    return res([xy[0], 0xac + xy[1]]);
+    return res([xy[0], 0xac + xy[1]], true);
 }
 xor_ixy = 'xor'i ws '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
     return res([xy, 0xae].concat(expr8(expr)));
 }
 or_a_ixyhl = 'or'i ws 'a'i ws? ',' ws? xy:ixyhl {
-    return res([xy[0], 0xb4 + xy[1]]);
+    return res([xy[0], 0xb4 + xy[1]], true);
 }
 or_a_ixy = 'or'i ws 'a'i ws? ',' ws? '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
     return res([xy, 0xb6].concat(expr8(expr)));
 }
 or_ixyhl = 'or'i ws ws? xy:ixyhl {
-    return res([xy[0], 0xb4 + xy[1]]);
+    return res([xy[0], 0xb4 + xy[1]], true);
 }
 or_ixy = 'or'i ws '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
     return res([xy, 0xb6].concat(expr8(expr)));
 }
 cp_a_ixyhl = 'cp'i ws 'a'i ws? ',' ws? xy:ixyhl {
-    return res([xy[0], 0xbc + xy[1]]);
+    return res([xy[0], 0xbc + xy[1]], true);
 }
 cp_a_ixy = 'cp'i ws 'a'i ws? ',' ws? '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
     return res([xy, 0xbe].concat(expr8(expr)));
 }
 cp_ixyhl = 'cp'i ws xy:ixyhl {
-    return res([xy[0], 0xbc + xy[1]]);
+    return res([xy[0], 0xbc + xy[1]], true);
 }
 cp_ixy = 'cp'i ws '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
     return res([xy, 0xbe].concat(expr8(expr)));
 }
 ld_bd_ixyhl = 'ld'i ws reg:bd ws? ',' ws? xy:ixyhl {
-    return res([xy[0], 0x44 + xy[1] + (reg << 4)]);
+    return res([xy[0], 0x44 + xy[1] + (reg << 4)], true);
 }
 ld_cea_ixyhl = 'ld'i ws reg:cea ws? ',' ws? xy:ixyhl {
-    return res([xy[0], 0x4c + xy[1] + (reg << 4)]);
+    return res([xy[0], 0x4c + xy[1] + (reg << 4)], true);
 }
 ld_ixyhl_bcdehla = 'ld'i ws xy:ixyhl ws? ',' ws? reg:bcdehla {
-    return res([xy[0], 0x60 + reg + (xy[1] << 3)]);
+    return res([xy[0], 0x60 + reg + (xy[1] << 3)], true);
 }
 ld_ixyaddr_bcdehla = 'ld'i ws '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' ws? ',' ws? reg:bcdehla {
     return res([xy, 0x70 + reg].concat(expr8(expr)));
@@ -698,10 +701,10 @@ ld_cela_ixy = 'ld'i ws reg:cela ws? ',' ws? '(' ws? xy:ixiy ws? '+' ws? expr:exp
     return res([xy, 0x4e + (reg << 4)].concat(expr8(expr)));
 }
 ld_ixyh_n = 'ld'i ws xy:ixhiyh ws? ',' ws? expr:expr {
-    return res([xy, 0x26].concat(expr8(expr)));
+    return res([xy, 0x26].concat(expr8(expr)), true);
 }
 ld_ixyl_n = 'ld'i ws xy:ixliyl ws? ',' ws? expr:expr {
-    return res([xy, 0x2e].concat(expr8(expr)));
+    return res([xy, 0x2e].concat(expr8(expr)), true);
 }
 ld_nn_ixy = 'ld'i ws '(' ws? expr:expr ws? ')' ws? ',' ws? xy:ixiy {
     return res([xy, 0x22].concat(expr16(expr)));
@@ -713,10 +716,10 @@ inc_ixy = 'inc'i ws xy:ixiy {
     return res([xy, 0x23]);
 }
 inc_ixyh = 'inc'i ws xy:ixhiyh {
-    return res([xy, 0x24]);
+    return res([xy, 0x24], true);
 }
 inc_ixyl = 'inc'i ws xy:ixliyl {
-    return res([xy, 0x2c]);
+    return res([xy, 0x2c], true);
 }
 dec_ixyaddr = 'dec'i ws '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' {
     return res([xy, 0x35].concat(expr8(expr)));
@@ -725,16 +728,16 @@ dec_ixy = 'dec'i ws xy:ixiy {
     return res([xy, 0x2b]);
 }
 dec_ixyh = 'dec'i ws xy:ixhiyh {
-    return res([xy, 0x25]);
+    return res([xy, 0x25], true);
 }
 dec_ixyl = 'dec'i ws xy:ixliyl {
-    return res([xy, 0x2d]);
+    return res([xy, 0x2d], true);
 }
 rlc_reg = 'rlc'i ws reg:reg {
     return res([0xcb, 0x00 + reg]);
 }
 rlc_ixy_reg = 'rlc'i ws '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' ws? ',' ws? reg:bcdehla {
-    return res([xy, 0xcb, 0x00 + reg].concat(expr8(expr)));
+    return res([xy, 0xcb, 0x00 + reg].concat(expr8(expr)), true);
 }
 rlc_ixy = 'rlc'i ws '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' {
     return res([xy, 0xcb, 0x06].concat(expr8(expr)));
@@ -743,7 +746,7 @@ rrc_reg = 'rrc'i ws reg:reg {
     return res([0xcb, 0x08 + reg]);
 }
 rrc_ixy_reg = 'rrc'i ws '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' ws? ',' ws? reg:bcdehla {
-    return res([xy, 0xcb, 0x08 + reg].concat(expr8(expr)));
+    return res([xy, 0xcb, 0x08 + reg].concat(expr8(expr)), true);
 }
 rrc_ixy = 'rrc'i ws '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' {
     return res([xy, 0xcb, 0x0e].concat(expr8(expr)));
@@ -752,7 +755,7 @@ rl_reg = 'rl'i ws reg:reg {
     return res([0xcb, 0x10 + reg]);
 }
 rl_ixy_reg = 'rl'i ws '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' ws? ',' ws? reg:bcdehla {
-    return res([xy, 0xcb, 0x10 + reg].concat(expr8(expr)));
+    return res([xy, 0xcb, 0x10 + reg].concat(expr8(expr)), true);
 }
 rl_ixy = 'rl'i ws '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' {
     return res([xy, 0xcb, 0x16].concat(expr8(expr)));
@@ -761,7 +764,7 @@ rr_reg = 'rr'i ws reg:reg {
     return res([0xcb, 0x18 + reg]);
 }
 rr_ixy_reg = 'rr'i ws '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' ws? ',' ws? reg:bcdehla {
-    return res([xy, 0xcb, 0x18 + reg].concat(expr8(expr)));
+    return res([xy, 0xcb, 0x18 + reg].concat(expr8(expr)), true);
 }
 rr_ixy = 'rr'i ws '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' {
     return res([xy, 0xcb, 0x1e].concat(expr8(expr)));
@@ -770,7 +773,7 @@ sla_reg = 'sla'i ws reg:reg {
     return res([0xcb, 0x20 + reg]);
 }
 sla_ixy_reg = 'sla'i ws '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' ws? ',' ws? reg:bcdehla {
-    return res([xy, 0xcb, 0x20 + reg].concat(expr8(expr)));
+    return res([xy, 0xcb, 0x20 + reg].concat(expr8(expr)), true);
 }
 sla_ixy = 'sla'i ws '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' {
     return res([xy, 0xcb, 0x26].concat(expr8(expr)));
@@ -779,25 +782,25 @@ sra_reg = 'sra'i ws reg:reg {
     return res([0xcb, 0x28 + reg]);
 }
 sra_ixy_reg = 'sra'i ws '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' ws? ',' ws? reg:bcdehla {
-    return res([xy, 0xcb, 0x28 + reg].concat(expr8(expr)));
+    return res([xy, 0xcb, 0x28 + reg].concat(expr8(expr)), true);
 }
 sra_ixy = 'sra'i ws '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' {
     return res([xy, 0xcb, 0x2e].concat(expr8(expr)));
 }
 sll_reg = 'sll'i ws reg:reg {
-    return res([0xcb, 0x30 + reg]);
+    return res([0xcb, 0x30 + reg], true);
 }
 sll_ixy_reg = 'sll'i ws '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' ws? ',' ws? reg:bcdehla {
-    return res([xy, 0xcb, 0x30 + reg].concat(expr8(expr)));
+    return res([xy, 0xcb, 0x30 + reg].concat(expr8(expr)), true);
 }
 sll_ixy = 'sll'i ws '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' {
-    return res([xy, 0xcb, 0x36].concat(expr8(expr)));
+    return res([xy, 0xcb, 0x36].concat(expr8(expr)), true);
 }
 srl_reg = 'srl'i ws reg:reg {
     return res([0xcb, 0x38 + reg]);
 }
 srl_ixy_reg = 'srl'i ws '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' ws? ',' ws? reg:bcdehla {
-    return res([xy, 0xcb, 0x38 + reg].concat(expr8(expr)));
+    return res([xy, 0xcb, 0x38 + reg].concat(expr8(expr)), true);
 }
 srl_ixy = 'srl'i ws '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' {
     return res([xy, 0xcb, 0x3e].concat(expr8(expr)));
@@ -820,6 +823,12 @@ res_n_reg = 'res'i ws n:n0246 ws? ',' ws? reg:reg {
     / 'res'i ws n:n1357 ws? ',' ws? reg:reg {
         return res([0xcb, 0x88 + reg + (n << 4)]);
     }
+res_n_ixy_reg = 'res'i ws n:n0246 ws? ',' ws? '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' ws? ',' ws? reg:bcdehla {
+        return res([xy, 0xcb, 0x80 + reg + (n << 4)].concat(expr8(expr)), true);
+    }
+    / 'res'i ws n:n1357 ws? ',' ws? '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' ws? ',' ws? reg:bcdehla {
+        return res([xy, 0xcb, 0x88 + reg + (n << 4)].concat(expr8(expr)), true);
+    }
 res_n_ixy = 'res'i ws n:n0246 ws? ',' ws? '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' {
         return res([xy, 0xcb, 0x86 + (n << 4)].concat(expr8(expr)));
     }
@@ -831,6 +840,12 @@ set_n_reg = 'set'i ws n:n0246 ws? ',' ws? reg:reg {
     }
     / 'set'i ws n:n1357 ws? ',' ws? reg:reg {
         return res([0xcb, 0xc8 + reg + (n << 4)]);
+    }
+set_n_ixy_reg = 'set'i ws n:n0246 ws? ',' ws? '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' ws? ',' ws? reg:bcdehla {
+        return res([xy, 0xcb, 0xc0 + reg + (n << 4)].concat(expr8(expr)), true);
+    }
+    / 'set'i ws n:n1357 ws? ',' ws? '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' ws? ',' ws? reg:bcdehla {
+        return res([xy, 0xcb, 0xc8 + reg + (n << 4)].concat(expr8(expr)), true);
     }
 set_n_ixy = 'set'i ws n:n0246 ws? ',' ws? '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' {
         return res([xy, 0xcb, 0xc6 + (n << 4)].concat(expr8(expr)));
@@ -992,10 +1007,10 @@ out_c_cela = 'out'i ws '(' ws? 'c'i ws? ')' ws? ',' ws? reg:cela {
     return res([0xed, 0x49 | (reg << 4)]);
 }
 in_c = 'in'i ws ('f'i? ws? ',' ws?)? '(' ws? 'c'i ws? ')' {
-    return res([0xed, 0x70]);
+    return res([0xed, 0x70], true);
 }
 out_c_0 = 'out'i ws '(' ws? 'c'i ws? ')' ws? ',' ws? '0' {
-    return res([0xed, 0x71]);
+    return res([0xed, 0x71], true);
 }
 in_a_n = 'in'i ws 'a'i ws? ',' ws? '(' ws? expr:expr ws? ')' {
     return res([0xdb].concat(expr8(expr)));
