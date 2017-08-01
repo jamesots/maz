@@ -32,9 +32,9 @@ Strings can be entered just like JavaScript strings. They can be enclosed in dou
 |Code   |Output   |
 |-------|---------|
 |\0     | a NULL character (0) |
-|\'     | a single quote |
-|\"     | a double quote |
-|\\     | a backslash |
+|\\'     | a single quote |
+|\\"     | a double quote |
+|\\\\     | a backslash |
 |\n     | a newline (10) |
 |\r     | a carriage return (13) |
 |\v     | a vertical tab (11) |
