@@ -17,6 +17,16 @@ Numbers are decimal unless one of the following applies:
 
 Numbers can have _ in them to improve readability: eg: 1101_0100_1010_1111b
 
+Strings
+-------
+
+Source files are expected to be encoded in UTF-8, and so all strings are processed as UTF-8 strings. Characters in the range 00-7F are the same as ASCII characters. Example:
+
+    68           db "h"
+    c3 9f        db "ß"
+    e2 84 a2     db "™"
+    f0 9f 98 81  db "😁"
+
 Labels
 ------
 

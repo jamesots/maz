@@ -1,6 +1,10 @@
 {
     const Expr = require('./expr');
 
+    function toUtf8(s) {
+        return unescape(encodeURIComponent(s));
+    }
+
     function exprVars(els, indices) {
         let varlist = [];
         if (els) {
@@ -259,8 +263,9 @@ dbytes = db1:dbyte db2:(ws? ',' ws? dbytes)? {
 dbyte = ex:expr {
     if (typeof ex === 'string') {
         const bytes = [];
-        for (let i = 0; i < ex.length; i++) {
-            bytes.push(ex.charCodeAt(i));
+        const utf8 = toUtf8(ex);
+        for (let i = 0; i < utf8.length; i++) {
+            bytes.push(utf8.charCodeAt(i));
         }
         return bytes;
     } else if (!Array.isArray(ex)) {

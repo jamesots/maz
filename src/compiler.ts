@@ -4,6 +4,8 @@ import * as parser from './parser';
 // import * as Tracer from 'pegjs-backtrace';
 import * as Expr from './expr';
 
+declare function unescape(s: string): string;
+
 const BYTELEN = 8;
 
 export function compile(filename, options) {
@@ -386,9 +388,10 @@ export class Programme {
                         const value = this.evaluateExpression(prefix, byte);
 
                         if (typeof value === 'string') {
+                            const utf8 = toUtf8(value);
                             let bytes = [];
-                            for (let i = 0; i < value.length; i++) {
-                                bytes.push(value.charCodeAt(i));
+                            for (let i = 0; i < utf8.length; i++) {
+                                bytes.push(utf8.charCodeAt(i));
                             }
                             el.bytes.splice(i, 1, ...bytes);
                         } else {
@@ -559,3 +562,6 @@ export function getWholePrefix(symbol) {
     return '';
 }
 
+function toUtf8(s) {
+    return unescape(encodeURIComponent(s));
+}

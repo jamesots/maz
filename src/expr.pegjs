@@ -1,6 +1,10 @@
 {
     let variables = options.variables;
 
+    function toUtf8(s) {
+        return unescape(encodeURIComponent(s));
+    }
+
     function lookupVar(term) {
         if (term.variable) {
             // console.log(`looking up ${term.variable}`);
@@ -34,10 +38,13 @@
     }
 
     function toNumber(term) {
-        if (typeof term === 'string' && term.length === 1) {
-            return term.charCodeAt(0);
-        } else if (typeof term === 'string' && term.length === 2) {
-            return term.charCodeAt(0) * 256 + term.charCodeAt(1);
+        if (typeof term === 'string') {
+            const utf8 = toUtf8(term);
+            if (utf8.length === 1) {
+                return utf8.charCodeAt(0);
+            } else if (utf8.length === 2) {
+                return utf8.charCodeAt(0) * 256 + utf8.charCodeAt(1);
+            }
         }
         if (typeof term === 'number') {
             return term;
