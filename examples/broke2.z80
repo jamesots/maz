@@ -58,6 +58,8 @@ jumpforward:
     db "\x80"
     db "\xFF"
     db "\uC3BF"
+a1: equ a2
+a2: equ a1
 
     ; ld a,"hello" * $
 ; end:

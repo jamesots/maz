@@ -159,7 +159,7 @@ export class Programme {
             if (el.include && !el.included) {
                 const filename = path.join(this.dir, el.include);
                 if (!fs.existsSync(filename)) {
-                    this.error("File does not exist", el.location);
+                    this.error("File does not exist: " + filename, el.location);
                     el.included = true;
                     return;
                 }
@@ -648,6 +648,8 @@ export class Programme {
                 console.log('  > ' + e.source);
                 console.log('  > ' + ' '.repeat(e.location.column - 1) + '^');
             }
+        } else if (e.message) {
+            console.log(chalk.red(e.message));
         } else {
             console.log(chalk.red(e));
         }        
