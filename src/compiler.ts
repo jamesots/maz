@@ -396,7 +396,7 @@ export class Programme {
         for (const variable of variables) {
             const subVar = this.findVariable(prefix, variable);
 
-            if (this.symbols[subVar] === undefined) {
+            if (this.symbols[subVar] === undefined || this.symbols[subVar] === null) {
                 this.error(`Symbol '${variable}' not found`, expr.location);
                 subVars[variable] = 0;
             } else {

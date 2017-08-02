@@ -56,9 +56,8 @@ describe('compiler', function() {
             {label: 'one'},
             {label: 'one'},
         ];
-        expect(function() {
-            prog.getSymbols();
-        }).toThrow();
+        prog.getSymbols();
+        expect(prog.errors.length).toBe(1);
     });
     it('should not allow symbol to repeat in a block', function() {
         prog.ast = [
@@ -67,9 +66,8 @@ describe('compiler', function() {
             {label: 'one'},
             {endblock: true}
         ];
-        expect(function() {
-            prog.getSymbols();
-        }).toThrow();
+        prog.getSymbols();
+        expect(prog.errors.length).toBe(1);
     });
     it('should get symbols in two blocks', function() {
         prog.ast = [
@@ -294,9 +292,8 @@ describe('compiler', function() {
             one: null,
             two: null,
         }
-        expect(function() {
-            prog.assignPCandEQU();
-        }).toThrow();
+        prog.assignPCandEQU();
+        expect(prog.errors.length).toBe(1);
     });
     it('should evaluate ORG expressions where possible', function() {
         prog.ast = [
@@ -348,9 +345,8 @@ describe('compiler', function() {
             one: null,
             two: null,
         }
-        expect(function() {
-            prog.assignPCandEQU();
-        }).toThrow();
+        prog.assignPCandEQU();
+        expect(prog.errors.length).toBe(1);
     });
     it('should evaluate PHASE expressions where possible', function() {
         prog.ast = [
@@ -402,9 +398,8 @@ describe('compiler', function() {
             one: null,
             two: null,
         }
-        expect(function() {
-            prog.assignPCandEQU();
-        }).toThrow();
+        prog.assignPCandEQU();
+        expect(prog.errors.length).toBe(1);
     });
     it('should evaluate ALIGN expressions where possible', function() {
         prog.ast = [
@@ -459,9 +454,8 @@ describe('compiler', function() {
             two: {expression: 'three', vars: ['three']},
             three: {expression: 'two', vars: ['two']}
         };
-        expect(function() {
-             prog.evaluateSymbols();
-        }).toThrow();
+        prog.evaluateSymbols();
+        expect(prog.errors.length).toBe(1);
     });
     it('should evaluate symbols with scope', function() {
         prog.symbols = {
@@ -581,9 +575,8 @@ describe('compiler', function() {
             { macrodef: 'thing' },
             { endmacro: true }
         ];
-        expect(function() {
-            const macros = prog.getMacros();
-        }).toThrow();
+        const macros = prog.getMacros();
+        expect(prog.errors.length).toBe(1);
     });
     it('should find macros with content', function() {
         prog.ast = [
@@ -622,25 +615,22 @@ describe('compiler', function() {
             { endmacro: true },
             { endmacro: true }
         ];
-        expect(function() {
-            prog.getMacros();
-        }).toThrow();
+        prog.getMacros();
+        expect(prog.errors.length).toBe(2);
     });
     it('should not like macros which don\'t end', function() {
         prog.ast = [
             { macrodef: 'thing2' },
         ];
-        expect(function() {
-            prog.getMacros();
-        }).toThrow();
+        prog.getMacros();
+        expect(prog.errors.length).toBe(1);
     });
     it('should not like macros which don\'t start', function() {
         prog.ast = [
             { endmacro: true },
         ];
-        expect(function() {
-            prog.getMacros();
-        }).toThrow();
+        prog.getMacros();
+        expect(prog.errors.length).toBe(1);
     });
     it('should expand macros', function() {
         prog.ast = [
@@ -767,8 +757,7 @@ describe('compiler', function() {
             { bytes: [4,5,6], out: 0 },
             { bytes: [7,8,9], out: 7 },
         ];
-        expect(function() {
-            const bytes = prog.getBytes();
-        }).toThrow();
+        const bytes = prog.getBytes();
+        expect(prog.errors.length).toBe(1);
     });
 });

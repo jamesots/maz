@@ -7,7 +7,7 @@ describe('parser', function() {
     function parse(text) {
         const tracer = new Tracer(text);
         try {
-            return parser.parse(text, { trace: true, tracer: tracer, source: 0});
+            return parser.parse(text, { trace: true, tracer: tracer, source: 0, line: 1});
         } catch (e) {
             console.log(tracer.getBacktraceString());
             throw e;
