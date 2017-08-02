@@ -127,8 +127,6 @@ export class Programme {
 
             if (el.macrodef) {
                 inMacro = true;
-            } else if (el.endmacro) {
-                inMacro = false;
             }
 
             if (el.if !== undefined) {
@@ -146,6 +144,10 @@ export class Programme {
 
             if (ignoreIf || ifStack[ifStack.length - 1]) {
                 func(el, i, prefixes[prefixes.length - 1] || '', inMacro, ifStack[ifStack.length - 1]);
+            }
+
+            if (el.endmacro) {
+                inMacro = false;
             }
         }    
     }
@@ -253,7 +255,7 @@ export class Programme {
                 nextBlock++;
             } else if (el.endblock || el.endmacrocall) {
                 blocks.pop();
-            } else if (el.macrocall) {
+            } else if (el.macrocall && !inMacro) {
                 blocks.push(nextBlock);
                 el.prefix = labelPrefix(blocks);
                 nextBlock++;
@@ -306,7 +308,7 @@ export class Programme {
 
     public expandMacros() {
         this.iterateAst((el, i, prefix, inMacro) => {
-            if (el.macrocall) {
+            if (el.macrocall && !inMacro) {
                 const macro = this.macros[el.macrocall];
                 if (!macro) {
                     this.error(`Unknown instruction/macro '${el.macrocall}'`, el.location);
@@ -568,7 +570,7 @@ export class Programme {
                 (warnUndoc && el.undoc) ? 'U' :
                 el.error ? 'E' : ' ');
                 
-            if (el.macrocall) {
+            if (el.macrocall && !el.inMacro) {
                 list.push('           ' + ' '.repeat(BYTELEN * 2) + '  *UNROLL MACRO')
             }
 

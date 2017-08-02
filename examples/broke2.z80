@@ -61,5 +61,15 @@ jumpforward:
 a1: equ a2
 a2: equ a1
 
+macro a1
+    a2
+endm
+
+macro a2
+    db "hey"
+endm
+
+    a1
+
     ; ld a,"hello" * $
 ; end:
