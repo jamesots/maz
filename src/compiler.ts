@@ -616,13 +616,13 @@ export class Programme {
             console.log(`Syntax error`);
             console.log(e.message);
             console.log(`${e.filename}:${e.location.start.line}`);
-            console.log('> ' + e.source);
-            console.log('> ' + ' '.repeat(e.location.start.column - 1) + '^');
+            console.log('  > ' + e.source);
+            console.log('  > ' + ' '.repeat(e.location.start.column - 1) + '^');
         } else if (e.location) {
             console.log(e.message);
             console.log(`${e.filename}:${e.location.line}`);
-            console.log('> ' + e.source);
-            console.log('> ' + ' '.repeat(e.location.column - 1) + '^');
+            console.log('  > ' + e.source);
+            console.log('  > ' + ' '.repeat(e.location.column - 1) + '^');
         } else {
             console.log(e);
         }        

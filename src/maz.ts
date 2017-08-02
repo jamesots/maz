@@ -40,19 +40,24 @@ console.log("         warning, and future versions will probably be completely")
 console.log("         incompatible.");
 
 
-console.log(`Compiling ${options.src}`);
+console.log(`Assembling ${options.src}`);
 
 let prog = compiler.compile(options.src, {
     trace: false,
     warnUndocumented: options.undoc
 });
-// console.log(JSON.stringify(ast, undefined, 2));
-// console.log(JSON.stringify(symbols, undefined, 2));
-const bytes = prog.getBytes();
-// console.log(JSON.stringify(bytes, undefined, 2));
+if (prog.errors.length === 0) {
+    // console.log(JSON.stringify(ast, undefined, 2));
+    // console.log(JSON.stringify(symbols, undefined, 2));
+    const bytes = prog.getBytes();
+    // console.log(JSON.stringify(bytes, undefined, 2));
 
-fs.writeFileSync(options.out, Buffer.from(bytes));
-console.log(`Written ${bytes.length} ($${bytes.length.toString(16)}) bytes ${options.out}`);
+    fs.writeFileSync(options.out, Buffer.from(bytes));
+    console.log(`Written ${bytes.length} ($${bytes.length.toString(16)}) bytes ${options.out}`);
+} else {
+    console.log(`${prog.errors.length} error${prog.errors.length > 1 ? 's' : ''} found`);
+    process.exitCode = 64;
+}
 if (options.list) {
     const list = prog.getList(options.undoc);
     const file = fs.openSync(options.list, 'w');
