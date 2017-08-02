@@ -18,7 +18,7 @@ export function compile(filename, options) {
     //     parserOptions.tracer = tracer;
     // }
     try {
-        const prog = new Programme();
+        const prog = new Programme(options);
         prog.parse(filename);
         prog.processIncludes();
         prog.getMacros();
@@ -49,6 +49,8 @@ export class Programme {
     public dir: string;
     public macros = {};
     public errors = [];
+
+    constructor(private options) {}
 
     public parse(filename) {
         const code = this.readSource(filename);
@@ -613,16 +615,24 @@ export class Programme {
 
     public logError(e) {
         if (e.name === "SyntaxError") {
-            console.log(`Syntax error`);
-            console.log(e.message);
-            console.log(`${e.filename}:${e.location.start.line}`);
-            console.log('  > ' + e.source);
-            console.log('  > ' + ' '.repeat(e.location.start.column - 1) + '^');
+            if (this.options.brief) {
+                console.log(`${e.filename}:${e.location.start.line},${e.location.start.column}: Syntax error — ${e.message}`);
+            } else {
+                console.log(`Syntax error`);
+                console.log(e.message);
+                console.log(`  ${e.filename}:${e.location.start.line}`);
+                console.log('  > ' + e.source);
+                console.log('  > ' + ' '.repeat(e.location.start.column - 1) + '^');
+            }
         } else if (e.location) {
-            console.log(e.message);
-            console.log(`${e.filename}:${e.location.line}`);
-            console.log('  > ' + e.source);
-            console.log('  > ' + ' '.repeat(e.location.column - 1) + '^');
+            if (this.options.brief) {
+                console.log(`${e.filename}:${e.location.line},${e.location.column}: ${e.message}`);
+            } else {
+                console.log(e.message);
+                console.log(`  ${e.filename}:${e.location.line}`);
+                console.log('  > ' + e.source);
+                console.log('  > ' + ' '.repeat(e.location.column - 1) + '^');
+            }
         } else {
             console.log(e);
         }        

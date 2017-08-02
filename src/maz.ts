@@ -12,6 +12,7 @@ const optionDefinitions = [
     { name: 'src', alias: 's', type: String, multiple: false, defaultOption: true },
     { name: 'out', alias: 'o', type: String, multiple: false },
     { name: 'list', alias: 'l', type: String, multiple: false},
+    { name: 'brief', alias: 'b', type: Boolean, multiple: false, description: 'Show brief errors'},
     { name: 'undoc', alias: 'u', type: Boolean, mutliple: false, description: 'Warn about undocumented instructions'},
     { name: 'help', alias: 'h', type: Boolean, multiple: false }
 ];
@@ -20,7 +21,7 @@ const options = commandLineArgs(optionDefinitions);
 function showUsage() {
     console.log(commandLineUsage([
         {
-            header: 'MAZ v0.1.0',
+            header: 'MAZ v0.3.0',
             content: 'Macro Assembler for Z80'
         },
         {
@@ -34,7 +35,7 @@ if (!options.src || !options.out || options.help) {
     process.exit(-1);
 }
 
-console.log("MAZ v0.1.1");
+console.log("MAZ v0.3.0");
 console.log("WARNING: maz is under development, and likely to break without");
 console.log("         warning, and future versions will probably be completely");
 console.log("         incompatible.");
@@ -44,7 +45,8 @@ console.log(`Assembling ${options.src}`);
 
 let prog = compiler.compile(options.src, {
     trace: false,
-    warnUndocumented: options.undoc
+    warnUndocumented: options.undoc,
+    brief: options.brief
 });
 if (prog.errors.length === 0) {
     // console.log(JSON.stringify(ast, undefined, 2));
@@ -58,7 +60,7 @@ if (prog.errors.length === 0) {
     console.log(`${prog.errors.length} error${prog.errors.length > 1 ? 's' : ''} found`);
     process.exitCode = 64;
 }
-if (options.list) {
+if (options.list !== undefined) {
     const list = prog.getList(options.undoc);
     const file = fs.openSync(options.list, 'w');
     for (const line of list) {
@@ -66,5 +68,5 @@ if (options.list) {
         fs.writeSync(file, '\n');
     }
     fs.closeSync(file);
+    console.log(`List written to ${options.list}`);
 }
-console.log(`List written to ${options.list}`);
