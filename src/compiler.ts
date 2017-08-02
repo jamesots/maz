@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as parser from './parser';
 // import * as Tracer from 'pegjs-backtrace';
 import * as Expr from './expr';
+import * as chalk from 'chalk';
 
 declare function unescape(s: string): string;
 
@@ -618,8 +619,8 @@ export class Programme {
             if (this.options.brief) {
                 console.log(`${e.filename}:${e.location.start.line},${e.location.start.column}: Syntax error — ${e.message}`);
             } else {
-                console.log(`Syntax error`);
-                console.log(e.message);
+                console.log(chalk.red(`Syntax error`));
+                console.log(chalk.red(e.message));
                 console.log(`  ${e.filename}:${e.location.start.line}`);
                 console.log('  > ' + e.source);
                 console.log('  > ' + ' '.repeat(e.location.start.column - 1) + '^');
@@ -628,13 +629,13 @@ export class Programme {
             if (this.options.brief) {
                 console.log(`${e.filename}:${e.location.line},${e.location.column}: ${e.message}`);
             } else {
-                console.log(e.message);
+                console.log(chalk.red(e.message));
                 console.log(`  ${e.filename}:${e.location.line}`);
                 console.log('  > ' + e.source);
                 console.log('  > ' + ' '.repeat(e.location.column - 1) + '^');
             }
         } else {
-            console.log(e);
+            console.log(chalk.red(e));
         }        
     }
 
