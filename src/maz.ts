@@ -42,42 +42,24 @@ console.log("         incompatible.");
 
 console.log(`Compiling ${options.src}`);
 
-try {
-    let prog = compiler.compile(options.src, {
-        trace: false,
-        warnUndocumented: options.undoc
-    });
-    // console.log(JSON.stringify(ast, undefined, 2));
-    // console.log(JSON.stringify(symbols, undefined, 2));
-    const bytes = prog.getBytes();
-    // console.log(JSON.stringify(bytes, undefined, 2));
+let prog = compiler.compile(options.src, {
+    trace: false,
+    warnUndocumented: options.undoc
+});
+// console.log(JSON.stringify(ast, undefined, 2));
+// console.log(JSON.stringify(symbols, undefined, 2));
+const bytes = prog.getBytes();
+// console.log(JSON.stringify(bytes, undefined, 2));
 
-    fs.writeFileSync(options.out, Buffer.from(bytes));
-    console.log(`Written ${bytes.length} ($${bytes.length.toString(16)}) bytes ${options.out}`);
-    if (options.list) {
-        const list = prog.getList(options.undoc);
-        const file = fs.openSync(options.list, 'w');
-        for (const line of list) {
-            fs.writeSync(file, line);
-            fs.writeSync(file, '\n');
-        }
-        fs.closeSync(file);
+fs.writeFileSync(options.out, Buffer.from(bytes));
+console.log(`Written ${bytes.length} ($${bytes.length.toString(16)}) bytes ${options.out}`);
+if (options.list) {
+    const list = prog.getList(options.undoc);
+    const file = fs.openSync(options.list, 'w');
+    for (const line of list) {
+        fs.writeSync(file, line);
+        fs.writeSync(file, '\n');
     }
-    console.log(`List written to ${options.list}`);
-
-} catch (e) {
-    if (e.name === "SyntaxError") {
-        console.log(`Syntax error`);
-        console.log(e.message);
-        console.log(`${e.filename}:${e.location.start.line}`);
-        console.log('> ' + e.source);
-        console.log('> ' + ' '.repeat(e.location.start.column - 1) + '^');
-    } else if (e.location) {
-        console.log(e.message);
-        console.log(`${e.filename}:${e.location.line}`);
-        console.log('> ' + e.source);
-        console.log('> ' + ' '.repeat(e.location.column - 1) + '^');
-    } else {
-        console.log(e);
-    }
+    fs.closeSync(file);
 }
+console.log(`List written to ${options.list}`);

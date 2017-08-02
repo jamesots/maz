@@ -43,7 +43,7 @@
 
     function loc() {
         return {
-            line: location().start.line,
+            line: options.line,
             column: location().start.column,
             source: options.source
         };

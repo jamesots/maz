@@ -36,6 +36,7 @@ export function compile(filename, options) {
         // if (options.trace) {
         //     // console.log(tracer.getBacktraceString());
         // } else {
+            console.log(JSON.stringify(e, undefined, 2));
             throw e;
         // }
     }
@@ -47,18 +48,63 @@ export class Programme {
     public sources = [];
     public dir: string;
     public macros = {};
+    public errors = [];
 
     public parse(filename) {
         const code = this.readSource(filename);
-        this.ast = parser.parse(code, {source: 0});        
+        this.ast = this.parseLines(code, 0);
+    }
+
+    private parseLines(lines, sourceIndex) {
+        let ast = [];
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            try {
+                const els = parser.parse(line, {source: sourceIndex, line: i + 1});
+                if (els !== null) {
+                    ast = ast.concat(els);
+                }
+            } catch (e) {
+                if (e.name === 'SyntaxError') {
+                    ast.push({
+                        error: e.message,
+                        filename: e.filename,
+                        location: {
+                            line: i + 1,
+                            column: e.location.start.column,
+                            source: sourceIndex
+                        }
+                    });
+                } else if (e.location) {
+                    ast.push({
+                        error: e.message,
+                        filename: e.filename,
+                        location: e.location
+                    });
+                } else {
+                    ast.push({
+                        error: e,
+                        location: {
+                            source: sourceIndex,
+                            line: i + 1,
+                            column: 0
+                        }
+                    });
+                }
+                e.filename = this.sources[sourceIndex].name;
+                e.source = this.sources[sourceIndex].source[i]
+                this.logError(e);
+            }
+        }
+        return ast;
     }
 
     private readSource(filename) {
         this.dir = path.dirname(filename);
-        const source = fs.readFileSync(filename).toString();
+        const source = fs.readFileSync(filename).toString().split('\n');
         this.sources.push({
             name: filename,
-            source: source.split('\n')
+            source: source
         });
         return source;
     }
@@ -111,12 +157,14 @@ export class Programme {
                 const filename = path.join(this.dir, el.include);
                 if (!fs.existsSync(filename)) {
                     this.error("File does not exist", el.location);
+                    el.included = true;
+                    return;
                 }
                 const source = this.readSource(filename);
                 dirs.push(this.dir);
                 sourceIndices.push(sourceIndex);
                 sourceIndex = this.sources.length - 1;
-                const includeAst = parser.parse(source, {source: sourceIndex}) || [];
+                const includeAst = this.parseLines(source, sourceIndex);
                 this.ast.splice(i + 1, 0, ...includeAst);
                 this.ast.splice(i + 1 + includeAst.length, 0, {
                     endinclude: sourceIndex,
@@ -142,6 +190,7 @@ export class Programme {
             if (el.macrodef) {
                 if (macro) {
                     this.error("Cannot nest macros", el.location);
+                    return;
                 }
                 macroLocation = el.location;
                 macroName = el.macrodef;
@@ -151,10 +200,12 @@ export class Programme {
                 };
                 if (this.macros[macroName]) {
                     this.error(`Already defined macro '${macroName}'`, el.location);
+                    return;
                 }
             } else if (el.endmacro) {
                 if (!macro) {
                     this.error("Not in a macro", el.location);
+                    return;
                 }
                 this.macros[macroName] = macro;
                 macro = undefined;
@@ -182,12 +233,14 @@ export class Programme {
                 if (blocks.length > 0 && !el.public) {
                     if (typeof this.symbols[labelName(blocks, el.label)] !== 'undefined') {
                         this.error(`Label '${el.label}' already defined at in this block`, el.location);
+                        return;
                     }
                     this.symbols[labelName(blocks, el.label)] = null;
                     el.label = labelName(blocks, el.label);
                 } else {
                     if (typeof this.symbols[el.label] !== 'undefined') {
                         this.error(`Label '${el.label}' already defined`, el.location);
+                        return;
                     }
                     this.symbols[el.label] = null;
                 }
@@ -219,22 +272,33 @@ export class Programme {
                     }
                 } else {
                     this.error("EQU has no label", el.location);
+                    return;
                 }
             }
         });
         if (blocks.length !== 0) {
-            throw "Mismatch between .block and .endblock statements";
+            this.error("Mismatch between .block and .endblock statements");
         }
         return this.symbols;
     }
 
-    private error(message, location): never {
-        throw {
-            message: message,
-            location: location,
-            source: this.sources[location.source].source[location.line - 1],
-            filename: this.sources[location.source].name
-        };
+    private error(message, location?) {
+        if (location !== undefined) {
+            const error = {
+                message: message,
+                location: location,
+                source: this.sources[location.source].source[location.line - 1],
+                filename: this.sources[location.source].name
+            };
+            this.errors.push(error);
+            this.logError(error);
+        } else {
+            const error = {
+                message: message
+            };
+            this.errors.push(error);
+            this.logError(error);
+        }
     }
 
     public expandMacros() {
@@ -243,6 +307,9 @@ export class Programme {
                 const macro = this.macros[el.macrocall];
                 if (!macro) {
                     this.error(`Unknown instruction/macro '${el.macrocall}'`, el.location);
+                    el.params = [];
+                    el.expanded = true;
+                    return;
                 }
                 el.params = JSON.parse(JSON.stringify(macro.params));
                 el.expanded = true;
@@ -328,11 +395,13 @@ export class Programme {
 
             if (this.symbols[subVar] === undefined) {
                 this.error(`Symbol '${variable}' not found`, expr.location);
+                subVars[variable] = 0;
+            } else {
+                if (this.symbols[subVar].expression) {
+                    this.evaluateSymbol(subVar, evaluated);
+                }
+                subVars[variable] = this.symbols[subVar];
             }
-            if (this.symbols[subVar].expression) {
-                this.evaluateSymbol(subVar, evaluated);
-            }
-            subVars[variable] = this.symbols[subVar];
         }
         return Expr.parse(expr.expression, {variables: subVars});
     }
@@ -340,6 +409,7 @@ export class Programme {
     private evaluateSymbol(symbol, evaluated) {
         if (evaluated.indexOf(symbol) !== -1) {
             this.error(`Circular symbol dependency while evaluating '${symbol}'`, this.symbols[symbol].location);
+            return;
         }
         evaluated.push(symbol);
         const prefix = getWholePrefix(symbol);
@@ -376,7 +446,7 @@ export class Programme {
     public checkSymbols() {
         for (const symbol in this.symbols) {
             if (this.symbols[symbol].expression) {
-                throw `Symbol '${symbol}' cannot be calculated`;
+                this.error(`Symbol '${symbol}' cannot be calculated`);
             }
         }
     }
@@ -435,6 +505,16 @@ export class Programme {
         return collectedAst;
     }
 
+    public collectErrors(ast) {
+        for (const el of ast) {
+            for (const error of this.errors) {
+                if ((error.location !== undefined) && (el.location.line === error.location.line) && (el.location.source === error.location.source)) {
+                    el.error = error;
+                }
+            }
+        }
+    }
+
     public getList(warnUndoc: boolean) {
         const list = [];
         const lastLines = [];
@@ -442,17 +522,23 @@ export class Programme {
         let lastSource = 0;
         let lastLine = 0;
         const ast = this.collectAst();
+        this.collectErrors(ast);
         let undoc = false;
+        let error = false;
         for (const el of ast) {
             if (el.location.source !== lastSource) {
                 lastLines.push(lastLine);
                 sources.push(lastSource);
             } else {
                 while (lastLine < el.location.line - 1) {
+                    //TODO don't insert extra lines after a macro
                     lastLine++;
-                    list.push(pad(lastLine, 4));
+                    list.push(' ' + pad(lastLine, 4));
                 }
             }
+
+            undoc = undoc || el.undoc;
+            error = error || el.error;
 
             this.dumpLine(list, 
                 this.sources[el.location.source].source, 
@@ -462,16 +548,15 @@ export class Programme {
                 el.bytes, 
                 el.inMacro, 
                 el.ifTrue,
-                warnUndoc && el.undoc);
-
-            undoc = undoc || el.undoc;
+                (warnUndoc && el.undoc) ? 'U' :
+                el.error ? 'E' : ' ');
                 
             if (el.macrocall) {
-                list.push('          ' + ' '.repeat(BYTELEN * 2) + '  *UNROLL MACRO')
+                list.push('           ' + ' '.repeat(BYTELEN * 2) + '  *UNROLL MACRO')
             }
 
             if (el.endinclude) {
-                list.push(`${pad(el.location.line + 1, 4)}                        *END INCLUDE ${this.sources[el.location.source].name}`);
+                list.push(` ${pad(el.location.line + 1, 4)}                        *END INCLUDE ${this.sources[el.location.source].name}`);
                 lastLine = lastLines.pop();
                 lastSource = sources.pop();
             } else {
@@ -483,7 +568,12 @@ export class Programme {
         list.push('');
 
         if (warnUndoc && undoc) {
-            list.push('Found undocumented instructions, marked with U')
+            list.push('U = Undocumented instruction')
+        }
+        if (error) {
+            list.push('E = Error');
+        }
+        if ((warnUndoc && undoc) || error) {
             list.push('');
         }
 
@@ -496,7 +586,7 @@ export class Programme {
         return list;
     }
 
-    private dumpLine(list, lines, line, out, address, bytes, inMacro, ifTrue, undoc) {
+    private dumpLine(list, lines, line, out, address, bytes, inMacro, ifTrue, letter = ' ') {
         let byteString = '';
         if (bytes) {
             for (const byte of bytes) {
@@ -515,10 +605,27 @@ export class Programme {
             addressString = 'xxxx';
             outString = 'xxxx';
         }
-        list.push(`${pad(line, 4)} ${address !== out?addressString + '@':''}${outString} ${padr(byteString, BYTELEN * 2).substring(0, BYTELEN * 2)} ${undoc ? 'U' : ' '}${inMacro ? '*' : ' '}${lines[line - 1]}`);
+        list.push(`${letter}${pad(line, 4)} ${address !== out?addressString + '@':''}${outString} ${padr(byteString, BYTELEN * 2).substring(0, BYTELEN * 2)}  ${inMacro ? '*' : ' '}${lines[line - 1]}`);
         for (let i = BYTELEN * 2; i < byteString.length; i += BYTELEN * 2) {
-            list.push(`          ${padr(byteString.substring(i, i + BYTELEN * 2), BYTELEN * 2).substring(0,BYTELEN * 2)}`)
+            list.push(`           ${padr(byteString.substring(i, i + BYTELEN * 2), BYTELEN * 2).substring(0,BYTELEN * 2)}`)
         }
+    }
+
+    public logError(e) {
+        if (e.name === "SyntaxError") {
+            console.log(`Syntax error`);
+            console.log(e.message);
+            console.log(`${e.filename}:${e.location.start.line}`);
+            console.log('> ' + e.source);
+            console.log('> ' + ' '.repeat(e.location.start.column - 1) + '^');
+        } else if (e.location) {
+            console.log(e.message);
+            console.log(`${e.filename}:${e.location.line}`);
+            console.log('> ' + e.source);
+            console.log('> ' + ' '.repeat(e.location.column - 1) + '^');
+        } else {
+            console.log(e);
+        }        
     }
 
     public warnUndocumented() {

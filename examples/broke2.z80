@@ -3,7 +3,7 @@ zero: equ %1011
     db 1,2,$
     ld a,zero
 
-.include "another_dir/test.z80"
+.include "another_dir/test.z80s"
 
 .if "a" ge "b"
     ld a,one
@@ -17,7 +17,7 @@ something:
     ld a,$
     db 1,2,$
 .else
-    db 123
+    d b 123
 .endif
 one: equ $
 two: equ $ + 1
@@ -26,6 +26,7 @@ two: equ $ + 1
 one: equ 100
 @bob: equ 200
     ld a, one
+    db 1, 5 + end, 2
 
     in f,(c)
 
@@ -49,4 +50,4 @@ one: equ 100
     db "\x80"
     db "\xFF"
     db "\uC3BF"
-end:
+; end:
