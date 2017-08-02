@@ -55,9 +55,9 @@
             location: loc(),
             undoc: undocumented
         };
-        const references = bytes.filter(byte => byte && byte.expression).map(byte => byte.expression);
+        const references = bytes.filter(byte => byte && (byte.expression || (byte.relative !== undefined)));
         if (references.length > 0) {
-            result.references = references;
+            result.references = true;
         }
         return result;
     }

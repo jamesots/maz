@@ -460,6 +460,20 @@ export class Programme {
                 this.symbols['$'] = el.address;
                 for (let i = 0; i < el.bytes.length; i++) {
                     const byte = el.bytes[i];
+                    if (byte && byte.relative) {
+                        let value = byte.relative;
+                        if (value.expression) {
+                            value = this.evaluateExpression(prefix, value);
+                        }
+
+                        const relative = value - el.address;
+                        if (relative > 127) {
+                            this.error(`Relative jump is out of range (${relative} > 127)`, el.location);
+                        } else if (relative < -128) {
+                            this.error(`Relative jump is out of range (${relative} < -128)`, el.location);
+                        }
+                        el.bytes[i] = relative & 0xff;
+                    }
                     if (byte && byte.expression) {
                         const value = this.evaluateExpression(prefix, byte);
 

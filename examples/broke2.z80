@@ -36,13 +36,21 @@ one: equ 100
 
     bob not 2
 
+jumpback:
     db "ß™—hi¡😁"
 
-    jr one
-    jr end
+    jr jumpback
+    jr jumpforward
+jumphere:
+    jr jumphere
+
+    djnz jumphere
+
+    jr $1000
 
     db "ß"
     db "™"
+jumpforward:
     db "😁"
     db "\x00"
     db "\x01"
@@ -50,4 +58,6 @@ one: equ 100
     db "\x80"
     db "\xFF"
     db "\uC3BF"
+
+    ; ld a,"hello" * $
 ; end:
