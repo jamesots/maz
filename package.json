@@ -1,11 +1,12 @@
 {
   "name": "maz",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Macro Assembler for Z80",
   "main": "lib/maz.js",
   "bin": {
     "maz": "lib/maz.js"
   },
+  "repository": "jamesots/maz",
   "types": "lib/maz.d.ts",
   "scripts": {
     "build-parser": "pegjs --optimize speed -o lib/parser.js src/parser.pegjs",
