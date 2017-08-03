@@ -564,9 +564,12 @@ export class Programme {
                 sources.push(lastSource);
             } else {
                 while (lastLine < el.location.line - 1) {
-                    //TODO don't insert extra lines after a macro
                     lastLine++;
                     list.push(' ' + pad(lastLine, 4));
+                }
+                if (el.macrocall) {
+                    lastLines.push(lastLine);
+                    sources.push(lastSource);
                 }
             }
 
@@ -592,6 +595,9 @@ export class Programme {
             if (el.endinclude) {
                 list.push(` ${pad(el.location.line + 1, 4)}                        *END INCLUDE ${this.sources[el.location.source].name}`);
                 lastLine = lastLines.pop();
+                lastSource = sources.pop();
+            } else if (el.endmacrocall) {
+                lastLine = lastLines.pop() + 1;
                 lastSource = sources.pop();
             } else {
                 lastLine = el.location.line;
