@@ -114,6 +114,7 @@ export class Programme {
 
     private iterateAst(func, ignoreIf = false) {
         let inMacro = false;
+        let inMacroCall = false;
         const prefixes = [];
         const ifStack = [true];
         for (let i = 0; i < this.ast.length; i++) {
@@ -127,6 +128,10 @@ export class Programme {
 
             if (el.macrodef) {
                 inMacro = true;
+            }
+
+            if (!inMacro && el.macrocall) {
+                inMacroCall = true;
             }
 
             if (el.if !== undefined) {
@@ -143,11 +148,14 @@ export class Programme {
             }
 
             if (ignoreIf || ifStack[ifStack.length - 1]) {
-                func(el, i, prefixes[prefixes.length - 1] || '', inMacro, ifStack[ifStack.length - 1]);
+                func(el, i, prefixes[prefixes.length - 1] || '', inMacro, ifStack[ifStack.length - 1], inMacroCall);
             }
 
             if (el.endmacro) {
                 inMacro = false;
+            }
+            if (el.endmacrocall) {
+                inMacroCall = false;
             }
         }    
     }
@@ -311,16 +319,16 @@ export class Programme {
             if (el.macrocall && !inMacro) {
                 const macro = this.macros[el.macrocall];
                 if (!macro) {
-                    this.error(`Unknown instruction/macro '${el.macrocall}'`, el.location);
+                    this.error(`Unknown macro '${el.macrocall}'`, el.location);
                     el.params = [];
                     el.expanded = true;
+                    this.ast.splice(i + 1, 0, { endmacrocall: true });
                     return;
                 }
                 el.params = JSON.parse(JSON.stringify(macro.params));
                 el.expanded = true;
                 this.ast.splice(i + 1, 0, ...(JSON.parse(JSON.stringify(macro.ast))));
                 this.ast.splice(i + 1 + macro.ast.length, 0, { endmacrocall: true });
-                i += macro.ast.length + 1;
             }
         });
     }
@@ -503,7 +511,7 @@ export class Programme {
         let line = 0;
         let source = 0;
         let ast: any = {};
-        this.iterateAst((el, i, prefix, inMacro, ifTrue) => {
+        this.iterateAst((el, i, prefix, inMacro, ifTrue, inMacroCall) => {
             if (el.location) {
                 if ((el.location.line !== line && line !== 0) || (el.location.source !== source)) {
                     collectedAst.push(ast);                
@@ -514,7 +522,12 @@ export class Programme {
             }
   
             Object.assign(ast, el);
-            ast.inMacro = inMacro;
+            if (inMacro) {
+                ast.inMacro = true;
+            }
+            if (inMacroCall) {
+                ast.inMacroCall = true;
+            }
             ast.ifTrue = ifTrue;
             ast.prefix = prefix;
         }, true);
@@ -542,6 +555,7 @@ export class Programme {
         let lastLine = 0;
         const ast = this.collectAst();
         this.collectErrors(ast);
+        // console.log(JSON.stringify(ast, undefined, 2));
         let undoc = false;
         let error = false;
         for (const el of ast) {
@@ -566,13 +580,14 @@ export class Programme {
                 el.address, 
                 el.bytes, 
                 el.inMacro, 
+                el.inMacroCall,
                 el.ifTrue,
                 (warnUndoc && el.undoc) ? 'U' :
                 el.error ? 'E' : ' ');
                 
-            if (el.macrocall && !el.inMacro) {
-                list.push('           ' + ' '.repeat(BYTELEN * 2) + '  *UNROLL MACRO')
-            }
+            // if (el.macrocall && !el.inMacro) {
+            //     list.push('           ' + ' '.repeat(BYTELEN * 2) + '  *UNROLL MACRO')
+            // }
 
             if (el.endinclude) {
                 list.push(` ${pad(el.location.line + 1, 4)}                        *END INCLUDE ${this.sources[el.location.source].name}`);
@@ -598,16 +613,21 @@ export class Programme {
 
         for (const symbol in this.symbols) {
             if (!symbol.startsWith('%')) {
-                list.push(`${padr(symbol, 20)} ${pad(this.symbols[symbol].toString(16), 4, '0')}`);
+                const value = this.symbols[symbol];
+                if (value.expression) {
+                    list.push(`${padr(symbol, 20)} unknown value`);
+                } else {
+                    list.push(`${padr(symbol, 20)} ${pad(value.toString(16), 4, '0')}`);
+                }
             }
         }
 
         return list;
     }
 
-    private dumpLine(list, lines, line, out, address, bytes, inMacro, ifTrue, letter = ' ') {
+    private dumpLine(list, lines, line, out, address, bytes, inMacro, inMacroCall, ifTrue, letter = ' ') {
         let byteString = '';
-        if (bytes) {
+        if (bytes && !inMacro) {
             for (const byte of bytes) {
                 byteString += pad((byte & 0xFF).toString(16), 2, '0');
             }
@@ -624,7 +644,7 @@ export class Programme {
             addressString = 'xxxx';
             outString = 'xxxx';
         }
-        list.push(`${letter}${pad(line, 4)} ${address !== out?addressString + '@':''}${outString} ${padr(byteString, BYTELEN * 2).substring(0, BYTELEN * 2)}  ${inMacro ? '*' : ' '}${lines[line - 1]}`);
+        list.push(`${letter}${pad(line, 4)} ${address !== out?addressString + '@':''}${outString} ${padr(byteString, BYTELEN * 2).substring(0, BYTELEN * 2)} ${inMacroCall ? 'M' : ' '} ${lines[line - 1]}`);
         for (let i = BYTELEN * 2; i < byteString.length; i += BYTELEN * 2) {
             list.push(`           ${padr(byteString.substring(i, i + BYTELEN * 2), BYTELEN * 2).substring(0,BYTELEN * 2)}`)
         }
