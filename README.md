@@ -81,7 +81,7 @@ Any directive shown below without a leading full stop (period) may also be writt
 <dt>db <i>bytes</i></dt>
 <dt>defb <i>bytes</i></dt>
 <dd>Declare bytes. Strings are converted into their UTF-8 values.
-Only the low byte of any value is used.
+Only the low byte of any numeric value is used.
 
     db 0,1,100,$12,"hello\n",$1234
     00 01 64 12 68 65 6c 6c 6f 0a 34
