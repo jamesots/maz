@@ -3,6 +3,7 @@ start:
 one: equ 1
 two: equ one + 1
 one_s: equ "one"
+a_s: equ "a"
 
 org $1234
 here:
@@ -25,6 +26,10 @@ here:
     ld hl,one_s     ; 21 6f 6e
     ld hl,one_s * 2 ; 21 6f 6e
     ld hl,-2        ; 21 fe ff
+    ld hl,a_s       ; 21 61 00
+    ld hl,a_s * 2   ; 21 c2 00
+    ld hl,"a"       ; 21 61 00
+    ld hl,"a" * 2   ; 21 c2 00
 
     db $1234        ; 34
     db $1234 * 2    ; 68
@@ -34,6 +39,10 @@ here:
     db one_s        ; 6f 6e 65
     db one_s * 2    ; 6f 6e 65 6f 6e 65
     db -2           ; fe
+    db a_s          ; 61
+    db a_s * 2      ; c2
+    db "a"          ; 61
+    db "a" * 2      ; c2
 
     dw $1234        ; 34 12
     dw $1234 * 2    ; 68 24
@@ -43,6 +52,10 @@ here:
     dw one_s        ; 6f 6e 65 00
     dw one_s * 2    ; 6f 6e 65 6f 6e 65
     dw -2           ; fe ff
+    dw a_s          ; 61 00
+    dw a_s * 2      ; c2 00
+    dw "a"          ; 61 00
+    dw "a" * 2      ; c2 00
 
     jp here         ; c3 34 12
     jp here * 2     ; c3 68 24

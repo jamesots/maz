@@ -57,7 +57,7 @@ export class Programme {
     public parse(filename) {
         const code = this.readSource(filename);
         this.ast = this.parseLines(code, 0);
-        this.debug();
+        // this.debug();
     }
 
     private debug() {
@@ -535,6 +535,9 @@ export class Programme {
                                 let bytes = [];
                                 for (let i = 0; i < utf8.length; i++) {
                                     bytes.push(utf8.charCodeAt(i));
+                                }
+                                if (utf8.length % 2 === 1) {
+                                    bytes.push(0);
                                 }
                                 el.bytes.splice(i, 1, ...bytes);
                             } else {
