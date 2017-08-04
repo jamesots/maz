@@ -1482,6 +1482,16 @@ describe('parser', function() {
             const result = parser.parse('ld (hl),(hl)', {trace: false, tracer: null});
         }).toThrow();
     });
+    it('should parse ld a,"one"', function() {
+        const result = parse('ld a,"one"');
+        expect(result.length).toBe(1);
+        expect(result[0].bytes).toEqual([0x3e, 0x6f]);
+    });
+    it('should parse ld hl,"one"', function() {
+        const result = parse('ld hl,"one"');
+        expect(result.length).toBe(1);
+        expect(result[0].bytes).toEqual([0x21, 0x6f, 0x6e]);
+    });
     it('should parse db string in double quotes', function() {
         const result = parse('db "hello"');
         expect(result.length).toBe(1);

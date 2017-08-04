@@ -1,0 +1,67 @@
+start:
+
+one: equ 1
+two: equ one + 1
+one_s: equ "one"
+
+org $1234
+here:
+
+    ld a,one        ; 3e 01
+    ld a,one * 2    ; 3e 02
+    ld a,"one"      ; 3e 6f
+    ld a,"one" * 2  ; 3e 6f
+    ld a,$1234      ; 3e 34
+    ld a,$1234 * 2  ; 3e 68
+    ld a,one_s      ; 3e 6f
+    ld a,one_s * 2  ; 3e 6f
+    ld a,-2         ; 3e fe
+
+    ld hl,$1234     ; 21 34 12
+    ld hl,$1234 * 2 ; 21 68 24
+    ld hl,$123456   ; 21 56 34
+    ld hl,"one"     ; 21 6f 6e
+    ld hl,"one" * 2 ; 21 6f 6e
+    ld hl,one_s     ; 21 6f 6e
+    ld hl,one_s * 2 ; 21 6f 6e
+    ld hl,-2        ; 21 fe ff
+
+    db $1234        ; 34
+    db $1234 * 2    ; 68
+    db $123456      ; 56
+    db "one"        ; 6f 6e 65
+    db "one" * 2    ; 6f 6e 65 6f 6e 65
+    db one_s        ; 6f 6e 65
+    db one_s * 2    ; 6f 6e 65 6f 6e 65
+    db -2           ; fe
+
+    dw $1234        ; 34 12
+    dw $1234 * 2    ; 68 24
+    dw $123456      ; 56 34
+    dw "one"        ; 6f 6e 65 00
+    dw "one" * 2    ; 6f 6e 65 6f 6e 65
+    dw one_s        ; 6f 6e 65 00
+    dw one_s * 2    ; 6f 6e 65 6f 6e 65
+    dw -2           ; fe ff
+
+    jp here         ; c3 34 12
+    jp here * 2     ; c3 68 24
+    jp "one"        ; c3 6f 6e
+    jp "one" * 2    ; c3 6f 6e
+    jp one_s        ; c3 6f 6e
+    jp one_s * 2    ; c3 6f 6e
+    jp $123         ; c3 23 01
+    jp $1234        ; c3 34 12
+    jp $12345       ; c3 45 23
+    jp -2           ; c3 fe ff
+
+    jr $            ; 18 00
+    jr $-2          ; 18 fe
+    jr $ + 2        ; 18 02
+
+; symbols
+; start 0001
+; one   0001
+; two   0002
+; one_s "one"
+; $     ... whatever the end of the file is

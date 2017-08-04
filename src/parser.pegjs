@@ -23,6 +23,12 @@
         if (expr.expression) {
             return [expr, null]
         } else {
+            if (typeof expr === 'string') {
+                return [
+                    toUtf8(expr).charCodeAt(0),
+                    toUtf8(expr).charCodeAt(1)
+                ];
+            }
             return [expr & 0xFF, (expr & 0xFF00) >> 8]
         }
     }
@@ -31,6 +37,9 @@
         if (expr.expression) {
             return [expr]
         } else {
+            if (typeof expr === 'string') {
+                return [toUtf8(expr).charCodeAt(0)];
+            }
             return [expr & 0xFF]
         }
     }
