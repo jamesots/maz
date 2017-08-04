@@ -1658,7 +1658,7 @@ nop`);
         const result = parse('dw "hello"');
         expect(result.length).toBe(1);
         expect(result[0].bytes).toEqual([
-            101, 104, 108, 108, 0, 111
+            104, 101, 108, 108, 111, 0
         ]);
     });
 
@@ -1676,7 +1676,7 @@ nop`);
         expect(result[0].bytes).toEqual([
             0x34, 0x12,
             0xf0, 0x99,
-            101, 104, 0, 108,
+            104, 101, 108, 0,
             0x11, 0x00
         ]);
     });

@@ -89,10 +89,10 @@ Only the low byte of any numeric value is used.
 <dt>dw <i>words</i></dt>
 <dt>defw <i>words</i></dt>
 <dd>Declare words. Strings are converted into their UTF-8 values.
-Words are stored low-byte first. Each pair of characters in a string is stored in reverse. If the string has an odd length, an extra zero is stored.
+Words are stored low-byte first. If the string has an odd length, an extra zero is stored.
 
-    db 0,$1234,"hello",$12345
-    00 00 34 12 65 68 6c 6c 00 6f 45 23
+    dw 0,$1234,"hello",$12345
+    00 00 34 12 68 65 6c 6c 6f 00 45 23
 </dd>
 <dt>ds <i>expression</i></dt>
 <dt>defs <i>expression</i></dt>

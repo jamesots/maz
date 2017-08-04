@@ -82,6 +82,16 @@ export interface Defs extends Element, Locatable {
     address: number;
     out: number;
 }
+export interface Defb extends Bytes {
+    defb: true;
+    address: number;
+    out: number;
+}
+export interface Defw extends Bytes {
+    defw: true;
+    address: number;
+    out: number;
+}
 export interface Label extends Element, Locatable {
     label: string;
     public: boolean;
@@ -173,4 +183,10 @@ export function isPhase(el: Element): el is Phase {
 }
 export function isDefs(el: Element): el is Defs {
     return (el as Defs).defs !== undefined;
+}
+export function isDefb(el: Element): el is Defb {
+    return (el as Defb).defb === true;
+}
+export function isDefw(el: Element): el is Defw {
+    return (el as Defw).defw === true;
 }

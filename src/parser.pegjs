@@ -249,11 +249,15 @@ ds = '.'? ('ds'i / 'defs'i) ws? expr:expr {
 }
 
 db = '.'? ('db'i / 'defb'i) ws? dbytes:dbytes {
-    return res(dbytes);
+    const result = res(dbytes);
+    result.defb = true;
+    return result;
 }
 
 dw = '.'? ('dw'i / 'defw'i) ws? dwords:dwords {
-    return res(dwords);
+    const result = res(dwords);
+    result.defw = true;
+    return result;
 }
 
 dbytes = db1:dbyte db2:(ws? ',' ws? dbytes)? {
@@ -305,9 +309,11 @@ dword = ex:expr {
     if (typeof ex === 'string') {
         const bytes = [];
         const utf8 = toUtf8(ex);
-        for (let i = 0; i < utf8.length; i += 2) {
-            bytes.push(utf8.charCodeAt(i + 1) || 0);
+        for (let i = 0; i < utf8.length; i++) {
             bytes.push(utf8.charCodeAt(i));
+        }
+        if (utf8.length % 2 == 1) {
+            bytes.push(0);
         }
         return bytes;
     } else if (!Array.isArray(ex)) {

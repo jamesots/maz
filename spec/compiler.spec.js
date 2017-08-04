@@ -514,18 +514,30 @@ describe('compiler', function() {
     });
     it('should update bytes', function() {
         prog.ast = [
-            { references: ['three'], bytes: [0, {expression: 'three', vars: ['three']}]},
-            { references: ['three'], bytes: [0, {expression: 'three', vars: ['three']}, null]},
-            { references: ['$'], bytes: [0, {expression: '$', vars: ['$']}], address: 5}
+            { references: true, bytes: [0, {expression: 'three', vars: ['three']}]},
+            { references: true, bytes: [0, {expression: 'three', vars: ['three']}, null]},
+            { references: true, bytes: [0, {expression: '$', vars: ['$']}], address: 5},
+            { references: true, defb: true, bytes: [0, {expression: 'three', vars: ['three']}, null, 0]},
+            { references: true, defw: true, bytes: [0, {expression: 'three', vars: ['three']}, 0]},
+            { references: true, defb: true, bytes: [0, {expression: '"abc"', vars: []}, 0]},
+            { references: true, defw: true, bytes: [0, {expression: '"abc"', vars: []}, 0]},
+            { references: true, bytes: [0, {expression: '"abc"', vars: []}, 0]},
+            { references: true, bytes: [0, {expression: '"abc"', vars: []}, null, 0]},
         ];
         prog.symbols = {
             three: 0x1234
         }
         prog.updateBytes();
         expect(prog.ast).toEqual([
-            { references: ['three'], bytes: [0, 0x34]},
-            { references: ['three'], bytes: [0, 0x34, 0x12]},
-            { references: ['$'], bytes: [0, 5], address: 5}
+            { references: true, bytes: [0, 0x34]},
+            { references: true, bytes: [0, 0x34, 0x12]},
+            { references: true, bytes: [0, 5], address: 5},
+            { references: true, defb: true, bytes: [0, 0x34, null, 0]},
+            { references: true, defw: true, bytes: [0, 0x34, 0x12, 0]},
+            { references: true, defb: true, bytes: [0, 97, 98, 99, 0]},
+            { references: true, defw: true, bytes: [0, 97, 98, 99, 0]},
+            { references: true, bytes: [0, 97, 0]},
+            { references: true, bytes: [0, 97, 98, 0]},
         ])
     });
     it('should update bytes with scope', function() {

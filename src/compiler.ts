@@ -511,15 +511,35 @@ export class Programme {
 
                         if (typeof value === 'string') {
                             const utf8 = toUtf8(value);
-                            let bytes = [];
-                            for (let i = 0; i < utf8.length; i++) {
-                                bytes.push(utf8.charCodeAt(i));
+                            if (els.isDefb(el)) {
+                                let bytes = [];
+                                for (let i = 0; i < utf8.length; i++) {
+                                    bytes.push(utf8.charCodeAt(i));
+                                }
+                                el.bytes.splice(i, 1, ...bytes);
+                            } else if (els.isDefw(el)) {
+                                let bytes = [];
+                                for (let i = 0; i < utf8.length; i++) {
+                                    bytes.push(utf8.charCodeAt(i));
+                                }
+                                el.bytes.splice(i, 1, ...bytes);
+                            } else {
+                                el.bytes[i] = utf8.charCodeAt(0);
+                                if (el.bytes[i + 1] === null) {
+                                    el.bytes[i + 1] = utf8.charCodeAt(1);
+                                }
                             }
-                            el.bytes.splice(i, 1, ...bytes);
                         } else {
-                            el.bytes[i] = value & 0xFF;
-                            if (el.bytes[i + 1] === null) {
-                                el.bytes[i + 1] = (value & 0xFF00) >> 8;
+                            if (els.isDefb(el)) {
+                                el.bytes[i] = value & 0xff;
+                            } else if (els.isDefw(el)) {
+                                el.bytes[i] = value & 0xff;
+                                el.bytes.splice(i + 1, 0, (value >> 8) & 0xff);
+                            } else {
+                                el.bytes[i] = value & 0xff;
+                                if (el.bytes[i + 1] === null) {
+                                    el.bytes[i + 1] = (value >> 8) & 0xff;
+                                }
                             }
                         }
                     }
