@@ -1,7 +1,11 @@
+org 0
 size: equ end - $
 zero: equ %1011
     db 1,2,$
+low: equ $
     ld a,zero
+
+.align 10
 
 .include "another_dir/test.z80s"
 
@@ -68,6 +72,9 @@ endm
 macro a2 blah
     db "hey",blah
 endm
+    ld a,"hello"
+    ld a,"hello"*2
+    ld a,"hello"*low
 
     a1 "ho"
 

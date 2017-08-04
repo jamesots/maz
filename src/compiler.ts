@@ -4,6 +4,7 @@ import * as parser from './parser';
 // import * as Tracer from 'pegjs-backtrace';
 import * as Expr from './expr';
 import * as chalk from 'chalk';
+import * as els from './els';
 
 declare function unescape(s: string): string;
 
@@ -44,7 +45,7 @@ export function compile(filename, options) {
 }
 
 export class Programme {
-    public ast;
+    public ast: els.Element[];
     public symbols = {};
     public sources = [];
     public dir: string;
@@ -59,7 +60,7 @@ export class Programme {
     }
 
     private parseLines(lines, sourceIndex) {
-        let ast = [];
+        let ast: els.Element[] = [];
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             try {
@@ -77,13 +78,13 @@ export class Programme {
                             column: e.location.start.column,
                             source: sourceIndex
                         }
-                    });
+                    } as els.Error);
                 } else if (e.location) {
                     ast.push({
                         error: e.message,
                         filename: e.filename,
                         location: e.location
-                    });
+                    } as els.Error);
                 } else {
                     ast.push({
                         error: e,
@@ -92,7 +93,7 @@ export class Programme {
                             line: i + 1,
                             column: 0
                         }
-                    });
+                    } as els.Error);
                 }
                 e.filename = this.sources[sourceIndex].name;
                 e.source = this.sources[sourceIndex].source[i]
@@ -112,38 +113,38 @@ export class Programme {
         return source;
     }
 
-    private iterateAst(func, ignoreIf = false) {
+    private iterateAst(func: (el: els.Element, index: number, prefix: string, inMacro: boolean, ifTrue: boolean, inMacroCall: boolean) => void, ignoreIf = false) {
         let inMacro = false;
         let inMacroCall = false;
         const prefixes = [];
         const ifStack = [true];
         for (let i = 0; i < this.ast.length; i++) {
             const el = this.ast[i];
-            if (el.prefix) {
+            if (els.isPrefixed(el)) {
                 prefixes.push(el.prefix);
             }
-            if (el.endmacro || el.endblock) {
+            if (els.isEndMacro(el) || els.isEndBlock(el)) {
                 prefixes.pop();
             }
 
-            if (el.macrodef) {
+            if (els.isMacroDef(el)) {
                 inMacro = true;
             }
 
-            if (!inMacro && el.macrocall) {
+            if (!inMacro && els.isMacroCall(el)) {
                 inMacroCall = true;
             }
 
-            if (el.if !== undefined) {
-                if (el.if.expression) {
+            if (els.isIf(el)) {
+                if (els.isExpression(el.if)) {
                     el.if = this.evaluateExpression(prefixes[prefixes.length - 1], el.if);
                 }
                 ifStack.push(el.if !== 0);
             }
-            if (el.else) {
+            if (els.isElse(el)) {
                 ifStack.push(!ifStack.pop());
             }
-            if (el.endif) {
+            if (els.isEndIf(el)) {
                 ifStack.pop();
             }
 
@@ -151,10 +152,10 @@ export class Programme {
                 func(el, i, prefixes[prefixes.length - 1] || '', inMacro, ifStack[ifStack.length - 1], inMacroCall);
             }
 
-            if (el.endmacro) {
+            if (els.isEndMacro(el)) {
                 inMacro = false;
             }
-            if (el.endmacrocall) {
+            if (els.isEndMacroCall(el)) {
                 inMacroCall = false;
             }
         }    
@@ -166,7 +167,7 @@ export class Programme {
         let sourceIndex = 0;
 
         this.iterateAst((el, i, prefix, inMacro) => {
-            if (el.include && !el.included) {
+            if (els.isInclude(el) && !el.included) {
                 const filename = path.join(this.dir, el.include);
                 if (!fs.existsSync(filename)) {
                     this.error("File does not exist: " + filename, el.location);
@@ -186,9 +187,9 @@ export class Programme {
                         column: 0,
                         source: sourceIndex
                     }
-                });
+                } as els.EndInclude);
                 el.included = true;
-            } else if (el.endinclude !== undefined) {
+            } else if (els.isEndInclude(el)) {
                 this.dir = dirs.pop();
                 sourceIndex = sourceIndices.pop();
             }
@@ -200,7 +201,7 @@ export class Programme {
         let macroName = undefined;
         let macroLocation = undefined;
         this.iterateAst((el, i, prefix, inMacro) => {
-            if (el.macrodef) {
+            if (els.isMacroDef(el)) {
                 if (macro) {
                     this.error("Cannot nest macros", el.location);
                     return;
@@ -215,7 +216,7 @@ export class Programme {
                     this.error(`Already defined macro '${macroName}'`, el.location);
                     return;
                 }
-            } else if (el.endmacro) {
+            } else if (els.isEndMacro(el)) {
                 if (!macro) {
                     this.error("Not in a macro", el.location);
                     return;
@@ -224,7 +225,7 @@ export class Programme {
                 macro = undefined;
                 macroName = undefined;
             }
-            if (macro && !el.macrodef && !el.endmacro) {
+            if (macro && !els.isMacroDef(el) && !els.isEndMacro(el)) {
                 macro.ast.push(el);
             }
         });
@@ -242,7 +243,7 @@ export class Programme {
         let nextBlock = 0;
         let blocks = [];
         this.iterateAst((el, i, prefix, inMacro) => {
-            if (el.label && !inMacro) {
+            if (els.isLabel(el) && !inMacro) {
                 if (blocks.length > 0 && !el.public) {
                     if (typeof this.symbols[labelName(blocks, el.label)] !== 'undefined') {
                         this.error(`Label '${el.label}' already defined at in this block`, el.location);
@@ -257,13 +258,13 @@ export class Programme {
                     }
                     this.symbols[el.label] = null;
                 }
-            } else if (el.block) {
+            } else if (els.isBlock(el)) {
                 blocks.push(nextBlock);
                 el.prefix = labelPrefix(blocks);
                 nextBlock++;
-            } else if (el.endblock || el.endmacrocall) {
+            } else if (els.isEndBlock(el) || els.isEndMacroCall(el)) {
                 blocks.pop();
-            } else if (el.macrocall && !inMacro) {
+            } else if (els.isMacroCall(el) && !inMacro) {
                 blocks.push(nextBlock);
                 el.prefix = labelPrefix(blocks);
                 nextBlock++;
@@ -276,11 +277,12 @@ export class Programme {
                         this.symbols[param] = null;
                     }
                 }
-            } else if (el.equ) {
-                if (i > 0 && this.ast[i - 1].label) {
+            } else if (els.isEqu(el)) {
+                if (i > 0 && els.isLabel(this.ast[i - 1])) {
                     let ii = i - 1;
-                    while (this.ast[ii] && this.ast[ii].label) {
-                        this.symbols[this.ast[ii].label] = el.equ;
+                    let el2;
+                    while ((el2 = this.ast[ii]) && els.isLabel(el2)) {
+                        this.symbols[el2.label] = el.equ;
                         ii--;
                     }
                 } else {
@@ -316,19 +318,19 @@ export class Programme {
 
     public expandMacros() {
         this.iterateAst((el, i, prefix, inMacro) => {
-            if (el.macrocall && !inMacro) {
+            if (els.isMacroCall(el) && !inMacro) {
                 const macro = this.macros[el.macrocall];
                 if (!macro) {
                     this.error(`Unknown macro '${el.macrocall}'`, el.location);
                     el.params = [];
                     el.expanded = true;
-                    this.ast.splice(i + 1, 0, { endmacrocall: true });
+                    this.ast.splice(i + 1, 0, { endmacrocall: true } as els.EndMacroCall);
                     return;
                 }
                 el.params = JSON.parse(JSON.stringify(macro.params));
                 el.expanded = true;
                 this.ast.splice(i + 1, 0, ...(JSON.parse(JSON.stringify(macro.ast))));
-                this.ast.splice(i + 1 + macro.ast.length, 0, { endmacrocall: true });
+                this.ast.splice(i + 1 + macro.ast.length, 0, { endmacrocall: true } as els.EndMacroCall);
             }
         });
     }
@@ -347,47 +349,63 @@ export class Programme {
             if (inMacro) {
                 return;
             }
-            if (el.label) {
+            if (els.isLabel(el)) {
                 if (this.symbols[el.label] === null) {
                     this.symbols[el.label] = pc;
                 }
                 return;
-            } else if (el.equ) {
+            } else if (els.isEqu(el)) {
                 if (el.equ.expression) {
                     el.equ.address = pc;
                 }
-            } else if (el.defs !== undefined) {
-                let size = el.defs;
-                if (size.expression) {
+            } else if (els.isDefs(el)) {
+                let size: string | number | els.Expression = el.defs;
+                if (els.isExpression(size)) {
                     size = this.evaluateExpression(prefix, size);
+                }
+                if (typeof size === 'string') {
+                    const utf8 = toUtf8(size);
+                    size = utf8.charCodeAt(0); // TODO test this
                 }
                 el.address = pc;
                 el.out = out;
                 pc += size;
                 out += size;
-            } else if (el.org !== undefined) {
-                if (el.org.expression) {
+            } else if (els.isOrg(el)) {
+                if (els.isExpression(el.org)) {
                     el.org = this.evaluateExpression(prefix, el.org);
+                }
+                if (typeof el.org === 'string') {
+                    const utf8 = toUtf8(el.org);
+                    el.org = utf8.charCodeAt(0); // TODO test this
                 }
                 pc = el.org;
                 out = el.org;
-            } else if (el.phase !== undefined) {
-                if (el.phase.expression) {
+            } else if (els.isPhase(el)) {
+                if (els.isExpression(el.phase)) {
                     el.phase = this.evaluateExpression(prefix, el.phase);
                 }
+                if (typeof el.phase === 'string') {
+                    const utf8 = toUtf8(el.phase);
+                    el.phase = utf8.charCodeAt(0); // TODO test this
+                }
                 pc = el.phase;
-            } else if (el.endphase) {
+            } else if (els.isEndPhase(el)) {
                 pc = out;
-            } else if (el.align !== undefined) {
-                if (el.align.expression) {
+            } else if (els.isAlign(el)) {
+                if (els.isExpression(el.align)) {
                     el.align = this.evaluateExpression(prefix, el.align);
+                }
+                if (typeof el.align === 'string') {
+                    const utf8 = toUtf8(el.align);
+                    el.align = utf8.charCodeAt(0); // TODO test this
                 }
                 let add = el.align - (pc % el.align);
                 if (add !== el.align) {
                     pc += add;
                     out += add;
                 }
-            } else if (el.bytes) {
+            } else if (els.isBytes(el)) {
                 el.address = pc;
                 el.out = out;
                 
@@ -397,7 +415,7 @@ export class Programme {
         });
     }
 
-    private evaluateExpression(prefix = '', expr, evaluated = []) {
+    private evaluateExpression(prefix = '', expr, evaluated = []): number | string {
         const variables = expr.vars;
         const subVars = {}; // substitute variables
         if (expr.address !== undefined) {
@@ -466,14 +484,18 @@ export class Programme {
 
     public updateBytes() {
         this.iterateAst((el, i, prefix, inMacro) => {
-            if (el.references && !inMacro) {
+            if (els.isBytes(el) && el.references && !inMacro) {
                 this.symbols['$'] = el.address;
                 for (let i = 0; i < el.bytes.length; i++) {
                     const byte = el.bytes[i];
-                    if (byte && byte.relative) {
+                    if (byte && els.isRelative(byte)) {
                         let value = byte.relative;
-                        if (value.expression) {
+                        if (els.isExpression(value)) {
                             value = this.evaluateExpression(prefix, value);
+                        }
+                        if (typeof value === 'string') {
+                            const utf8 = toUtf8(value);
+                            value = utf8.charCodeAt(0); // TODO test this - treat as signed value??
                         }
 
                         const relative = value - el.address;
@@ -484,7 +506,7 @@ export class Programme {
                         }
                         el.bytes[i] = relative & 0xff;
                     }
-                    if (byte && byte.expression) {
+                    if (byte && els.isExpression(byte)) {
                         const value = this.evaluateExpression(prefix, byte);
 
                         if (typeof value === 'string') {
@@ -512,7 +534,7 @@ export class Programme {
         let source = 0;
         let ast: any = {};
         this.iterateAst((el, i, prefix, inMacro, ifTrue, inMacroCall) => {
-            if (el.location) {
+            if (els.isLocatable(el)) {
                 if ((el.location.line !== line && line !== 0) || (el.location.source !== source)) {
                     collectedAst.push(ast);                
                     ast = {};
@@ -686,7 +708,7 @@ export class Programme {
     public warnUndocumented() {
         let lines = [];
         this.iterateAst((el) => {
-            if (el.undoc) {
+            if (els.isUndocumented(el)) {
                 lines.push(el.location.line);
             }
         });
@@ -702,7 +724,7 @@ export class Programme {
         let out = null;
 
         this.iterateAst((el, i, prefix, inMacro) => {
-            if (el.bytes && !inMacro) {
+            if (els.isBytes(el) && !inMacro) {
                 const end = bytes.length + startOut;
                 if (out === null || el.out === end) {
                     if (startOut === null) {
