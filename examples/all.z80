@@ -56,6 +56,7 @@ here:
     dw a_s * 2      ; c2 00
     dw "a"          ; 61 00
     dw "a" * 2      ; c2 00
+    dw 0, "one", 0  ; 00 00 6f 6e 65 00 00 00
 
     jp here         ; c3 34 12
     jp here * 2     ; c3 68 24

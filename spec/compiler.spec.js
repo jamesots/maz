@@ -535,7 +535,7 @@ describe('compiler', function() {
             { references: true, defb: true, bytes: [0, 0x34, null, 0]},
             { references: true, defw: true, bytes: [0, 0x34, 0x12, 0]},
             { references: true, defb: true, bytes: [0, 97, 98, 99, 0]},
-            { references: true, defw: true, bytes: [0, 97, 98, 99, 0]},
+            { references: true, defw: true, bytes: [0, 97, 98, 99, 0, 0]},
             { references: true, bytes: [0, 97, 0]},
             { references: true, bytes: [0, 97, 98, 0]},
         ])
