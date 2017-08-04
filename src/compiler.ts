@@ -105,7 +105,7 @@ export class Programme {
                         location: {
                             source: sourceIndex,
                             line: i + 1,
-                            column: 0
+                            column: 1
                         }
                     } as els.Error);
                 }

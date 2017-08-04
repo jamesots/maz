@@ -4,6 +4,7 @@ one: equ 1
 two: equ one + 1
 one_s: equ "one"
 a_s: equ "a"
+ab_s: equ "ab"
 
 org $1234
 here:
@@ -72,6 +73,13 @@ here:
     jr $            ; 18 00
     jr $-2          ; 18 fe
     jr $ + 2        ; 18 02
+
+    dw "cd" - "ba"  ; 01 03     - 2 char strings count as numbers
+    dw "ab" + "cd"  ; c4 c6     - here they are added
+    dw "abcd" + "efg" ; 61 62 63 64 65 66 67 00  - bigger strings are strings and are concatenated
+                    ; this is confusing
+    dw ab_s + ab_s
+    dw one_s + one_s
 
 ; symbols
 ; start 0001

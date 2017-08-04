@@ -43,7 +43,7 @@
             if (utf8.length === 1) {
                 return utf8.charCodeAt(0);
             } else if (utf8.length === 2) {
-                return utf8.charCodeAt(0) * 256 + utf8.charCodeAt(1);
+                return utf8.charCodeAt(1) * 256 + utf8.charCodeAt(0);
             }
         }
         if (typeof term === 'number') {

@@ -1425,8 +1425,21 @@ ws = [ \t]+
 wsnl = [ \t\r\n]+
 
 expr = t1:expr1 {
+    // In the parser, the value returns in t1 is a list
+    // of all the symbols this expression depends on.
+    // If there are no symbols, we can evaluate the
+    // expression immediately, otherwise we have to
+    // keep the expression around to be evaluated later.
     if (t1.length === 0) {
-        return Expr.parse(text(), {});
+        try {
+            const value = Expr.parse(text(), {});
+            return value;
+        } catch (e) {
+            throw {
+                message: e,
+                location: loc()
+            }
+        }
     }
     return {
         expression: text(),
