@@ -1510,6 +1510,9 @@ function = 'min('i ws? expr1:expr1 ws? ',' ws? expr2:expr1 ws? ')'  {
     / 'max('i ws? expr1:expr1 ws? ',' ws? expr2:expr1 ws? ')' { 
         return expr1.concat(expr2);
     }
+    / 'swap('i ws? expr1:expr1 ws? ')' {
+        return expr1;
+    }
 number_literal = binary_literal { return []; }
     / hex_literal { return []; }
     / decimal_literal { return []; }

@@ -310,6 +310,14 @@ function = 'min('i ws? expr1:expr ws? ',' ws? expr2:expr ws? ')' {
         }
         return Math.max(toNumber(expr1), toNumber(expr2));
     }
+    / 'swap('i ws? expr1:expr ws? ')' {
+        expr1 = lookupVar(expr1);
+        if (isString(expr1)) {
+            throw `Cannot swap endinanness of string`;
+        }
+        let value = toNumber(expr1);
+        return ((value >> 8) & 0xff) | ((value & 0xff) << 8);
+    }
 
 number_literal = binary_literal
     / hex_literal

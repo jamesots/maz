@@ -81,6 +81,11 @@ here:
     dw ab_s + ab_s
     dw one_s + one_s
 
+    dw swap($1234), $1234
+    db swap($1234), $1234
+    db swap("ab"), "ab"
+    dw swap("ab"), "ab"
+
 ; symbols
 ; start 0001
 ; one   0001

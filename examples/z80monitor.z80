@@ -375,6 +375,7 @@ next:
 .macro djump val
     db (val / $100) + $80
     db val & $ff
+    dw val + $8000
 .endm
 
 cmd_help:
