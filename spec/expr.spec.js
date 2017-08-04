@@ -48,6 +48,26 @@ describe('expr', function() {
         expect(result).toBe(50);
     });
 
+    it('should multiply two char strings', function() {
+        const result = expr.parse(`"ab" * 2`);
+        expect(result).toBe(0xc4c2);
+    });
+
+    it('should multiply one char strings', function() {
+        const result = expr.parse(`"a" * 2`);
+        expect(result).toBe(0xc2);
+    });
+
+    it('should add two char strings', function() {
+        const result = expr.parse(`"ab" + "cd"`);
+        expect(result).toBe(0xc6c4);
+    });
+
+    it('should concatenate three char strings', function() {
+        const result = expr.parse(`"abc" + "def"`);
+        expect(result).toBe("abcdef");
+    });
+
     it('should parse string', function() {
         const result = expr.parse(`"hello"`);
         expect(result).toBe("hello");
