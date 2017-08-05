@@ -10,6 +10,48 @@ declare function unescape(s: string): string;
 
 const BYTELEN = 8;
 
+export abstract class FileResolver {
+    public abstract fileExists(filename: string): boolean;
+    public abstract readFile(filename: string): string[];
+    public abstract finishFile();
+    public abstract getRealFilename(filename: string): string;
+    public readonly filename: string;
+}
+
+export class DefaultFileResolver {
+    private files: string[] = [];
+    private _filename: string;
+
+    public fileExists(filename: string): boolean {
+        return fs.existsSync(this.getFilename(filename));
+    }
+
+    public readFile(filename: string): string[] {
+        this._filename = this.getFilename(filename);
+        this.files.push(filename);
+        return fs.readFileSync(this._filename).toString().split('\n');
+    }
+
+    public finishFile() {
+        this._filename = this.files.pop();
+    }
+
+    public getRealFilename(filename: string): string {
+        return this.getFilename(filename);
+    }
+
+    private getFilename(filename: string): string {
+        if (this._filename === undefined) {
+            return filename;
+        }
+        return path.join(path.dirname(this._filename), filename);
+    }
+
+    public get filename(): string {
+        return this._filename;
+    }
+}
+
 export function compile(filename, options) {
     const parserOptions = {source: 0} as any;
     // const tracer = new Tracer(code, {
@@ -19,40 +61,37 @@ export function compile(filename, options) {
     // if (options.trace) {
     //     parserOptions.tracer = tracer;
     // }
-    try {
-        const prog = new Programme(options);
-        prog.parse(filename);
-        prog.processIncludes();
-        prog.getMacros();
-        prog.expandMacros();
-        prog.getSymbols();
-        prog.assignPCandEQU();
-        prog.evaluateSymbols();
-        prog.checkSymbols();
-        prog.updateBytes();
-        if (options.warnUndocumented) {
-            prog.warnUndocumented();
-        }
-        return prog;
-    } catch (e) {
-        // if (options.trace) {
-        //     // console.log(tracer.getBacktraceString());
-        // } else {
-            console.log(JSON.stringify(e, undefined, 2));
-            throw e;
-        // }
+    const prog = new Programme(options);
+    prog.parse(filename);
+    prog.processIncludes();
+    prog.getMacros();
+    prog.expandMacros();
+    prog.getSymbols();
+    prog.assignPCandEQU();
+    prog.evaluateSymbols();
+    prog.checkSymbols();
+    prog.updateBytes();
+    if (options.warnUndocumented) {
+        prog.warnUndocumented();
     }
+    return prog;
 }
 
 export class Programme {
     public ast: els.Element[];
     public symbols = {};
     public sources = [];
-    public dir: string;
     public macros = {};
     public errors = [];
+    private fileResolver: FileResolver;
 
-    constructor(private options) {}
+    constructor(private options) {
+        if (options.fileResolver) {
+            this.fileResolver = options.fileResolver;
+        } else {
+            this.fileResolver = new DefaultFileResolver();
+        }
+    }
 
     public parse(filename) {
         const code = this.readSource(filename);
@@ -84,44 +123,50 @@ export class Programme {
                 }
             } catch (e) {
                 if (e.name === 'SyntaxError') {
-                    ast.push({
-                        error: e.message,
-                        filename: e.filename,
+                    const error = {
+                        error: 'Syntax Error: ' + e.message,
+                        filename: this.sources[sourceIndex].name,
                         location: {
                             line: i + 1,
                             column: e.location.start.column,
                             source: sourceIndex
-                        }
-                    } as els.Error);
+                        },
+                        source: this.sources[sourceIndex].source[i]
+                    };
+                    ast.push(error);
+                    this.logError(error);
                 } else if (e.location) {
-                    ast.push({
+                    const error = {
                         error: e.message,
-                        filename: e.filename,
-                        location: e.location
-                    } as els.Error);
+                        filename: this.sources[sourceIndex].name,
+                        location: e.location,
+                        source: this.sources[sourceIndex].source[i]
+                    } as els.Error;
+                    ast.push(error);
+                    this.logError(error);
                 } else {
-                    ast.push({
+                    const error = {
                         error: e,
+                        filename: this.sources[sourceIndex].name,
                         location: {
                             source: sourceIndex,
                             line: i + 1,
                             column: 1
-                        }
-                    } as els.Error);
+                        },
+                        source: this.sources[sourceIndex].source[i]
+                    } as els.Error;
+                    ast.push(error);
+                    this.logError(error);
                 }
-                e.filename = this.sources[sourceIndex].name;
-                e.source = this.sources[sourceIndex].source[i]
-                this.logError(e);
             }
         }
         return ast;
     }
 
     private readSource(filename) {
-        this.dir = path.dirname(filename);
-        const source = fs.readFileSync(filename).toString().split('\n');
+        const source = this.fileResolver.readFile(filename);
         this.sources.push({
-            name: filename,
+            name: this.fileResolver.filename,
             source: source
         });
         return source;
@@ -176,20 +221,17 @@ export class Programme {
     }
 
     public processIncludes() {
-        const dirs = [];
         const sourceIndices = [];
         let sourceIndex = 0;
 
         this.iterateAst((el, i, prefix, inMacro) => {
             if (els.isInclude(el) && !el.included) {
-                const filename = path.join(this.dir, el.include);
-                if (!fs.existsSync(filename)) {
-                    this.error("File does not exist: " + filename, el.location);
+                if (!this.fileResolver.fileExists(el.include)) {
+                    this.error("File does not exist: " + this.fileResolver.getRealFilename(el.include), el.location);
                     el.included = true;
                     return;
                 }
-                const source = this.readSource(filename);
-                dirs.push(this.dir);
+                const source = this.readSource(el.include);
                 sourceIndices.push(sourceIndex);
                 sourceIndex = this.sources.length - 1;
                 const includeAst = this.parseLines(source, sourceIndex);
@@ -204,7 +246,7 @@ export class Programme {
                 } as els.EndInclude);
                 el.included = true;
             } else if (els.isEndInclude(el)) {
-                this.dir = dirs.pop();
+                this.fileResolver.finishFile();
                 sourceIndex = sourceIndices.pop();
             }
         });
@@ -314,7 +356,7 @@ export class Programme {
     private error(message, location?) {
         if (location !== undefined) {
             const error = {
-                message: message,
+                error: message,
                 location: location,
                 source: this.sources[location.source].source[location.line - 1],
                 filename: this.sources[location.source].name
@@ -323,7 +365,10 @@ export class Programme {
             this.logError(error);
         } else {
             const error = {
-                message: message
+                error: message,
+                location: undefined,
+                source: undefined,
+                filename: undefined
             };
             this.errors.push(error);
             this.logError(error);
@@ -448,7 +493,11 @@ export class Programme {
                 subVars[variable] = this.symbols[subVar];
             }
         }
-        return Expr.parse(expr.expression, {variables: subVars});
+        try {
+            return Expr.parse(expr.expression, {variables: subVars});
+        } catch (e) {
+            this.error(e, expr.location);
+        }
     }
 
     private evaluateSymbol(symbol, evaluated) {
@@ -571,7 +620,7 @@ export class Programme {
         let source = 0;
         let ast: any = {};
         this.iterateAst((el, i, prefix, inMacro, ifTrue, inMacroCall) => {
-            if (els.isLocatable(el)) {
+            if (el.location) {
                 if ((el.location.line !== line && line !== 0) || (el.location.source !== source)) {
                     collectedAst.push(ast);                
                     ast = {};
@@ -717,30 +766,21 @@ export class Programme {
         }
     }
 
-    public logError(e) {
-        if (e.name === "SyntaxError") {
-            if (this.options.brief) {
-                console.log(`${e.filename}:${e.location.start.line},${e.location.start.column}: Syntax error — ${e.message}`);
-            } else {
-                console.log(chalk.red(`Syntax error`));
-                console.log(chalk.red(e.message));
-                console.log(`  ${e.filename}:${e.location.start.line}`);
-                console.log('  > ' + e.source);
-                console.log('  > ' + ' '.repeat(e.location.start.column - 1) + '^');
-            }
+    public logError(e: els.Error | string) {
+        if (typeof e === 'string') {
+            console.log(chalk.red(e));
         } else if (e.location) {
             if (this.options.brief) {
-                console.log(`${e.filename}:${e.location.line},${e.location.column}: ${e.message}`);
+                console.log(`${e.filename}:${e.location.line},${e.location.column}: ${e.error}`);
             } else {
-                console.log(chalk.red(e.message));
+                console.log(chalk.red(e.error));
                 console.log(`  ${e.filename}:${e.location.line}`);
                 console.log('  > ' + e.source);
                 console.log('  > ' + ' '.repeat(e.location.column - 1) + '^');
             }
-        } else if (e.message) {
-            console.log(chalk.red(e.message));
+        } else if (e.error) {
+            console.log(chalk.red(e.error));
         } else {
-            console.log(chalk.red(e));
         }        
     }
 

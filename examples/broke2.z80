@@ -7,7 +7,7 @@ low: equ $
 
 .align 10
 
-.include "another_dir/test.z80s"
+.include "another_dir/test.z80"
 
 .if "a" ge "b"
     ld a,one
@@ -73,8 +73,8 @@ macro a2 blah
     db "hey",blah
 endm
     ld a,"hello"
-    ld a,"hello"*2
-    ld a,"hello"*low
+    ld a,rpt("hello",2)
+    ld a,rpt("hello",low)
 
     a1 "ho"
 

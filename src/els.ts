@@ -15,47 +15,44 @@ export interface Relative  {
 export interface Prefixed {
     prefix: string;    
 }
-export interface Locatable {
+export interface Element {
     location: Location;
 }
 
-export interface Element {
-    something?: boolean; // make typescript recognise this type
-}
-
-export interface Error extends Element, Locatable {
+export interface Error extends Element {
     error: string;
     filename: string;
+    source?: number;
 }
-export interface Org extends Element, Locatable {
+export interface Org extends Element {
     org: string | number | Expression;
 }
-export interface Phase extends Element, Locatable {
+export interface Phase extends Element {
     phase: string | number | Expression;
 }
-export interface Align extends Element, Locatable {
+export interface Align extends Element {
     align: string | number | Expression;
 }
-export interface Include extends Element, Locatable {
+export interface Include extends Element {
     include: string;
     included?: true;
 }
-export interface EndInclude extends Element, Locatable {
+export interface EndInclude extends Element {
     endinclude: number;
 }
-export interface MacroCall extends Element, Prefixed, Locatable {
+export interface MacroCall extends Element, Prefixed {
     macrocall: string;
     args: (string | number | Expression)[];
     params: string[];
     expanded: boolean;
 }
-export interface Block extends Element, Prefixed, Locatable {
+export interface Block extends Element, Prefixed {
     block: true;
 }
-export interface EndBlock extends Element, Locatable {
+export interface EndBlock extends Element {
     endblock: true;
 }
-export interface Bytes extends Element, Locatable {
+export interface Bytes extends Element {
     bytes: (Expression | Relative | number)[];
     references: boolean;
     address: number;
@@ -64,20 +61,20 @@ export interface Bytes extends Element, Locatable {
 export interface EndMacroCall extends Element  {
     endmacrocall: true;
 }
-export interface Comment extends Element, Locatable {
+export interface Comment extends Element {
     comment: string;
 }
-export interface EndMacro extends Element, Locatable {
+export interface EndMacro extends Element {
     endmacro: true;
 }
-export interface MacroDef extends Element, Locatable {
+export interface MacroDef extends Element {
     macrodef: string;
     params: string[];
 }
-export interface Equ extends Element, Locatable {
+export interface Equ extends Element {
     equ: Expression;
 }
-export interface Defs extends Element, Locatable {
+export interface Defs extends Element {
     defs: Expression;
     address: number;
     out: number;
@@ -92,23 +89,23 @@ export interface Defw extends Bytes {
     address: number;
     out: number;
 }
-export interface Label extends Element, Locatable {
+export interface Label extends Element {
     label: string;
     public: boolean;
 }
-export interface Undocumented extends Element, Locatable {
+export interface Undocumented extends Element {
     undoc: true;
 }
 export interface EndPhase extends Element {
     endphase: true;
 }
-export interface If extends Element, Locatable {
+export interface If extends Element {
     if: number | string | Expression;
 }
-export interface EndIf extends Element, Locatable {
+export interface EndIf extends Element {
     endif: true;
 }
-export interface Else extends Element, Locatable {
+export interface Else extends Element {
     else: true;
 }
 
@@ -135,9 +132,6 @@ export function isExpression(item: string | number | Expression | Relative): ite
 }
 export function isPrefixed(el: Element | Prefixed): el is Prefixed {
     return (el as Prefixed).prefix !== undefined;
-}
-export function isLocatable(el: Element | Locatable): el is Locatable {
-    return (el as Locatable).location !== undefined;
 }
 export function isAlign(el: Element): el is Align {
     return (el as Align).align !== undefined;
@@ -189,4 +183,7 @@ export function isDefb(el: Element): el is Defb {
 }
 export function isDefw(el: Element): el is Defw {
     return (el as Defw).defw === true;
+}
+export function isError(el: Element): el is Error {
+    return (el as Error).error !== undefined;
 }
