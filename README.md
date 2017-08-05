@@ -6,6 +6,20 @@ Macro Assembler for Z80
 
 Maz is a Z80 macro assembler, which is currently under development. I wouldn't advise using it until it's at version 1, or at least until I change this message.
 
+Command Line
+------------
+
+If using a new version of npm, you can run maz using npx: 'npx maz ...'. The command line parameters are:
+
+| Option (short and long) | Description |
+|--------|-------------|
+| -s filename<br>--src filename | The source file to assemble |
+| -o filename<br>--out filename | The binary file to output to |
+| -l filename<br>--list filename | The listing file to create |
+| -b<br>--brief | Show brief error messages |
+| -u<br>--undoc | Show warnings when undocumented instructions are used |
+| -p path<br>--path path | Specify a directory to search in when looking for files to include. This option can be specified multiple times. |
+
 Numbers
 -------
 
