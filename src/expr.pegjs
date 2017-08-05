@@ -229,11 +229,7 @@ plusminus = t1:term t2:(ws? [+-] ws? term)* {
         for (const group of t2) {
             const operator = group[1];
             const term = lookupVar(group[3]);
-            if (isString(term) && isString(result) && operator == '+') {
-                result = result + term;
-            } else {
-                result = plusMinus(toNumber(result), toNumber(term), operator);
-            }
+            result = plusMinus(toNumber(result), toNumber(term), operator);
         }
         return result;
     }

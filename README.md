@@ -48,8 +48,6 @@ Note that although you can enter a latin character such as \xFF, because the str
 
 One and two character strings can be used as numbers, where the first byte is the low order byte and the second is the high order byte. For example, "ab" is the equivalent of $6261. (When I say two character strings, I really mean two bytes, when encoded in UTF-8).
 
-This can be a little confusing, as "abc" + "def" is interpreted as a concatenation, giving "abcdef", which "ab" + "cd" is a numeric addition, giving $c6c4. (Perhaps it doesn't make sense to concatenate strings).
-
 You can also repeat a string using the multiplication operator: "ho! " * 3 results in "ho! ho! ho!" (However, "ho" * 3 produces a number).
 
 Labels
@@ -181,6 +179,7 @@ There are some functions which you can use in expressions:
 | min(x, y) | Returns the smallest of x and y |
 | max(x, y) | Returns the largest of x and y |
 | swap(x)   | Swaps high and low order bytes of number x |
+| concat(x, y, ...) | Concatenates the strings |
 
 Instructions
 ------------

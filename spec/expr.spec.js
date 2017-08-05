@@ -63,19 +63,15 @@ describe('expr', function() {
         expect(result).toBe(0xc6c4);
     });
 
-    it('should concatenate three char strings', function() {
-        const result = expr.parse(`"abc" + "def"`);
-        expect(result).toBe("abcdef");
+    it('should not add three char strings', function() {
+        expect(function() {
+            const result = expr.parse(`"abc" + "def"`);
+        }).toThrow();
     });
 
     it('should parse string', function() {
         const result = expr.parse(`"hello"`);
         expect(result).toBe("hello");
-    });
-
-    it('should add strings', function() {
-        const result = expr.parse(`"hello" + "bob"`);
-        expect(result).toBe("hellobob");
     });
 
     it('should add char and number', function() {
