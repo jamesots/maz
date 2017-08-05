@@ -1504,11 +1504,11 @@ factor = '(' expr:expr1 ')'  {
     / string { 
         return [];
     }
-function = 'min('i ws? expr1:expr1 ws? ',' ws? expr2:expr1 ws? ')'  { 
-        return expr1.concat(expr2);
+function = 'min('i ws? expr1:expr1 ws? expr2:(',' ws? expr1 ws?)+ ')'  { 
+        return expr1.concat(exprVars(expr2, [2]));
     }
-    / 'max('i ws? expr1:expr1 ws? ',' ws? expr2:expr1 ws? ')' { 
-        return expr1.concat(expr2);
+    / 'max('i ws? expr1:expr1 ws? expr2:(',' ws? expr1 ws?)+ ')' { 
+        return expr1.concat(exprVars(expr2, [2]));
     }
     / 'rpt('i ws? expr1:expr1 ws? ',' ws? expr2:expr1 ws? ')' { 
         return expr1.concat(expr2);

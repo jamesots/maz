@@ -205,9 +205,15 @@ describe('expr', function() {
     it('should min things', function() {
         let result = expr.parse(`min(1, 2)`);
         expect(result).toBe(1);
+        result = expr.parse(`min(5, 1, 2)`);
+        expect(result).toBe(1);
         result = expr.parse(`min('a', 'z')`);
         expect(result).toBe(97);
+        result = expr.parse(`min('m', 'a', 'z')`);
+        expect(result).toBe(97);
         result = expr.parse(`min("abba", "zappa")`);
+        expect(result).toBe("abba");
+        result = expr.parse(`min("bubba", "abba", "zappa")`);
         expect(result).toBe("abba");
     });
 
@@ -223,9 +229,15 @@ describe('expr', function() {
     it('should max things', function() {
         let result = expr.parse(`max(1, 2)`);
         expect(result).toBe(2);
+        result = expr.parse(`max(5, 1, 2)`);
+        expect(result).toBe(5);
         result = expr.parse(`max('a', 'z')`);
         expect(result).toBe(122);
+        result = expr.parse(`max('a', 'z', 'b')`);
+        expect(result).toBe(122);
         result = expr.parse(`max("abba", "zappa")`);
+        expect(result).toBe("zappa");
+        result = expr.parse(`max("abba", "zappa", "bubba")`);
         expect(result).toBe("zappa");
     });
 

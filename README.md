@@ -190,8 +190,8 @@ There are some functions which you can use in expressions:
 
 | Function | Description |
 |----------|-------------|
-| min(x, y) | Returns the smallest of x and y |
-| max(x, y) | Returns the largest of x and y |
+| min(x, y, ...) | Returns the smallest value |
+| max(x, y, ...) | Returns the largest value |
 | swp(x)   | Swaps high and low order bytes of number x |
 | cat(x, y, ...) | Concatenates the strings |
 | rpt(s, n) | Repeat string s, n times |

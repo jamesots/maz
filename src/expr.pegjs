@@ -278,27 +278,52 @@ factor = '(' expr:expr ')' {
     }
     / string
 
-function = 'min('i ws? expr1:expr ws? ',' ws? expr2:expr ws? ')' {
-        expr1 = lookupVar(expr1);
-        expr2 = lookupVar(expr2);
-        if ((isString(expr1) && !isString(expr2)) || (!isString(expr1) && isString(expr2))) {
-            throw `Cannot find min of number and string (${expr1}, ${expr2})`;
+function = 'min('i ws? expr1:expr ws? expr2:(',' ws? expr ws?)+ ')' {
+        let exprs = [lookupVar(expr1)];
+        let strings = isString(exprs[0]) ? 1 : 0;
+        let numbers = 1 - strings;
+        for (const group of expr2) {
+            const value = lookupVar(group[2]);
+            if (isString(value)) {
+                strings++;
+                exprs.push(value);
+            } else {
+                numbers++;
+                exprs.push(toNumber(value));
+            }
         }
-        if (isString(expr1)) {
-            return expr1 <= expr2 ? expr1 : expr2;
+        if (strings > 0 && numbers > 0) {
+            throw `Cannot find min of numbers and strings`;
         }
-        return Math.min(toNumber(expr1), toNumber(expr2));
+        if (strings > 0) {
+            return exprs.sort()[0];
+        }
+        exprs[0] = toNumber(exprs[0]);
+        return Math.min.apply(this, exprs);
     }
-    / 'max('i ws? expr1:expr ws? ',' ws? expr2:expr ws? ')' {
-        expr1 = lookupVar(expr1);
-        expr2 = lookupVar(expr2);
-        if ((isString(expr1) && !isString(expr2)) || (!isString(expr1) && isString(expr2))) {
-            throw `Cannot find max of number and string (${expr1}, ${expr2})`;
+    / 'max('i ws? expr1:expr ws? expr2:(',' ws? expr ws?)+ ')' {
+        let exprs = [lookupVar(expr1)];
+        let strings = isString(exprs[0]) ? 1 : 0;
+        let numbers = 1 - strings;
+        for (const group of expr2) {
+            const value = lookupVar(group[2]);
+            if (isString(value)) {
+                strings++;
+                exprs.push(value);
+            } else {
+                numbers++;
+                exprs.push(toNumber(value));
+            }
         }
-        if (isString(expr1)) {
-            return expr1 >= expr2 ? expr1 : expr2;
+        if (strings > 0 && numbers > 0) {
+            throw `Cannot find max of numbers and strings`;
         }
-        return Math.max(toNumber(expr1), toNumber(expr2));
+        if (strings > 0) {
+            const sorted = exprs.sort();
+            return sorted[sorted.length - 1];
+        }
+        exprs[0] = toNumber(exprs[0]);
+        return Math.max.apply(this, exprs);
     }
     / 'rpt('i ws? expr1:expr ws? ',' ws? expr2:expr ws? ')' {
         expr1 = lookupVar(expr1);
