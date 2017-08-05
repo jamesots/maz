@@ -117,13 +117,15 @@ describe('expr', function() {
     });
 
     it('should multiply string and number', function() {
-        const result = expr.parse(`"BOB" * 2`);
-        expect(result).toBe("BOBBOB");
+        expect(function() {
+            const result = expr.parse(`"BOB" * 2`);
+        }).toThrow();
     });
 
-    it('should multiply number and string', function() {
-        const result = expr.parse(`2 * "BOB"`);
-        expect(result).toBe("BOBBOB");
+    it('should not multiply number and string', function() {
+        expect(function() {
+            const result = expr.parse(`2 * "BOB"`);
+        }).toThrow();
     });
 
     it('should not multiply two strings', function() {
@@ -132,25 +134,11 @@ describe('expr', function() {
         }).toThrow();
     });
 
-    it('should multiply number and chars, with brackets, etc', function() {
-        const result = expr.parse(`((1 + 2) * 3) * "BOB"`);
-        expect(result).toBe("BOBBOBBOBBOBBOBBOBBOBBOBBOB");
-    });
-
     it('should add numbers and variables', function() {
         const result = expr.parse(`123 + bob`, {variables: {
             bob: 2
         }});
         expect(result).toBe(125);
-    });
-
-    it('should use variables', function() {
-        const result = expr.parse(`(num + chr) * str`, {variables: {
-            num: 2,
-            chr: 'A',
-            str: 'BOB'
-        }});
-        expect(result).toBe('BOB'.repeat(65 + 2));
     });
 
     it('should shift numbers left', function() {
@@ -200,8 +188,18 @@ describe('expr', function() {
     });
 
     it('should concatenate thing', function() {
-        let result = expr.parse(`concat("ab", "bc", 16)`);
+        let result = expr.parse(`cat("ab", "bc", 16)`);
         expect(result).toBe("abbc16");
+    });
+
+    it('should repeat string', function() {
+        let result = expr.parse(`rpt("hello", 3)`);
+        expect(result).toBe("hellohellohello");
+    });
+
+    it('should swap bytes', function() {
+        let result = expr.parse(`swp($1234)`);
+        expect(result).toBe(0x3412);
     });
 
     it('should min things', function() {

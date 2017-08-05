@@ -1510,10 +1510,13 @@ function = 'min('i ws? expr1:expr1 ws? ',' ws? expr2:expr1 ws? ')'  {
     / 'max('i ws? expr1:expr1 ws? ',' ws? expr2:expr1 ws? ')' { 
         return expr1.concat(expr2);
     }
-    / 'swap('i ws? expr1:expr1 ws? ')' {
+    / 'rpt('i ws? expr1:expr1 ws? ',' ws? expr2:expr1 ws? ')' { 
+        return expr1.concat(expr2);
+    }
+    / 'swp('i ws? expr1:expr1 ws? ')' {
         return expr1;
     }
-    / 'concat('i ws? expr1:expr1 ws? expr2:(',' ws? expr1 ws?)+ ')' { 
+    / 'cat('i ws? expr1:expr1 ws? expr2:(',' ws? expr1 ws?)+ ')' { 
         return expr1.concat(exprVars(expr2, [2]));
     }
 number_literal = binary_literal { return []; }

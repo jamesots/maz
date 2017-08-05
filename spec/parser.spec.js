@@ -1635,14 +1635,10 @@ nop`);
         });
     });
 
-    it('should parse db string * num', function() {
-        const result = parse('db "hello" * 3');
-        expect(result.length).toBe(1);
-        expect(result[0].bytes).toEqual([
-            104, 101, 108, 108, 111,
-            104, 101, 108, 108, 111,
-            104, 101, 108, 108, 111,
-        ]);
+    it('should not parse db string * num', function() {
+        expect(function() {
+            const result = parse('db "hello" * 3');
+        }).toThrow();
     });
 
     it('should parse db $', function() {

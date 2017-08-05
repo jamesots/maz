@@ -54,12 +54,6 @@
 
     function timesDivideMod(t1, t2, operator) {
         if (operator === '*') {
-            if (isString(t1)) {
-                return t1.repeat(toNumber(t2));
-            }
-            if (isString(t2)) {
-                return t2.repeat(toNumber(t1));
-            }
             return toNumber(t1) * toNumber(t2);
         } else if (operator === '/') {
             return toNumber(t1) / toNumber(t2);
@@ -306,7 +300,12 @@ function = 'min('i ws? expr1:expr ws? ',' ws? expr2:expr ws? ')' {
         }
         return Math.max(toNumber(expr1), toNumber(expr2));
     }
-    / 'concat('i ws? expr1:expr ws? expr2:(',' ws? expr ws?)+ ')' { 
+    / 'rpt('i ws? expr1:expr ws? ',' ws? expr2:expr ws? ')' {
+        expr1 = lookupVar(expr1);
+        expr2 = lookupVar(expr2);
+        return String(expr1).repeat(toNumber(expr2));
+    }
+    / 'cat('i ws? expr1:expr ws? expr2:(',' ws? expr ws?)+ ')' { 
         let result = String(lookupVar(expr1));
         for (const group of expr2) {
             const value = group[2];
@@ -314,7 +313,7 @@ function = 'min('i ws? expr1:expr ws? ',' ws? expr2:expr ws? ')' {
         }
         return result;
     }
-    / 'swap('i ws? expr1:expr ws? ')' {
+    / 'swp('i ws? expr1:expr ws? ')' {
         expr1 = lookupVar(expr1);
         if (isString(expr1)) {
             throw `Cannot swap endinanness of string`;

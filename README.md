@@ -178,8 +178,9 @@ There are some functions which you can use in expressions:
 |----------|-------------|
 | min(x, y) | Returns the smallest of x and y |
 | max(x, y) | Returns the largest of x and y |
-| swap(x)   | Swaps high and low order bytes of number x |
-| concat(x, y, ...) | Concatenates the strings |
+| swp(x)   | Swaps high and low order bytes of number x |
+| cat(x, y, ...) | Concatenates the strings |
+| rpt(s, n) | Repeat string s, n times |
 
 Instructions
 ------------
