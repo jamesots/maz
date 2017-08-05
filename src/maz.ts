@@ -14,7 +14,8 @@ const optionDefinitions = [
     { name: 'list', alias: 'l', type: String, multiple: false},
     { name: 'brief', alias: 'b', type: Boolean, multiple: false, description: 'Show brief errors'},
     { name: 'undoc', alias: 'u', type: Boolean, mutliple: false, description: 'Warn about undocumented instructions'},
-    { name: 'help', alias: 'h', type: Boolean, multiple: false }
+    { name: 'help', alias: 'h', type: Boolean, multiple: false },
+    { name: 'path', alias: 'p', type: String, multiple: true, description: 'Search for include files in thes paths'}
 ];
 const options = commandLineArgs(optionDefinitions);
 
@@ -46,7 +47,8 @@ console.log(`Assembling ${options.src}`);
 let prog = compiler.compile(options.src, {
     trace: false,
     warnUndocumented: options.undoc,
-    brief: options.brief
+    brief: options.brief,
+    searchPaths: options.path
 });
 if (prog.errors.length === 0) {
     // console.log(JSON.stringify(ast, undefined, 2));

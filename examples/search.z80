@@ -1,0 +1,8 @@
+start:
+    ld a,1
+
+.include "search_one.z80"
+.include "search_two.z80"
+
+    ld a,2
+end:

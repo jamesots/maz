@@ -19,7 +19,8 @@
     "start": "node lib/maz.js",
     "test-z80": "node lib/maz.js -s examples/z80monitor.z80 -o /tmp/z80monitor.bin -l /tmp/z80monitor.lst",
     "test-broke2": "node lib/maz.js -u -s examples/broke2.z80 -o /tmp/broke2.bin -l /tmp/broke2.lst",
-    "test-all": "node lib/maz.js -u -s examples/all.z80 -o /tmp/all.bin -l /tmp/all.lst"
+    "test-all": "node lib/maz.js -u -s examples/all.z80 -o /tmp/all.bin -l /tmp/all.lst",
+    "test-search": "node lib/maz.js -u -s examples/search.z80 -o /tmp/search.bin -l /tmp/search.lst -p examples/another_dir -p examples/search_dir_2"
   },
   "author": "James Ots <code@jamesots.com>",
   "license": "MIT",

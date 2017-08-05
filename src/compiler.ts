@@ -21,6 +21,7 @@ export abstract class FileResolver {
 export class DefaultFileResolver {
     private files: string[] = [];
     private _filename: string;
+    public searchPaths: string[] = [];
 
     public fileExists(filename: string): boolean {
         return fs.existsSync(this.getFilename(filename));
@@ -41,6 +42,12 @@ export class DefaultFileResolver {
     }
 
     private getFilename(filename: string): string {
+        for (const searchPath of this.searchPaths) {
+            const newFilename = path.join(searchPath, filename);
+            if (fs.existsSync(newFilename)) {
+                return newFilename;
+            }
+        }
         if (this._filename === undefined) {
             return filename;
         }
@@ -89,7 +96,11 @@ export class Programme {
         if (options.fileResolver) {
             this.fileResolver = options.fileResolver;
         } else {
-            this.fileResolver = new DefaultFileResolver();
+            const fileResolver = new DefaultFileResolver();
+            this.fileResolver = fileResolver;
+            if (options.searchPaths) {
+                fileResolver.searchPaths = options.searchPaths;
+            }
         }
     }
 
