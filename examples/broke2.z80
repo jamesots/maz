@@ -65,8 +65,9 @@ jumpforward:
 a1: equ a2
 a2: equ a1
 
-macro a1 thing
+macro a1 thing, bloo
     a2 thing
+    db bloo
 endm
 
 macro a2 blah
@@ -76,7 +77,7 @@ endm
     ld a,rpt("hello",2)
     ld a,rpt("hello",low)
 
-    a1 "ho"
+    a1 "ho","hee"
 
     ; ld a,"hello" * $
 ; end:

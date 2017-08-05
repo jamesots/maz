@@ -1215,10 +1215,10 @@ ret_zcpem = 'ret'i ws cond:zcpem {
 ret = 'ret'i {
     return res([0xc9]);
 }
-ld_r_a = 'ld'i ws 'r'i ws? ',' ws? 'a'i {
+ld_r_a = 'ld'i ws 'r'i ws? ',' ws? 'a'i ![a-z0-9_]i {
     return res([0xed, 0x4f]);
 }
-ld_a_r = 'ld'i ws 'a'i ws? ',' ws? 'r'i {
+ld_a_r = 'ld'i ws 'a'i ws? ',' ws? 'r'i ![a-z0-9_]i {
     return res([0xed, 0x5f]);
 }
 ld_r_r = 'ld'i ws reg1:reg ws? ',' ws? reg2:reg ![a-z0-9_]i ! {
@@ -1305,79 +1305,79 @@ rst_rst8 = 'rst'i ws rst:rst8 {
     return res([0xcf | rst << 4]);
 }
 
-reg = 'b'i { return 0; }
-    / 'c'i { return 1; }
-    / 'd'i { return 2; }
-    / 'e'i { return 3; }
-    / 'h'i { return 4; }
-    / 'l'i { return 5; }
+reg = 'b'i ![a-z0-9_]i { return 0; }
+    / 'c'i ![a-z0-9_]i { return 1; }
+    / 'd'i ![a-z0-9_]i { return 2; }
+    / 'e'i ![a-z0-9_]i { return 3; }
+    / 'h'i ![a-z0-9_]i { return 4; }
+    / 'l'i ![a-z0-9_]i { return 5; }
     / '(hl)'i { return 6; }
-    / 'a'i { return 7; }
+    / 'a'i ![a-z0-9_]i { return 7; }
 
-bcdehla = 'b'i { return 0; }
-    / 'c'i { return 1; }
-    / 'd'i { return 2; }
-    / 'e'i { return 3; }
-    / 'h'i { return 4; }
-    / 'l'i { return 5; }
-    / 'a'i { return 7; }
+bcdehla = 'b'i ![a-z0-9_]i { return 0; }
+    / 'c'i ![a-z0-9_]i { return 1; }
+    / 'd'i ![a-z0-9_]i { return 2; }
+    / 'e'i ![a-z0-9_]i { return 3; }
+    / 'h'i ![a-z0-9_]i { return 4; }
+    / 'l'i ![a-z0-9_]i { return 5; }
+    / 'a'i ![a-z0-9_]i { return 7; }
 
-bdhhl = 'b'i { return 0; }
-    / 'd'i { return 1; }
-    / 'h'i { return 2; }
+bdhhl = 'b'i ![a-z0-9_]i { return 0; }
+    / 'd'i ![a-z0-9_]i { return 1; }
+    / 'h'i ![a-z0-9_]i { return 2; }
     / '(hl)'i { return 3; }
 
-bdh = 'b'i { return 0; }
-    / 'd'i { return 1; }
-    / 'h'i { return 2; }
+bdh = 'b'i ![a-z0-9_]i { return 0; }
+    / 'd'i ![a-z0-9_]i { return 1; }
+    / 'h'i ![a-z0-9_]i { return 2; }
 
-bd = 'b'i { return 0; }
-    / 'd'i { return 1; }
+bd = 'b'i ![a-z0-9_]i { return 0; }
+    / 'd'i ![a-z0-9_]i { return 1; }
 
-cela = 'c'i { return 0; }
-    / 'e'i { return 1; }
-    / 'l'i { return 2; }
-    / 'a'i { return 3; }
+cela = 'c'i ![a-z0-9_]i { return 0; }
+    / 'e'i ![a-z0-9_]i { return 1; }
+    / 'l'i ![a-z0-9_]i { return 2; }
+    / 'a'i ![a-z0-9_]i { return 3; }
 
-cea = 'c'i { return 0; }
-    / 'e'i { return 1; }
-    / 'a'i { return 3; }
+cea = 'c'i ![a-z0-9_]i { return 0; }
+    / 'e'i ![a-z0-9_]i { return 1; }
+    / 'a'i ![a-z0-9_]i { return 3; }
 
-bcdehlsp = 'bc'i { return 0; }
-    / 'de'i { return 1; }
-    / 'hl'i { return 2; }
-    / 'sp'i { return 3; }
+bcdehlsp = 'bc'i ![a-z0-9_]i { return 0; }
+    / 'de'i ![a-z0-9_]i { return 1; }
+    / 'hl'i ![a-z0-9_]i { return 2; }
+    / 'sp'i ![a-z0-9_]i { return 3; }
 
-bcdesp = 'bc'i { return 0; }
-    / 'de'i { return 1; }
-    / 'sp'i { return 3; }
+bcdesp = 'bc'i ![a-z0-9_]i { return 0; }
+    / 'de'i ![a-z0-9_]i { return 1; }
+    / 'sp'i ![a-z0-9_]i { return 3; }
 
-bcdehlaf = 'bc'i { return 0; }
-    / 'de'i { return 1; }
-    / 'hl'i { return 2; }
-    / 'af'i { return 3; }
+bcdehlaf = 'bc'i ![a-z0-9_]i { return 0; }
+    / 'de'i ![a-z0-9_]i { return 1; }
+    / 'hl'i ![a-z0-9_]i { return 2; }
+    / 'af'i ![a-z0-9_]i { return 3; }
 
-bcde = 'bc'i { return 0; }
-    / 'de'i { return 1; }
+bcde = 'bc'i ![a-z0-9_]i { return 0; }
+    / 'de'i ![a-z0-9_]i { return 1; }
 
-nznc = 'nz'i { return 0; }
-    / 'nc'i { return 1; }
+nznc = 'nz'i ![a-z0-9_]i { return 0; }
+    / 'nc'i ![a-z0-9_]i { return 1; }
 
-zc = 'z'i { return 0; }
-    / 'c'i { return 1; }
+zc = 'z'i ![a-z0-9_]i { return 0; }
+    / 'c'i ![a-z0-9_]i { return 1; }
 
-nzncpop = 'nz'i { return 0; }
-    / 'nc'i { return 1; }
-    / 'po'i { return 2; }
-    / 'p'i { return 3; }
+nzncpop = 'nz'i ![a-z0-9_]i { return 0; }
+    / 'nc'i ![a-z0-9_]i { return 1; }
+    / 'po'i ![a-z0-9_]i { return 2; }
+    / 'p'i ![a-z0-9_]i { return 3; }
 
-zcpem = 'z'i { return 0; }
-    / 'c'i { return 1; }
-    / 'pe'i { return 2; }
-    / 'm'i { return 3; }
+zcpem = 'z'i ![a-z0-9_]i { return 0; }
+    / 'c'i ![a-z0-9_]i { return 1; }
+    / 'pe'i ![a-z0-9_]i { return 2; }
+    / 'm'i ![a-z0-9_]i { return 3; }
 
-hla = 'hl'i { return 0; }
-    / 'a'i { return 1; }
+hla = 'hl'i ![a-z0-9_]i { return 0; }
+    / 'a'i ![a-z0-9_]i { return 1; }
 
 rst0 = '00h'i { return 0; }
     / '$00' { return 0; }
@@ -1407,19 +1407,19 @@ n1357 = '1' { return 0; }
     / '5' { return 2; }
     / '7' { return 3; }
 
-ixiy = 'ix'i { return 0xdd; }
-    / 'iy'i { return 0xfd; }
+ixiy = 'ix'i ![a-z0-9_]i { return 0xdd; }
+    / 'iy'i ![a-z0-9_]i { return 0xfd; }
 
-ixhiyh = 'ixh'i { return 0xdd; }
-    / 'iyh'i { return 0xfd; }
+ixhiyh = 'ixh'i ![a-z0-9_]i { return 0xdd; }
+    / 'iyh'i ![a-z0-9_]i { return 0xfd; }
 
-ixliyl = 'ixl'i { return 0xdd; }
-    / 'iyl'i { return 0xfd; }
+ixliyl = 'ixl'i ![a-z0-9_]i { return 0xdd; }
+    / 'iyl'i ![a-z0-9_]i { return 0xfd; }
 
-ixyhl = 'ixh'i { return [0xdd, 0]; }
-    / 'ixl'i { return [0xdd, 1]; }
-    / 'iyh'i { return [0xfd, 0]; }
-    / 'iyl'i { return [0xfd, 1]; }
+ixyhl = 'ixh'i ![a-z0-9_]i { return [0xdd, 0]; }
+    / 'ixl'i ![a-z0-9_]i { return [0xdd, 1]; }
+    / 'iyh'i ![a-z0-9_]i { return [0xfd, 0]; }
+    / 'iyl'i ![a-z0-9_]i { return [0xfd, 1]; }
 
 ws = [ \t]+
 wsnl = [ \t\r\n]+

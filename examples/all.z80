@@ -10,22 +10,22 @@ org $1234
 here:
 
     ld a,one        ; 3e 01
-    ld a,one * 2    ; 3e 02
+    ld a,rpt(one, 2); 3e 02
     ld a,"one"      ; 3e 6f
-    ld a,"one" * 2  ; 3e 6f
+    ld a,rpt("one", 2)  ; 3e 6f
     ld a,$1234      ; 3e 34
     ld a,$1234 * 2  ; 3e 68
     ld a,one_s      ; 3e 6f
-    ld a,one_s * 2  ; 3e 6f
+    ld a,rpt(one_s, 2)  ; 3e 6f
     ld a,-2         ; 3e fe
 
     ld hl,$1234     ; 21 34 12
     ld hl,$1234 * 2 ; 21 68 24
     ld hl,$123456   ; 21 56 34
     ld hl,"one"     ; 21 6f 6e
-    ld hl,"one" * 2 ; 21 6f 6e
+    ld hl,rpt("one", 2) ; 21 6f 6e
     ld hl,one_s     ; 21 6f 6e
-    ld hl,one_s * 2 ; 21 6f 6e
+    ld hl,rpt(one_s, 2) ; 21 6f 6e
     ld hl,-2        ; 21 fe ff
     ld hl,a_s       ; 21 61 00
     ld hl,a_s * 2   ; 21 c2 00
@@ -36,9 +36,9 @@ here:
     db $1234 * 2    ; 68
     db $123456      ; 56
     db "one"        ; 6f 6e 65
-    db "one" * 2    ; 6f 6e 65 6f 6e 65
+    db rpt("one", 2)  ; 6f 6e 65 6f 6e 65
     db one_s        ; 6f 6e 65
-    db one_s * 2    ; 6f 6e 65 6f 6e 65
+    db rpt(one_s, 2)  ; 6f 6e 65 6f 6e 65
     db -2           ; fe
     db a_s          ; 61
     db a_s * 2      ; c2
@@ -49,9 +49,9 @@ here:
     dw $1234 * 2    ; 68 24
     dw $123456      ; 56 34
     dw "one"        ; 6f 6e 65 00
-    dw "one" * 2    ; 6f 6e 65 6f 6e 65
+    dw rpt("one", 2)  ; 6f 6e 65 6f 6e 65
     dw one_s        ; 6f 6e 65 00
-    dw one_s * 2    ; 6f 6e 65 6f 6e 65
+    dw rpt(one_s, 2)  ; 6f 6e 65 6f 6e 65
     dw -2           ; fe ff
     dw a_s          ; 61 00
     dw a_s * 2      ; c2 00
@@ -62,9 +62,9 @@ here:
     jp here         ; c3 34 12
     jp here * 2     ; c3 68 24
     jp "one"        ; c3 6f 6e
-    jp "one" * 2    ; c3 6f 6e
+    jp rpt("one", 2)    ; c3 6f 6e
     jp one_s        ; c3 6f 6e
-    jp one_s * 2    ; c3 6f 6e
+    jp rpt(one_s, 2)    ; c3 6f 6e
     jp $123         ; c3 23 01
     jp $1234        ; c3 34 12
     jp $12345       ; c3 45 23
@@ -74,19 +74,19 @@ here:
     jr $-2          ; 18 fe
     jr $ + 2        ; 18 02
 
-    dw "cd" - "ba"  ; 01 03     - 2 char strings count as numbers
+    dw "cd" - "ba"  ; 01 03     - 2 char strings count as numbers (unless they're on their own in a db)
     dw "ab" + "cd"  ; c4 c6     - here they are added
-    dw "abcd" + "efg" ; 61 62 63 64 65 66 67 00  - bigger strings are strings and are concatenated
+    dw cat("abcd", "efg") ; 61 62 63 64 65 66 67 00  - bigger strings are strings and are concatenated
                     ; this is confusing
-    dw ab_s + ab_s
-    dw one_s + one_s
+    dw ab_s + ab_s    ; c2 c4
+    dw cat(one_s, one_s)  ; 6f 6e 65 6f 6e 65
 
-    dw swap($1234), $1234
-    db swap($1234), $1234
-    db swap("ab"), "ab"
-    dw swap("ab"), "ab"
+    dw swp($1234), $1234  ; 12 34 34 12
+    db swp($1234), $1234  ; 12 34
+    db swp("ab"), "ab"    ; 62 61 62  - correct, as "ab" gets swapped and treated as a byte, then "ab" is a string
+    dw swp("ab"), "ab"    ; 62 61 61 62
 
-    db concat("ab", "bc", 16, ab_s) ; 61 62 62 63 31 36 61 62
+    db cat("ab", "bc", 16, ab_s) ; 61 62 62 63 31 36 61 62
 
 ; symbols
 ; start 0001

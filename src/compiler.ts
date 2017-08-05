@@ -93,12 +93,12 @@ export class Programme {
     private fileResolver: FileResolver;
 
     constructor(private options) {
-        if (options.fileResolver) {
+        if (options && options.fileResolver) {
             this.fileResolver = options.fileResolver;
         } else {
             const fileResolver = new DefaultFileResolver();
             this.fileResolver = fileResolver;
-            if (options.searchPaths) {
+            if (options && options.searchPaths) {
                 fileResolver.searchPaths = options.searchPaths;
             }
         }
