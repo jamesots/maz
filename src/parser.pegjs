@@ -1513,6 +1513,9 @@ function = 'min('i ws? expr1:expr1 ws? ',' ws? expr2:expr1 ws? ')'  {
     / 'swap('i ws? expr1:expr1 ws? ')' {
         return expr1;
     }
+    / 'concat('i ws? expr1:expr1 ws? expr2:(',' ws? expr1 ws?)+ ')' { 
+        return expr1.concat(exprVars(expr2, [2]));
+    }
 number_literal = binary_literal { return []; }
     / hex_literal { return []; }
     / decimal_literal { return []; }

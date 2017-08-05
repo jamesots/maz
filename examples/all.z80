@@ -86,6 +86,8 @@ here:
     db swap("ab"), "ab"
     dw swap("ab"), "ab"
 
+    db concat("ab", "bc", 16, ab_s) ; 61 62 62 63 31 36 61 62
+
 ; symbols
 ; start 0001
 ; one   0001

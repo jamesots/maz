@@ -203,6 +203,11 @@ describe('expr', function() {
         }).toThrow();
     });
 
+    it('should concatenate thing', function() {
+        let result = expr.parse(`concat("ab", "bc", 16)`);
+        expect(result).toBe("abbc16");
+    });
+
     it('should min things', function() {
         let result = expr.parse(`min(1, 2)`);
         expect(result).toBe(1);

@@ -310,6 +310,14 @@ function = 'min('i ws? expr1:expr ws? ',' ws? expr2:expr ws? ')' {
         }
         return Math.max(toNumber(expr1), toNumber(expr2));
     }
+    / 'concat('i ws? expr1:expr ws? expr2:(',' ws? expr ws?)+ ')' { 
+        let result = String(lookupVar(expr1));
+        for (const group of expr2) {
+            const value = group[2];
+            result += String(value);
+        }
+        return result;
+    }
     / 'swap('i ws? expr1:expr ws? ')' {
         expr1 = lookupVar(expr1);
         if (isString(expr1)) {
