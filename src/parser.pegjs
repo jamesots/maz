@@ -406,10 +406,7 @@ labeldef = at:'@'? label:label ':' {
     }
 }
 
-label = text1:[a-zA-Z_] text2:[a-zA-Z0-9_]* !{
-        const text = (text1 + text2.join('')).toLowerCase();
-        return (text === 'bc' || text === 'de' || text === 'hl' || text === 'sp');
-    } {
+label = text1:[a-zA-Z_] text2:[a-zA-Z0-9_]* {
         return text();
     }
 
@@ -544,8 +541,8 @@ code = ldir
     / adc_a_reg
     / adc_a_n
     / adc_reg
-    / adc_n
     / adc_hl_bcdehlsp
+    / adc_n
     / sub_a_ixyhl
     / sub_a_ixy
     / sub_ixyhl
@@ -561,8 +558,8 @@ code = ldir
     / sbc_a_reg
     / sbc_a_n
     / sbc_reg
-    / sbc_n
     / sbc_hl_bcdehlsp
+    / sbc_n
     / and_a_ixyhl
     / and_a_ixy
     / and_ixyhl

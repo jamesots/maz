@@ -412,9 +412,6 @@ unicode_escape_sequence = "u" digits:$([0-9a-f]i [0-9a-f]i [0-9a-f]i [0-9a-f]i) 
         return String.fromCodePoint(parseInt(digits, 16));
     }
 
-label = text1:[a-zA-Z] text2:[a-zA-Z0-9_]* !{
-        const text = (text1 + text2.join('')).toLowerCase();
-        return (text === 'bc' || text === 'de' || text === 'hl' || text === 'sp');
-    } {
+label = text1:[a-zA-Z] text2:[a-zA-Z0-9_]* {
         return text();
     }
