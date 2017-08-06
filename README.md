@@ -75,6 +75,8 @@ When defining a label in a block, you can prefix it with an at symbol (@) to mak
 
 Macros may have the same name as a label.
 
+There are no reserved words, so you may have labels which are the same as registers, and macros which are the same as instructions. This will be very confusing though, and will cause you to end up with ridiculous bugs in your code.
+
 Addresses
 ---------
 
