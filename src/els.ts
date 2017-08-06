@@ -22,7 +22,7 @@ export interface Element {
 export interface Error extends Element {
     error: string;
     filename: string;
-    source?: number;
+    source?: string;
 }
 export interface Org extends Element {
     org: string | number | Expression;

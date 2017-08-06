@@ -104,10 +104,15 @@ export function compile(filename, options) {
     return prog;
 }
 
+export interface Source {
+    name: string;
+    source: string[];
+}
+
 export class Programme {
     public ast: els.Element[];
     public symbols = {};
-    public sources = [];
+    public sources: Source[] = [];
     public macros = {};
     public errors = [];
     private fileResolver: FileResolver;
