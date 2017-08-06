@@ -22,7 +22,7 @@ const options = commandLineArgs(optionDefinitions);
 function showUsage() {
     console.log(commandLineUsage([
         {
-            header: 'MAZ v0.3.2',
+            header: 'MAZ v0.4.0',
             content: 'Macro Assembler for Z80'
         },
         {
@@ -36,7 +36,7 @@ if (!options.src || !options.out || options.help) {
     process.exit(-1);
 }
 
-console.log("MAZ v0.3.2");
+console.log("MAZ v0.4.0");
 console.log("WARNING: maz is under development, and likely to break without");
 console.log("         warning, and future versions will probably be completely");
 console.log("         incompatible.");
