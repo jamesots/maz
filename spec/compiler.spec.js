@@ -772,4 +772,22 @@ describe('compiler', function() {
         const bytes = prog.getBytes();
         expect(prog.errors.length).toBe(1);
     });
+    it('should calculate relative jumps', function() {
+        prog.ast = [
+            { 
+                references: true,
+                bytes: [1, {
+                    relative: {
+                        expression: '0',
+                        vars: []
+                    }
+                }],
+                address: 0 
+            }
+        ];
+        const bytes = prog.updateBytes();
+        expect(prog.ast).toEqual([
+            { references: true, address: 0, bytes: [1, 0xfe]}
+        ]);
+    })
 });

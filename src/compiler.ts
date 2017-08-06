@@ -18,7 +18,7 @@ export abstract class FileResolver {
     public readonly filename: string;
 }
 
-export class DefaultFileResolver {
+export class DefaultFileResolver implements FileResolver {
     private files: string[] = [];
     private _filename: string;
     public searchPaths: string[] = [];
@@ -54,6 +54,26 @@ export class DefaultFileResolver {
         return path.join(path.dirname(this._filename), filename);
     }
 
+    public get filename(): string {
+        return this._filename;
+    }
+}
+
+export class StringFileResolver implements FileResolver {
+    public constructor(private _filename: string, private code: string[]) {}
+    public fileExists(filename: string): boolean {
+        return filename === this._filename;
+    }
+    public readFile(filename: string): string[] {
+        if (filename === this._filename) {
+            return this.code;
+        }
+        throw "File not found: " + filename;
+    }
+    public finishFile() {}
+    public getRealFilename(filename: string): string {
+        return filename;
+    }
     public get filename(): string {
         return this._filename;
     }
@@ -572,7 +592,7 @@ export class Programme {
                             value = utf8.charCodeAt(0); // TODO test this - treat as signed value??
                         }
 
-                        const relative = value - el.address;
+                        const relative = value - (el.address + 2);
                         if (relative > 127) {
                             this.error(`Relative jump is out of range (${relative} > 127)`, el.location);
                         } else if (relative < -128) {
