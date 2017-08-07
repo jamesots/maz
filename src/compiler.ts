@@ -397,7 +397,6 @@ export class Programme {
                 source: this.sources[location.source].source[location.line - 1],
                 filename: this.sources[location.source].name
             };
-            this.errors.push(error);
             this.logError(error);
         } else {
             const error = {
@@ -406,7 +405,6 @@ export class Programme {
                 source: undefined,
                 filename: undefined
             };
-            this.errors.push(error);
             this.logError(error);
         }
     }
@@ -803,6 +801,7 @@ export class Programme {
     }
 
     public logError(e: els.Error | string) {
+        this.errors.push(e);
         if (typeof e === 'string') {
             console.log(chalk.red(e));
         } else if (e.location) {
