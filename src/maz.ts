@@ -15,14 +15,14 @@ const optionDefinitions = [
     { name: 'brief', alias: 'b', type: Boolean, multiple: false, description: 'Show brief errors'},
     { name: 'undoc', alias: 'u', type: Boolean, mutliple: false, description: 'Warn about undocumented instructions'},
     { name: 'help', alias: 'h', type: Boolean, multiple: false },
-    { name: 'path', alias: 'p', type: String, multiple: true, description: 'Search for include files in thes paths'}
+    { name: 'path', alias: 'p', type: String, multiple: true, description: 'Search for include files in these paths'}
 ];
 const options = commandLineArgs(optionDefinitions);
 
 function showUsage() {
     console.log(commandLineUsage([
         {
-            header: 'MAZ v0.4.0',
+            header: 'MAZ v0.4.2',
             content: 'Macro Assembler for Z80'
         },
         {
