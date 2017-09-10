@@ -25,7 +25,7 @@ describe('compiler', function() {
             {label: 'one'},
             {block: true},
                 {label: 'one'},
-            {endblock: true},
+            {endblock: true, endprefix: true},
             {label: 'two'},
         ];
         prog.symbols = prog.getSymbols();
@@ -41,7 +41,7 @@ describe('compiler', function() {
             {label: 'one'},
             {block: true},
                 {label: 'three', public: true},
-            {endblock: true},
+            {endblock: true, endprefix: true},
             {label: 'two'},
         ];
         prog.symbols = prog.getSymbols();
@@ -64,7 +64,7 @@ describe('compiler', function() {
             {block: true},
             {label: 'one'},
             {label: 'one'},
-            {endblock: true}
+            {endblock: true, endprefix: true}
         ];
         prog.getSymbols();
         expect(prog.errors.length).toBe(1);
@@ -74,10 +74,10 @@ describe('compiler', function() {
             {label: 'one'},
             {block: true},
                 {label: 'one'},
-            {endblock: true},
+            {endblock: true, endprefix: true},
             {block: true},
                 {label: 'one'},
-            {endblock: true},
+            {endblock: true, endprefix: true},
             {label: 'two'},
         ];
         prog.symbols = prog.getSymbols();
@@ -97,8 +97,8 @@ describe('compiler', function() {
                 {label: 'one'},
                 {block: true},
                     {label: 'one'},
-                {endblock: true},
-            {endblock: true},
+                {endblock: true, endprefix: true},
+            {endblock: true, endprefix: true},
             {label: 'two'},
         ];
         prog.symbols = prog.getSymbols();
@@ -118,14 +118,14 @@ describe('compiler', function() {
                 {label: 'one'},
                 {block: true},
                     {label: 'one'},
-                {endblock: true},
-            {endblock: true},
+                {endblock: true, endprefix: true},
+            {endblock: true, endprefix: true},
             {block: true},
                 {block: true},
                     {label: 'one'},
-                {endblock: true},
+                {endblock: true, endprefix: true},
                 {label: 'one'},
-            {endblock: true},
+            {endblock: true, endprefix: true},
             {label: 'two'},
         ];
         prog.symbols = prog.getSymbols();
@@ -548,7 +548,7 @@ describe('compiler', function() {
             { label: '%0_one' },
             { equ: 2 },
             { bytes: [ {expression: 'one', vars: ['one']}], references: ['one']},
-            { endblock: true},
+            { endblock: true, endprefix: true},
             { bytes: [ {expression: 'one', vars: ['one']}], references: ['one']}
         ];
         prog.symbols = {
@@ -563,7 +563,7 @@ describe('compiler', function() {
             { label: '%0_one' },
             { equ: 2 },
             { bytes: [ 2 ], references: ['one']},
-            { endblock: true},
+            { endblock: true, endprefix: true},
             { bytes: [ 1 ], references: ['one']}
         ])
     });
@@ -789,5 +789,19 @@ describe('compiler', function() {
         expect(prog.ast).toEqual([
             { references: true, address: 0, bytes: [1, 0xfe]}
         ]);
+    });
+    it('should handle macros in blocks', function() {
+        const prog = compiler.compile('test', {
+            fileResolver: new compiler.StringFileResolver('test',
+                [
+                    '.block',
+                    '.macro bob',
+                    '.endm',
+                    'ld a,3',
+                    '.endblock'
+                ])
+        });
+        const bytes = prog.getBytes();
+        expect(bytes).toEqual([62, 3]);
     })
 });
