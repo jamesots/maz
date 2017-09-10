@@ -394,6 +394,7 @@ block = '.block'i {
 endblock = '.endblock'i {
     return {
         endblock: true,
+        endprefix: true,
         location: loc()
     };
 }

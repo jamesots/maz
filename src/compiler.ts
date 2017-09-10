@@ -218,7 +218,7 @@ export class Programme {
             if (els.isPrefixed(el)) {
                 prefixes.push(el.prefix);
             }
-            if (els.isEndMacro(el) || els.isEndBlock(el)) {
+            if (els.isEndPrefix(el)) {
                 prefixes.pop();
             }
 
@@ -417,7 +417,10 @@ export class Programme {
                     this.error(`Unknown macro '${el.macrocall}'`, el.location);
                     el.params = [];
                     el.expanded = true;
-                    this.ast.splice(i + 1, 0, { endmacrocall: true } as els.EndMacroCall);
+                    this.ast.splice(i + 1, 0, { 
+                        endmacrocall: true,
+                        endprefix: true
+                    } as els.EndMacroCall);
                     return;
                 }
                 el.params = JSON.parse(JSON.stringify(macro.params));

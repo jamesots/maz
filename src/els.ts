@@ -40,6 +40,9 @@ export interface Include extends Element {
 export interface EndInclude extends Element {
     endinclude: number;
 }
+export interface EndPrefix extends Element {
+    endprefix: true;    
+}
 export interface MacroCall extends Element, Prefixed {
     macrocall: string;
     args: (string | number | Expression)[];
@@ -49,7 +52,7 @@ export interface MacroCall extends Element, Prefixed {
 export interface Block extends Element, Prefixed {
     block: true;
 }
-export interface EndBlock extends Element {
+export interface EndBlock extends Element, EndPrefix {
     endblock: true;
 }
 export interface Bytes extends Element {
@@ -58,7 +61,7 @@ export interface Bytes extends Element {
     address: number;
     out: number;
 }
-export interface EndMacroCall extends Element  {
+export interface EndMacroCall extends Element, EndPrefix  {
     endmacrocall: true;
 }
 export interface Comment extends Element {
@@ -156,6 +159,9 @@ export function isBlock(el: Element): el is Block {
 }
 export function isEndBlock(el: Element): el is EndBlock {
     return (el as EndBlock).endblock === true;
+}
+export function isEndPrefix(el: Element): el is EndPrefix {
+    return (el as EndPrefix).endprefix === true;
 }
 export function isInclude(el: Element): el is Include {
     return (el as Include).include !== undefined;
