@@ -810,9 +810,21 @@ describe('compiler', function() {
                 [
                     'start: defw $+2',
                     'defw $1234',
+                    'defw $2345,$3456'
                 ])
         });
         const bytes = prog.getBytes();
-        expect(bytes).toEqual([0x02, 0x00, 0x34, 0x12]);
+        expect(bytes).toEqual([0x02, 0x00, 0x34, 0x12, 0x45, 0x23, 0x56, 0x34]);
+    });
+    it('should handle defb properly', function() {
+        const prog = compiler.compile('test', {
+            fileResolver: new compiler.StringFileResolver('test',
+                [
+                    'defb "hello"',
+                    'defb "hello"'
+                ])
+        });
+        const bytes = prog.getBytes();
+        expect(bytes).toEqual([0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x68, 0x65, 0x6c, 0x6c, 0x6f]);
     });
 });

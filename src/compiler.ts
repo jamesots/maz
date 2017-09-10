@@ -506,10 +506,8 @@ export class Programme {
                 el.out = out;
                 
                 let length = el.bytes.length;
-                if (els.isDefb(el)) {
-                    length = 1;
-                } else if (els.isDefw(el)) {
-                    length = 2;
+                if (els.isDefw(el)) {
+                    length = length + (length % 2);
                 }
                 pc += length;
                 out += length;
