@@ -803,5 +803,16 @@ describe('compiler', function() {
         });
         const bytes = prog.getBytes();
         expect(bytes).toEqual([62, 3]);
-    })
+    });
+    it('should handle defw properly', function() {
+        const prog = compiler.compile('test', {
+            fileResolver: new compiler.StringFileResolver('test',
+                [
+                    'start: defw $+2',
+                    'defw $1234',
+                ])
+        });
+        const bytes = prog.getBytes();
+        expect(bytes).toEqual([0x02, 0x00, 0x34, 0x12]);
+    });
 });
