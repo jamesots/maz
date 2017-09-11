@@ -442,6 +442,7 @@ export class Programme {
         let pc = 0;
         let out = 0;
         this.iterateAst((el, i, prefix, inMacro) => {
+            // console.log("in: " + JSON.stringify(el, undefined, 2));
             if (inMacro) {
                 return;
             }
@@ -504,6 +505,8 @@ export class Programme {
             } else if (els.isBytes(el)) {
                 el.address = pc;
                 el.out = out;
+
+                this.updateByte(el, prefix, inMacro);
                 
                 let length = el.bytes.length;
                 if (els.isDefw(el)) {
@@ -512,6 +515,7 @@ export class Programme {
                 pc += length;
                 out += length;
             }
+            // console.log("out: " + JSON.stringify(el, undefined, 2));
         });
     }
 
@@ -588,71 +592,75 @@ export class Programme {
 
     public updateBytes() {
         this.iterateAst((el, i, prefix, inMacro) => {
-            if (els.isBytes(el) && el.references && !inMacro) {
-                this.symbols['$'] = el.address;
-                for (let i = 0; i < el.bytes.length; i++) {
-                    const byte = el.bytes[i];
-                    if (byte && els.isRelative(byte)) {
-                        let value = byte.relative;
-                        if (els.isExpression(value)) {
-                            value = this.evaluateExpression(prefix, value);
-                        }
-                        if (typeof value === 'string') {
-                            const utf8 = toUtf8(value);
-                            value = utf8.charCodeAt(0); // TODO test this - treat as signed value??
-                        }
+            this.updateByte(el, prefix, inMacro);
+        });
+    }
 
-                        const relative = value - (el.address + 2);
-                        if (relative > 127) {
-                            this.error(`Relative jump is out of range (${relative} > 127)`, el.location);
-                        } else if (relative < -128) {
-                            this.error(`Relative jump is out of range (${relative} < -128)`, el.location);
-                        }
-                        el.bytes[i] = relative & 0xff;
+    public updateByte(el: els.Element, prefix: string, inMacro: boolean) {
+        if (els.isBytes(el) && el.references && !inMacro) {
+            this.symbols['$'] = el.address;
+            for (let i = 0; i < el.bytes.length; i++) {
+                const byte = el.bytes[i];
+                if (byte && els.isRelative(byte)) {
+                    let value = byte.relative;
+                    if (els.isExpression(value)) {
+                        value = this.evaluateExpression(prefix, value);
                     }
-                    if (byte && els.isExpression(byte)) {
-                        const value = this.evaluateExpression(prefix, byte);
+                    if (typeof value === 'string') {
+                        const utf8 = toUtf8(value);
+                        value = utf8.charCodeAt(0); // TODO test this - treat as signed value??
+                    }
 
-                        if (typeof value === 'string') {
-                            const utf8 = toUtf8(value);
-                            if (els.isDefb(el)) {
-                                let bytes = [];
-                                for (let i = 0; i < utf8.length; i++) {
-                                    bytes.push(utf8.charCodeAt(i));
-                                }
-                                el.bytes.splice(i, 1, ...bytes);
-                            } else if (els.isDefw(el)) {
-                                let bytes = [];
-                                for (let i = 0; i < utf8.length; i++) {
-                                    bytes.push(utf8.charCodeAt(i));
-                                }
-                                if (utf8.length % 2 === 1) {
-                                    bytes.push(0);
-                                }
-                                el.bytes.splice(i, 1, ...bytes);
-                            } else {
-                                el.bytes[i] = utf8.charCodeAt(0);
-                                if (el.bytes[i + 1] === null) {
-                                    el.bytes[i + 1] = utf8.charCodeAt(1);
-                                }
+                    const relative = value - (el.address + 2);
+                    if (relative > 127) {
+                        this.error(`Relative jump is out of range (${relative} > 127)`, el.location);
+                    } else if (relative < -128) {
+                        this.error(`Relative jump is out of range (${relative} < -128)`, el.location);
+                    }
+                    el.bytes[i] = relative & 0xff;
+                }
+                if (byte && els.isExpression(byte)) {
+                    const value = this.evaluateExpression(prefix, byte);
+
+                    if (typeof value === 'string') {
+                        const utf8 = toUtf8(value);
+                        if (els.isDefb(el)) {
+                            let bytes = [];
+                            for (let i = 0; i < utf8.length; i++) {
+                                bytes.push(utf8.charCodeAt(i));
                             }
+                            el.bytes.splice(i, 1, ...bytes);
+                        } else if (els.isDefw(el)) {
+                            let bytes = [];
+                            for (let i = 0; i < utf8.length; i++) {
+                                bytes.push(utf8.charCodeAt(i));
+                            }
+                            if (utf8.length % 2 === 1) {
+                                bytes.push(0);
+                            }
+                            el.bytes.splice(i, 1, ...bytes);
                         } else {
-                            if (els.isDefb(el)) {
-                                el.bytes[i] = value & 0xff;
-                            } else if (els.isDefw(el)) {
-                                el.bytes[i] = value & 0xff;
-                                el.bytes.splice(i + 1, 0, (value >> 8) & 0xff);
-                            } else {
-                                el.bytes[i] = value & 0xff;
-                                if (el.bytes[i + 1] === null) {
-                                    el.bytes[i + 1] = (value >> 8) & 0xff;
-                                }
+                            el.bytes[i] = utf8.charCodeAt(0);
+                            if (el.bytes[i + 1] === null) {
+                                el.bytes[i + 1] = utf8.charCodeAt(1);
+                            }
+                        }
+                    } else {
+                        if (els.isDefb(el)) {
+                            el.bytes[i] = value & 0xff;
+                        } else if (els.isDefw(el)) {
+                            el.bytes[i] = value & 0xff;
+                            el.bytes.splice(i + 1, 0, (value >> 8) & 0xff);
+                        } else {
+                            el.bytes[i] = value & 0xff;
+                            if (el.bytes[i + 1] === null) {
+                                el.bytes[i + 1] = (value >> 8) & 0xff;
                             }
                         }
                     }
                 }
             }
-        });
+        }
     }
 
     public collectAst() {

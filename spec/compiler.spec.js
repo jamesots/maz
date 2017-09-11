@@ -827,4 +827,45 @@ describe('compiler', function() {
         const bytes = prog.getBytes();
         expect(bytes).toEqual([0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x68, 0x65, 0x6c, 0x6c, 0x6f]);
     });
+    it('should handle defb properly 2', function() {
+        const prog = compiler.compile('test', {
+            fileResolver: new compiler.StringFileResolver('test',
+                [
+                    'defb cat("hello", $+1), $+10, $+11, $+12',
+                    'defb 5'
+                ])
+        });
+        const bytes = prog.getBytes();
+        expect(bytes).toEqual([0x68, 0x65, 0x6c, 0x6c, 0x6f, 49, 10, 11, 12, 5]);
+    });
+    it('should handle defb properly 3', function() {
+        const prog = compiler.compile('test', {
+            fileResolver: new compiler.StringFileResolver('test',
+                [
+                    '   defb more',
+                    'more:',
+                    '   defb 5',
+                    '   defb more',
+                ])
+        });
+        expect(prog.errors.length).toBeGreaterThan(0);
+    });
+    it('should handle defw properly 2', function() {
+        const prog = compiler.compile('test', {
+            fileResolver: new compiler.StringFileResolver('test',
+                [
+                    'a1: equ $0102',
+                    'a2: equ $0304',
+                    'a3: equ $0506',
+                    'a4: equ $0708',
+                    'defw a1,a2,a3,a4',
+                    'defw a1,a2,a3,a4',
+                    'defw a1,a2,a3,a4',
+                ])
+        });
+        const bytes = prog.getBytes();
+        expect(bytes).toEqual([0x02,0x01,0x04,0x03,0x06,0x05,0x08,0x07,
+            0x02,0x01,0x04,0x03,0x06,0x05,0x08,0x07,
+            0x02,0x01,0x04,0x03,0x06,0x05,0x08,0x07]);
+    });
 });
