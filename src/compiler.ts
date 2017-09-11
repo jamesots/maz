@@ -506,7 +506,9 @@ export class Programme {
                 el.address = pc;
                 el.out = out;
 
-                this.updateByte(el, prefix, inMacro);
+                if (els.isDefb(el) || els.isDefw(el)) {
+                    this.updateByte(el, prefix, inMacro);
+                }
                 
                 let length = el.bytes.length;
                 if (els.isDefw(el)) {
