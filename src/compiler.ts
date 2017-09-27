@@ -94,6 +94,7 @@ export function compile(filename, options) {
     prog.getMacros();
     prog.expandMacros();
     prog.getSymbols();
+    // no evaluation up to here
     prog.assignPCandEQU();
     prog.evaluateSymbols();
     prog.checkSymbols();
@@ -208,8 +209,8 @@ export class Programme {
         return source;
     }
 
-    private iterateAst(func: (el: els.Element, index: number, prefix: string, inMacro: boolean, ifTrue: boolean, inMacroCall: boolean) => void, ignoreIf = false) {
-        let inMacro = false;
+    private iterateAst(func: (el: els.Element, index: number, prefix: string, inMacroDef: boolean, ifTrue: boolean, inMacroCall: boolean) => void, ignoreIf = false) {
+        let inMacroDef = false;
         let inMacroCall = false;
         const prefixes = [];
         const ifStack = [true];
@@ -223,10 +224,10 @@ export class Programme {
             }
 
             if (els.isMacroDef(el)) {
-                inMacro = true;
+                inMacroDef = true;
             }
 
-            if (!inMacro && els.isMacroCall(el)) {
+            if (!inMacroDef && els.isMacroCall(el)) {
                 inMacroCall = true;
             }
 
@@ -244,11 +245,11 @@ export class Programme {
             }
 
             if (ignoreIf || ifStack[ifStack.length - 1]) {
-                func(el, i, prefixes[prefixes.length - 1] || '', inMacro, ifStack[ifStack.length - 1], inMacroCall);
+                func(el, i, prefixes[prefixes.length - 1] || '', inMacroDef, ifStack[ifStack.length - 1], inMacroCall);
             }
 
             if (els.isEndMacro(el)) {
-                inMacro = false;
+                inMacroDef = false;
             }
             if (els.isEndMacroCall(el)) {
                 inMacroCall = false;
@@ -256,11 +257,19 @@ export class Programme {
         }    
     }
 
+    /**
+     * Finds all include elements which haven't already been included.
+     * Add error if file doesn't exist, but mark it as included
+     * If it does, read the file, parse it and insert it after the
+     * include element. Then add an endinclude element.
+     * Then carry on iterating over the file, so any included includes
+     * get processed.
+     */
     public processIncludes() {
         const sourceIndices = [];
         let sourceIndex = 0;
 
-        this.iterateAst((el, i, prefix, inMacro) => {
+        this.iterateAst((el, i, prefix, inMacroDef) => {
             if (els.isInclude(el) && !el.included) {
                 if (!this.fileResolver.fileExists(el.include)) {
                     this.error("File does not exist: " + this.fileResolver.getRealFilename(el.include), el.location);
@@ -288,11 +297,18 @@ export class Programme {
         });
     }
 
+    /**
+     * Look for macrodefs. Don't allow nested macros. Don't allow
+     * a macro to be redefined. 
+     * Store all ast elements until endmacro.
+     * Look for endmacros. If not in a macro, throw error. Otherwise
+     * store the macro in the list of macros, indexed by macro name.
+     */
     public getMacros() {
         let macro = undefined;
         let macroName = undefined;
         let macroLocation = undefined;
-        this.iterateAst((el, i, prefix, inMacro) => {
+        this.iterateAst((el, i, prefix, inMacroDef) => {
             if (els.isMacroDef(el)) {
                 if (macro) {
                     this.error("Cannot nest macros", el.location);
@@ -330,12 +346,26 @@ export class Programme {
     /**
      * Gets a map of symbols, and updates the parsed objects
      * so the block and endblock objects have prefixes
+     * 
+     * Labels
+     *  - don't allow label to redefined in the same block
+     *  - don't allow public label to be defined
+     *  - relabel labels in blocks with %n_n_n... for blocks
+     *  - symbol is stored with value of null
+     * Blocks / EndBlocks
+     *  - count the block depth
+     * Macrocall
+     *  - add prefixes to parameter names and
+     *    set their values to whatever they are being called with
+     * Equ
+     *  - must have a label
+     *  - this symbol is set to the equ expression
      */
     public getSymbols() {
         let nextBlock = 0;
         let blocks = [];
-        this.iterateAst((el, i, prefix, inMacro) => {
-            if (els.isLabel(el) && !inMacro) {
+        this.iterateAst((el, i, prefix, inMacroDef) => {
+            if (els.isLabel(el) && !inMacroDef) {
                 if (blocks.length > 0 && !el.public) {
                     if (typeof this.symbols[labelName(blocks, el.label)] !== 'undefined') {
                         this.error(`Label '${el.label}' already defined at in this block`, el.location);
@@ -356,7 +386,7 @@ export class Programme {
                 nextBlock++;
             } else if (els.isEndBlock(el) || els.isEndMacroCall(el)) {
                 blocks.pop();
-            } else if (els.isMacroCall(el) && !inMacro) {
+            } else if (els.isMacroCall(el) && !inMacroDef) {
                 blocks.push(nextBlock);
                 el.prefix = labelPrefix(blocks);
                 nextBlock++;
@@ -409,9 +439,15 @@ export class Programme {
         }
     }
 
+    /**
+     * Look for macrocalls. If macro doesn't exist, add error. Then add
+     * an endmacrocall element.
+     * If macro does exist, splice in the macro's ast. Then add an
+     * endmacrocall element.
+     */
     public expandMacros() {
-        this.iterateAst((el, i, prefix, inMacro) => {
-            if (els.isMacroCall(el) && !inMacro) {
+        this.iterateAst((el, i, prefix, inMacroDef) => {
+            if (els.isMacroCall(el) && !inMacroDef) {
                 const macro = this.macros[el.macrocall];
                 if (!macro) {
                     this.error(`Unknown macro '${el.macrocall}'`, el.location);
@@ -439,19 +475,23 @@ export class Programme {
      * the symbol
      */
     public assignPCandEQU() {
+        // pc starts at 0 unless org or phase changes it
         let pc = 0;
         let out = 0;
-        this.iterateAst((el, i, prefix, inMacro) => {
+        this.iterateAst((el, i, prefix, inMacroDef) => {
             // console.log("in: " + JSON.stringify(el, undefined, 2));
-            if (inMacro) {
+            if (inMacroDef) { // don't need to update things in the macro defs
                 return;
             }
             if (els.isLabel(el)) {
+                // label - just set the value to the pc
                 if (this.symbols[el.label] === null) {
                     this.symbols[el.label] = pc;
                 }
                 return;
             } else if (els.isEqu(el)) {
+                // if the equ is an expression, store the address in it
+                // for later evaluation
                 if (el.equ.expression) {
                     el.equ.address = pc;
                 }
@@ -459,6 +499,7 @@ export class Programme {
                 let size: string | number | els.Expression = el.defs;
                 if (els.isExpression(size)) {
                     size = this.evaluateExpression(prefix, size);
+                    // TODO what if size can't be evaluated
                 }
                 if (typeof size === 'string') {
                     const utf8 = toUtf8(size);
@@ -507,7 +548,7 @@ export class Programme {
                 el.out = out;
 
                 if (els.isDefb(el) || els.isDefw(el)) {
-                    this.updateByte(el, prefix, inMacro, true);
+                    this.updateByte(el, prefix, inMacroDef, true);
                 }
                 
                 let elementLength = els.isDefw(el) ? 2 : 1;
@@ -602,13 +643,13 @@ export class Programme {
     }
 
     public updateBytes() {
-        this.iterateAst((el, i, prefix, inMacro) => {
-            this.updateByte(el, prefix, inMacro);
+        this.iterateAst((el, i, prefix, inMacroDef) => {
+            this.updateByte(el, prefix, inMacroDef);
         });
     }
 
-    public updateByte(el: els.Element, prefix: string, inMacro: boolean, ignoreErrors: boolean = false) {
-        if (els.isBytes(el) && el.references && !inMacro) {
+    public updateByte(el: els.Element, prefix: string, inMacroDef: boolean, ignoreErrors: boolean = false) {
+        if (els.isBytes(el) && el.references && !inMacroDef) {
             this.symbols['$'] = el.address;
             for (let i = 0; i < el.bytes.length; i++) {
                 const byte = el.bytes[i];
@@ -685,7 +726,7 @@ export class Programme {
         let line = 0;
         let source = 0;
         let ast: any = {};
-        this.iterateAst((el, i, prefix, inMacro, ifTrue, inMacroCall) => {
+        this.iterateAst((el, i, prefix, inMacroDef, ifTrue, inMacroCall) => {
             if (el.location) {
                 if ((el.location.line !== line && line !== 0) || (el.location.source !== source)) {
                     collectedAst.push(ast);                
@@ -696,8 +737,8 @@ export class Programme {
             }
   
             Object.assign(ast, el);
-            if (inMacro) {
-                ast.inMacro = true;
+            if (inMacroDef) {
+                ast.inMacroDef = true;
             }
             if (inMacroCall) {
                 ast.inMacroCall = true;
@@ -756,13 +797,13 @@ export class Programme {
                 el.out, 
                 el.address, 
                 el.bytes, 
-                el.inMacro, 
+                el.inMacroDef, 
                 el.inMacroCall,
                 el.ifTrue,
                 (warnUndoc && el.undoc) ? 'U' :
                 el.error ? 'E' : ' ');
                 
-            // if (el.macrocall && !el.inMacro) {
+            // if (el.macrocall && !el.inMacroDef) {
             //     list.push('           ' + ' '.repeat(BYTELEN * 2) + '  *UNROLL MACRO')
             // }
 
@@ -807,9 +848,9 @@ export class Programme {
         return list;
     }
 
-    private dumpLine(list, lines, line, out, address, bytes, inMacro, inMacroCall, ifTrue, letter = ' ') {
+    private dumpLine(list, lines, line, out, address, bytes, inMacroDef, inMacroCall, ifTrue, letter = ' ') {
         let byteString = '';
-        if (bytes && !inMacro) {
+        if (bytes && !inMacroDef) {
             for (const byte of bytes) {
                 byteString += pad((byte & 0xFF).toString(16), 2, '0');
             }
@@ -869,8 +910,8 @@ export class Programme {
         let startOut = null;
         let out = null;
 
-        this.iterateAst((el, i, prefix, inMacro) => {
-            if (els.isBytes(el) && !inMacro) {
+        this.iterateAst((el, i, prefix, inMacroDef) => {
+            if (els.isBytes(el) && !inMacroDef) {
                 const end = bytes.length + startOut;
                 if (out === null || el.out === end) {
                     if (startOut === null) {
