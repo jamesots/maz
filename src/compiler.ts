@@ -507,12 +507,17 @@ export class Programme {
                 el.out = out;
 
                 if (els.isDefb(el) || els.isDefw(el)) {
-                    this.updateByte(el, prefix, inMacro);
+                    this.updateByte(el, prefix, inMacro, true);
                 }
                 
-                let length = el.bytes.length;
-                if (els.isDefw(el)) {
-                    length = length + (length % 2);
+                let elementLength = els.isDefw(el) ? 2 : 1;
+                let length = 0;
+                for (const byte of el.bytes) {
+                    if (byte && els.isExpression(byte)) {
+                        length += elementLength;
+                    } else {
+                        length += 1;
+                    }
                 }
                 pc += length;
                 out += length;
@@ -521,7 +526,7 @@ export class Programme {
         });
     }
 
-    private evaluateExpression(prefix = '', expr, evaluated = []): number | string {
+    private evaluateExpression(prefix = '', expr, evaluated = [], ignoreErrors: boolean = false): number | string {
         const variables = expr.vars;
         const subVars = {}; // substitute variables
         if (expr.address !== undefined) {
@@ -531,8 +536,10 @@ export class Programme {
             const subVar = this.findVariable(prefix, variable);
 
             if (this.symbols[subVar] === undefined || this.symbols[subVar] === null) {
-                this.error(`Symbol '${variable}' not found`, expr.location);
-                subVars[variable] = 0;
+                if (!ignoreErrors) {
+                    this.error(`Symbol '${variable}' not found`, expr.location);
+                    subVars[variable] = 0;
+                }
             } else {
                 if (this.symbols[subVar].expression) {
                     this.evaluateSymbol(subVar, evaluated);
@@ -543,7 +550,9 @@ export class Programme {
         try {
             return Expr.parse(expr.expression, {variables: subVars});
         } catch (e) {
-            this.error(e, expr.location);
+            if (!ignoreErrors) {
+                this.error(e, expr.location);
+            }
         }
     }
 
@@ -598,7 +607,7 @@ export class Programme {
         });
     }
 
-    public updateByte(el: els.Element, prefix: string, inMacro: boolean) {
+    public updateByte(el: els.Element, prefix: string, inMacro: boolean, ignoreErrors: boolean = false) {
         if (els.isBytes(el) && el.references && !inMacro) {
             this.symbols['$'] = el.address;
             for (let i = 0; i < el.bytes.length; i++) {
@@ -606,7 +615,7 @@ export class Programme {
                 if (byte && els.isRelative(byte)) {
                     let value = byte.relative;
                     if (els.isExpression(value)) {
-                        value = this.evaluateExpression(prefix, value);
+                        value = this.evaluateExpression(prefix, value, [], ignoreErrors);
                     }
                     if (typeof value === 'string') {
                         const utf8 = toUtf8(value);
@@ -614,15 +623,21 @@ export class Programme {
                     }
 
                     const relative = value - (el.address + 2);
-                    if (relative > 127) {
-                        this.error(`Relative jump is out of range (${relative} > 127)`, el.location);
-                    } else if (relative < -128) {
-                        this.error(`Relative jump is out of range (${relative} < -128)`, el.location);
+                    if (!ignoreErrors) {
+                        if (relative > 127) {
+                            this.error(`Relative jump is out of range (${relative} > 127)`, el.location);
+                        } else if (relative < -128) {
+                            this.error(`Relative jump is out of range (${relative} < -128)`, el.location);
+                        }
                     }
                     el.bytes[i] = relative & 0xff;
                 }
                 if (byte && els.isExpression(byte)) {
-                    const value = this.evaluateExpression(prefix, byte);
+                    const value = this.evaluateExpression(prefix, byte, [], ignoreErrors);
+
+                    if (ignoreErrors && value === undefined) {
+                        continue;
+                    }
 
                     if (typeof value === 'string') {
                         const utf8 = toUtf8(value);

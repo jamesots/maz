@@ -804,7 +804,7 @@ describe('compiler', function() {
         const bytes = prog.getBytes();
         expect(bytes).toEqual([62, 3]);
     });
-    it('should handle defw properly', function() {
+    it('should handle defw properly - should evaluate expression', function() {
         const prog = compiler.compile('test', {
             fileResolver: new compiler.StringFileResolver('test',
                 [
@@ -816,7 +816,7 @@ describe('compiler', function() {
         const bytes = prog.getBytes();
         expect(bytes).toEqual([0x02, 0x00, 0x34, 0x12, 0x45, 0x23, 0x56, 0x34]);
     });
-    it('should handle defb properly', function() {
+    it('should handle defb properly - strings should be the right length', function() {
         const prog = compiler.compile('test', {
             fileResolver: new compiler.StringFileResolver('test',
                 [
@@ -827,7 +827,7 @@ describe('compiler', function() {
         const bytes = prog.getBytes();
         expect(bytes).toEqual([0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x68, 0x65, 0x6c, 0x6c, 0x6f]);
     });
-    it('should handle defb properly 2', function() {
+    it('should handle defb properly - multiple expressions on the same line should work', function() {
         const prog = compiler.compile('test', {
             fileResolver: new compiler.StringFileResolver('test',
                 [
@@ -838,7 +838,7 @@ describe('compiler', function() {
         const bytes = prog.getBytes();
         expect(bytes).toEqual([0x68, 0x65, 0x6c, 0x6c, 0x6f, 49, 10, 11, 12, 5]);
     });
-    it('should handle defb properly 3', function() {
+    it('should handle defb properly - simple forward references should not be errors', function() {
         const prog = compiler.compile('test', {
             fileResolver: new compiler.StringFileResolver('test',
                 [
@@ -848,9 +848,10 @@ describe('compiler', function() {
                     '   defb more',
                 ])
         });
-        expect(prog.errors.length).toBeGreaterThan(0);
+        const bytes = prog.getBytes();
+        expect(bytes).toEqual([1, 5, 1]);
     });
-    it('should handle defw properly 2', function() {
+    it('should handle defw properly - mutliple expressions should work', function() {
         const prog = compiler.compile('test', {
             fileResolver: new compiler.StringFileResolver('test',
                 [
@@ -867,5 +868,75 @@ describe('compiler', function() {
         expect(bytes).toEqual([0x02,0x01,0x04,0x03,0x06,0x05,0x08,0x07,
             0x02,0x01,0x04,0x03,0x06,0x05,0x08,0x07,
             0x02,0x01,0x04,0x03,0x06,0x05,0x08,0x07]);
+    });
+    it('should handle defw properly - forward references should not be errors', function() {
+        const prog = compiler.compile('test', {
+            fileResolver: new compiler.StringFileResolver('test',
+                [
+                    '   defw more, more, 8',
+                    'more:',
+                    '   defb 5',
+                    '   defw more, 6',
+                ])
+        });
+        const bytes = prog.getBytes();
+        expect(bytes).toEqual([6, 0, 6, 0, 8, 0, 5, 6, 0, 6, 0]);
+    });
+    it('defw should pad strings', function() {
+        const prog = compiler.compile('test', {
+            fileResolver: new compiler.StringFileResolver('test',
+                [
+                    '   defw "123"',
+                ])
+        });
+        const bytes = prog.getBytes();
+        expect(bytes).toEqual([49, 50, 51, 0]);
+    });
+    it('defw cat should pad strings after catting', function() {
+        const prog = compiler.compile('test', {
+            fileResolver: new compiler.StringFileResolver('test',
+                [
+                    '   defw cat("1", "23")',
+                ])
+        });
+        const bytes = prog.getBytes();
+        expect(bytes).toEqual([49, 50, 51, 0]);
+    });
+    it('defw cat should interpret values as strings', function() {
+        const prog = compiler.compile('test', {
+            fileResolver: new compiler.StringFileResolver('test',
+                [
+                    'start: ',
+                    '   defw cat(start, "23")',
+                    'thing: equ 123',
+                    '   defw cat(thing, "0")'
+                ])
+        });
+        const bytes = prog.getBytes();
+        expect(bytes).toEqual([48, 50, 51, 0, 49, 50, 51, 48]);
+    });
+    fit('should handle defw properly - larger forward references should not be errors', function() {
+        const prog = compiler.compile('test', {
+            fileResolver: new compiler.StringFileResolver('test',
+                [
+                    '   defw cat(more, "44"), 8',
+                    'more:',
+                    '   defb 5',
+                    '   defw more, 6',
+                ])
+        });
+        const bytes = prog.getBytes();
+        expect(bytes).toEqual([54, 52, 52, 0, 8, 0, 5, 6, 0, 6, 0]);
+    });
+    fit('should handle defb properly - some forward references should be errors', function() {
+        const prog = compiler.compile('test', {
+            fileResolver: new compiler.StringFileResolver('test',
+                [
+                    '   defw rpt("hi", more)',
+                    'more:',
+                    '   defb 5',
+                ])
+        });
+        expect(prog.errors.length).toBeGreaterThan(0);
     });
 });
