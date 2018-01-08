@@ -34,7 +34,8 @@ export class DefaultFileResolver implements FileResolver {
     }
 
     public finishFile() {
-        this._filename = this.files.pop();
+        this.files.pop();
+        this._filename = this.files[this.files.length - 1];
     }
 
     public getRealFilename(filename: string): string {
@@ -52,6 +53,60 @@ export class DefaultFileResolver implements FileResolver {
             return filename;
         }
         return path.join(path.dirname(this._filename), filename);
+    }
+
+    public get filename(): string {
+        return this._filename;
+    }
+}
+
+export class StringFileResolvers implements FileResolver {
+    private files: string[] = [];
+    private _filename: string;
+    public searchPaths: string[] = [];
+
+    constructor(private fileContent: {[filename: string]: string[]}) {};
+
+    public fileExists(filename: string): boolean {
+        console.log(`fileExists ${filename}`);
+        return this.fileContent[this.getFilename(filename)] !== undefined;
+    }
+
+    public readFile(filename: string): string[] {
+        console.log(`readFile ${filename}`);
+        this._filename = this.getFilename(filename);
+        this.files.push(filename);
+        return this.fileContent[this._filename];
+    }
+
+    public finishFile() {
+        console.log('finishFile');
+        this.files.pop();
+        this._filename = this.files[this.files.length - 1];
+        console.log(`finishFile - _filename = ${this._filename}`);
+    }
+
+    public getRealFilename(filename: string): string {
+        console.log(`getRealFilename: ${filename}`);
+        return this.getFilename(filename);
+    }
+
+    private getFilename(filename: string): string {
+        console.log(`getFilename: ${filename}`);
+        for (const searchPath of this.searchPaths) {
+            const newFilename = searchPath + '/' + filename;
+            if (this.fileContent[newFilename] !== undefined) {
+                return newFilename;
+            }
+        }
+        if (this._filename === undefined) {
+            return filename;
+        }
+        const index = this._filename.lastIndexOf('/');
+        if (index === -1) {
+            return filename;
+        }
+        return this._filename.substring(index + 1) + '/' + filename;
     }
 
     public get filename(): string {

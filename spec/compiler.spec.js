@@ -915,7 +915,7 @@ describe('compiler', function() {
         const bytes = prog.getBytes();
         expect(bytes).toEqual([48, 50, 51, 0, 49, 50, 51, 48]);
     });
-    fit('should handle defw properly - larger forward references should not be errors', function() {
+    it('should handle defw properly - larger forward references should not be errors', function() {
         const prog = compiler.compile('test', {
             fileResolver: new compiler.StringFileResolver('test',
                 [
@@ -928,7 +928,7 @@ describe('compiler', function() {
         const bytes = prog.getBytes();
         expect(bytes).toEqual([54, 52, 52, 0, 8, 0, 5, 6, 0, 6, 0]);
     });
-    fit('should handle defb properly - some forward references should be errors', function() {
+    it('should handle defb properly - some forward references should be errors', function() {
         const prog = compiler.compile('test', {
             fileResolver: new compiler.StringFileResolver('test',
                 [
@@ -938,5 +938,24 @@ describe('compiler', function() {
                 ])
         });
         expect(prog.errors.length).toBeGreaterThan(0);
+    });
+    fit('should handle includes properly', function() {
+        const prog = compiler.compile('test', {
+            fileResolver: new compiler.StringFileResolvers({
+                'test': 
+                [
+                    '.include "src/one"',
+                    '.include "src/two"',
+                ],
+                'src/one' :
+                [
+                    ';.include "src/two"'
+                ],
+                'src/two' :
+                [
+                    ';blah'
+                ]
+            })
+        });
     });
 });
