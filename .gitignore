@@ -3,4 +3,3 @@ lib
 src/*.js
 node_modules
 *.tgz
-package-lock.json
