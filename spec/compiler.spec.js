@@ -939,7 +939,7 @@ describe('compiler', function() {
         });
         expect(prog.errors.length).toBeGreaterThan(0);
     });
-    fit('should handle includes properly', function() {
+    it('should handle includes properly', function() {
         const prog = compiler.compile('test', {
             fileResolver: new compiler.StringFileResolvers({
                 'test': 
