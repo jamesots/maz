@@ -2,12 +2,11 @@
   "compilerOptions": {
     "target": "es6",
     "module": "commonjs",
-    "outDir": "./build",
+    "outDir": "../buildtest",
     "strict": false,
     "noImplicitAny": false
   },
   "include": [
-    "**/*.ts",
-    "../src/**/*.d.ts"
+    "../lib/*.d.ts"
   ]
 }

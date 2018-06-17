@@ -1,1 +1,1 @@
-export function parse(code: string, options: any);
+export function parse(code: string, options?: any);
