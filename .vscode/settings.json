@@ -1,3 +1,15 @@
 {
-    "typescript.tsdk": "node_modules/typescript/lib"
+    "typescript.tsdk": "node_modules/typescript/lib",
+    "mocha.requires": [
+        "ts-node/register"
+    ],
+    "mocha.env": {
+        "TS_NODE_PROJECT": "test/tsconfig.json"
+    },
+    "mocha.files.glob": "test/**/*.ts",
+    "mocha.options": {
+        "compilers": {
+            "ts": "ts-node/register"
+        }
+    }
 }
