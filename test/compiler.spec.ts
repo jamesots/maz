@@ -866,12 +866,14 @@ describe('compiler', function() {
                     'defw a1,a2,a3,a4',
                     'defw a1,a2,a3,a4',
                     'defw a1,a2,a3,a4',
+                    'defw cat("a", "b", "c"), a1',
                 ])
         });
         const bytes = prog.getBytes();
         expect(bytes).to.eql([0x02,0x01,0x04,0x03,0x06,0x05,0x08,0x07,
             0x02,0x01,0x04,0x03,0x06,0x05,0x08,0x07,
-            0x02,0x01,0x04,0x03,0x06,0x05,0x08,0x07]);
+            0x02,0x01,0x04,0x03,0x06,0x05,0x08,0x07,
+            0x61,0x62,0x63,0x00,0x02,0x01]);
     });
     it('should handle defw properly - forward references should not be errors', function() {
         const prog = compiler.compile('test', {
@@ -919,12 +921,13 @@ describe('compiler', function() {
         const bytes = prog.getBytes();
         expect(bytes).to.eql([48, 50, 51, 0, 49, 50, 51, 48]);
     });
-    it('should handle defw properly - larger forward references should not be errors', function() {
+    it.only('should handle defw properly - larger forward references should not be errors', function() {
         const prog = compiler.compile('test', {
             fileResolver: new compiler.StringFileResolver('test',
                 [
                     '   defw cat(more, "44"), 8',
-                    'more:',
+                    'more:', // it is incorrectly working this out to be 4, and then
+                    // overwriting the bytes from the previous line
                     '   defb 5',
                     '   defw more, 6',
                 ])
