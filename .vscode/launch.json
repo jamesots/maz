@@ -14,9 +14,16 @@
                 "type": "node",
                 "request": "launch",
                 "name": "Test",
-                "program": "${workspaceRoot}/node_modules/.bin/jasmine",
-                "outFiles": [
-                    "${workspaceRoot}/out/**/*.js"
+                "program": "${workspaceRoot}/node_modules/mocha/bin/_mocha",
+                "env": {
+                    "TS_NODE_PROJECT": "${workspaceRoot}/test/tsconfig.json"
+                },
+                "runtimeArgs": [
+                    
+                ],
+                "args": [
+                    "-r", "${workspaceRoot}/node_modules/ts-node/register",
+                    "${workspaceRoot}/test/**/*.ts"
                 ]
             }
         ]
