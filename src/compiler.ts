@@ -609,7 +609,12 @@ export class Programme {
                 let elementLength = els.isDefw(el) ? 2 : 1;
                 let length = 0;
                 for (const byte of el.bytes) {
+                    // this is assuming all expressions return a single byte/word
+                    // but cat and repeat, etc, may not
                     if (byte && els.isExpression(byte)) {
+                        // todo: maybe make a method to get unevaluated
+                        // expression length, and throw error if it can't
+                        // be worked out at this time
                         length += elementLength;
                     } else {
                         length += 1;
@@ -704,6 +709,7 @@ export class Programme {
     }
 
     public updateByte(el: els.Element, prefix: string, inMacroDef: boolean, ignoreErrors: boolean = false) {
+        let allEvaluated = true;
         if (els.isBytes(el) && el.references && !inMacroDef) {
             this.symbols['$'] = el.address;
             for (let i = 0; i < el.bytes.length; i++) {
@@ -732,6 +738,7 @@ export class Programme {
                     const value = this.evaluateExpression(prefix, byte, [], ignoreErrors);
 
                     if (ignoreErrors && value === undefined) {
+                        allEvaluated = false;
                         continue;
                     }
 
@@ -774,6 +781,7 @@ export class Programme {
                 }
             }
         }
+        return allEvaluated;
     }
 
     public collectAst() {
