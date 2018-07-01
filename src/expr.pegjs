@@ -89,6 +89,7 @@ ternary = t1:logicalor t2:(ws? '?' ws? t2:expr ws? ':' ws? t3:expr)? {
     t1 = lookupVar(t1);
     if (t2) {
         let trueval = lookupVar(t2[3]);
+        //todo: should this do shortcut evaluation?
         let falseval = lookupVar(t2[7]);
         if (t1 != 0) {
             return trueval;
@@ -101,6 +102,7 @@ ternary = t1:logicalor t2:(ws? '?' ws? t2:expr ws? ':' ws? t3:expr)? {
 
 logicalor = t1:logicaland t2:(ws? '||' ws? logicaland)* {
         let result = lookupVar(t1);
+        //todo: should this do shortcut evaluation?
         for (const group of t2) {
             const operator = group[1];
             const term = lookupVar(group[3]);
@@ -112,6 +114,7 @@ logicalor = t1:logicaland t2:(ws? '||' ws? logicaland)* {
 
 logicaland = t1:bitwiseor t2:(ws? '&&' ws? bitwiseor)* {
         let result = lookupVar(t1);
+        //todo: should this do shortcut evaluation?
         for (const group of t2) {
             const operator = group[1];
             const term = lookupVar(group[3]);
