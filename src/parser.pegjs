@@ -8,10 +8,8 @@
     function exprVars(els, indices) {
         let varlist = [];
         if (els) {
-            for (let i = 0; i < els.length; i++) {
-                const el = els[i];
-                for (let j = 0; j < indices.length; j++) {
-                    const index = indices[j];
+            for (const el of els) {
+                for (const index of indices) {
                     varlist = varlist.concat(el[index]);
                 }
             }
@@ -1423,7 +1421,7 @@ ws = [ \t]+
 wsnl = [ \t\r\n]+
 
 expr = t1:expr1 {
-    // In the parser, the value returns in t1 is a list
+    // In the parser, the value returned in t1 is a list
     // of all the symbols this expression depends on.
     // If there are no symbols, we can evaluate the
     // expression immediately, otherwise we have to

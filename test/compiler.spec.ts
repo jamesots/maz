@@ -921,7 +921,7 @@ describe('compiler', function() {
         const bytes = prog.getBytes();
         expect(bytes).to.eql([48, 50, 51, 0, 49, 50, 51, 48]);
     });
-    it.only('should handle defw properly - larger forward references should not be errors', function() {
+    it('should handle defw properly - larger forward references should not be errors', function() {
         const prog = compiler.compile('test', {
             fileResolver: new compiler.StringFileResolver('test',
                 [
