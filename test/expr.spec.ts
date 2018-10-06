@@ -405,4 +405,13 @@ describe('expr', function() {
         let result = expr.parse('$', { variables: {'$': 10}});
         expect(result).to.equal(10);
     })
+
+    it('should parse variables', function() {
+        let result = expr.parse('a + b', { variables: {'a': 10, 'b': 5}});
+        expect(result).to.equal(15);
+    })
+
+    it('should not parse missing variable', function() {
+        expect(() => expr.parse('a + b', { variables: {'a': 10}})).to.throw();
+    })
 });
