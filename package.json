@@ -25,22 +25,22 @@
   "author": "James Ots <code@jamesots.com>",
   "license": "MIT",
   "devDependencies": {
-    "@types/chai": "^4.1.6",
+    "@types/chai": "^4.2.11",
     "@types/chalk": "2.2.0",
     "@types/command-line-args": "5.0.0",
-    "@types/mocha": "^5.2.5",
-    "@types/node": "^8.10.34",
+    "@types/mocha": "^7.0.2",
+    "@types/node": "^13.9.8",
     "chai": "4.2.0",
-    "mocha": "5.2.0",
+    "mocha": "^7.1.1",
     "pegjs": "0.10.0",
-    "pegjs-backtrace": "0.1.2",
-    "ts-node": "7.0.1",
-    "typescript": "3.1.1"
+    "pegjs-backtrace": "^0.2.0",
+    "ts-node": "^8.8.1",
+    "typescript": "^3.8.3"
   },
   "dependencies": {
-    "chalk": "2.4.1",
-    "command-line-args": "5.0.2",
-    "command-line-usage": "5.0.5",
-    "source-map-support": "0.5.9"
+    "chalk": "^3.0.0",
+    "command-line-args": "^5.1.1",
+    "command-line-usage": "^6.1.0",
+    "source-map-support": "^0.5.16"
   }
 }

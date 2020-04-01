@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as parser from './parser';
 // import * as Tracer from 'pegjs-backtrace';
 import * as Expr from './expr';
-import { default as chalk } from 'chalk';
+import * as chalk from 'chalk';
 import * as els from './els';
 
 declare function unescape(s: string): string;
