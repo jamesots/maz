@@ -1,6 +1,6 @@
 {
   "name": "maz",
-  "version": "0.4.6",
+  "version": "0.4.7",
   "description": "Macro Assembler for Z80",
   "main": "lib/maz.js",
   "bin": {
@@ -14,6 +14,8 @@
     "trace-parser": "pegjs --optimize speed --trace -o lib/parser.js src/parser.pegjs",
     "trace-expr": "pegjs --optimize speed --trace -o lib/expr.js src/expr.pegjs",
     "build-tsc": "tsc",
+    "lint-staged": "lint-staged",
+    "prepare": "husky install",
     "prepublish": "npm run build-tsc && npm run build-parser && npm run build-expr",
     "test": "TS_NODE_PROJECT=test/tsconfig.json mocha -r ts-node/register test/**/*.ts",
     "start": "node lib/maz.js",
@@ -24,23 +26,31 @@
   },
   "author": "James Ots <code@jamesots.com>",
   "license": "MIT",
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "prettier --write"
+    ]
+  },
   "devDependencies": {
-    "@types/chai": "^4.2.11",
+    "@types/chai": "^4.2.18",
     "@types/chalk": "2.2.0",
     "@types/command-line-args": "5.0.0",
-    "@types/mocha": "^7.0.2",
+    "@types/mocha": "^8.2.2",
     "@types/node": "^12.12.47",
-    "chai": "4.2.0",
-    "mocha": "^8.0.1",
+    "chai": "4.3.4",
+    "husky": "^6.0.0",
+    "lint-staged": "^11.0.0",
+    "mocha": "^8.4.0",
     "pegjs": "0.10.0",
     "pegjs-backtrace": "^0.2.0",
-    "ts-node": "^8.10.2",
-    "typescript": "^3.9.5"
+    "prettier": "^2.3.0",
+    "ts-node": "^10.0.0",
+    "typescript": "^4.3.2"
   },
   "dependencies": {
-    "chalk": "^4.1.0",
+    "chalk": "^4.1.1",
     "command-line-args": "^5.1.1",
-    "command-line-usage": "^6.1.0",
+    "command-line-usage": "^6.1.1",
     "source-map-support": "^0.5.19"
   }
 }

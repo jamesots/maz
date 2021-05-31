@@ -9,11 +9,11 @@ export interface Expression {
     location: Location;
     address: number;
 }
-export interface Relative  {
+export interface Relative {
     relative: Expression | number | string;
 }
 export interface Prefixed {
-    prefix: string;    
+    prefix: string;
 }
 export interface Element {
     location: Location;
@@ -41,7 +41,7 @@ export interface EndInclude extends Element {
     endinclude: number;
 }
 export interface EndPrefix extends Element {
-    endprefix: true;    
+    endprefix: true;
 }
 export interface MacroCall extends Element, Prefixed {
     macrocall: string;
@@ -61,7 +61,7 @@ export interface Bytes extends Element {
     address: number;
     out: number;
 }
-export interface EndMacroCall extends Element, EndPrefix  {
+export interface EndMacroCall extends Element, EndPrefix {
     endmacrocall: true;
 }
 export interface Comment extends Element {
@@ -127,10 +127,14 @@ export function isBytes(el: Element): el is Bytes {
 export function isUndocumented(el: Element): el is Undocumented {
     return (el as Undocumented).undoc === true;
 }
-export function isRelative(item: string | number | Expression | Relative): item is Relative {
+export function isRelative(
+    item: string | number | Expression | Relative
+): item is Relative {
     return (item as Relative).relative !== undefined;
 }
-export function isExpression(item: string | number | Expression | Relative): item is Expression {
+export function isExpression(
+    item: string | number | Expression | Relative
+): item is Expression {
     return (item as Expression).expression !== undefined;
 }
 export function isPrefixed(el: Element | Prefixed): el is Prefixed {

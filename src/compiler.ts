@@ -65,7 +65,7 @@ export class StringFileResolvers implements FileResolver {
     private _filename: string;
     public searchPaths: string[] = [];
 
-    constructor(private fileContent: {[filename: string]: string[]}) {};
+    constructor(private fileContent: { [filename: string]: string[] }) {}
 
     public fileExists(filename: string): boolean {
         console.log(`fileExists ${filename}`);
@@ -123,7 +123,7 @@ export class StringFileResolver implements FileResolver {
         if (filename === this._filename) {
             return this.code;
         }
-        throw "File not found: " + filename;
+        throw 'File not found: ' + filename;
     }
     public finishFile() {}
     public getRealFilename(filename: string): string {
@@ -135,7 +135,7 @@ export class StringFileResolver implements FileResolver {
 }
 
 export function compile(filename, options) {
-    const parserOptions = {source: 0} as any;
+    const parserOptions = { source: 0 } as any;
     // const tracer = new Tracer(code, {
     //     showTrace: true,
     //     showFullPath: true
@@ -192,15 +192,21 @@ export class Programme {
     }
 
     private debug() {
-        console.log(JSON.stringify(this.ast, function(name, value) {
-            if (name === 'location') {
-                return `${value.source}:${value.line}:${value.column}`;
-            }
-            if (typeof value === 'number') {
-                return '>> $' + value.toString(16);
-            }
-            return value;
-        }, 2));
+        console.log(
+            JSON.stringify(
+                this.ast,
+                function (name, value) {
+                    if (name === 'location') {
+                        return `${value.source}:${value.line}:${value.column}`;
+                    }
+                    if (typeof value === 'number') {
+                        return '>> $' + value.toString(16);
+                    }
+                    return value;
+                },
+                2
+            )
+        );
         console.log(JSON.stringify(this.symbols, undefined, 2));
     }
 
@@ -209,7 +215,10 @@ export class Programme {
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             try {
-                const els = parser.parse(line, {source: sourceIndex, line: i + 1});
+                const els = parser.parse(line, {
+                    source: sourceIndex,
+                    line: i + 1,
+                });
                 if (els !== null) {
                     ast = ast.concat(els);
                 }
@@ -221,9 +230,9 @@ export class Programme {
                         location: {
                             line: i + 1,
                             column: e.location.start.column,
-                            source: sourceIndex
+                            source: sourceIndex,
                         },
-                        source: this.sources[sourceIndex].source[i]
+                        source: this.sources[sourceIndex].source[i],
                     };
                     ast.push(error);
                     this.logError(error);
@@ -232,7 +241,7 @@ export class Programme {
                         error: e.message,
                         filename: this.sources[sourceIndex].name,
                         location: e.location,
-                        source: this.sources[sourceIndex].source[i]
+                        source: this.sources[sourceIndex].source[i],
                     } as els.Error;
                     ast.push(error);
                     this.logError(error);
@@ -243,9 +252,9 @@ export class Programme {
                         location: {
                             source: sourceIndex,
                             line: i + 1,
-                            column: 1
+                            column: 1,
                         },
-                        source: this.sources[sourceIndex].source[i]
+                        source: this.sources[sourceIndex].source[i],
                     } as els.Error;
                     ast.push(error);
                     this.logError(error);
@@ -259,12 +268,22 @@ export class Programme {
         const source = this.fileResolver.readFile(filename);
         this.sources.push({
             name: this.fileResolver.filename,
-            source: source
+            source: source,
         });
         return source;
     }
 
-    private iterateAst(func: (el: els.Element, index: number, prefix: string, inMacroDef: boolean, ifTrue: boolean, inMacroCall: boolean) => void, ignoreIf = false) {
+    private iterateAst(
+        func: (
+            el: els.Element,
+            index: number,
+            prefix: string,
+            inMacroDef: boolean,
+            ifTrue: boolean,
+            inMacroCall: boolean
+        ) => void,
+        ignoreIf = false
+    ) {
         let inMacroDef = false;
         let inMacroCall = false;
         const prefixes = [];
@@ -288,7 +307,10 @@ export class Programme {
 
             if (els.isIf(el)) {
                 if (els.isExpression(el.if)) {
-                    el.if = this.evaluateExpression(prefixes[prefixes.length - 1], el.if);
+                    el.if = this.evaluateExpression(
+                        prefixes[prefixes.length - 1],
+                        el.if
+                    );
                 }
                 ifStack.push(el.if !== 0);
             }
@@ -300,7 +322,14 @@ export class Programme {
             }
 
             if (ignoreIf || ifStack[ifStack.length - 1]) {
-                func(el, i, prefixes[prefixes.length - 1] || '', inMacroDef, ifStack[ifStack.length - 1], inMacroCall);
+                func(
+                    el,
+                    i,
+                    prefixes[prefixes.length - 1] || '',
+                    inMacroDef,
+                    ifStack[ifStack.length - 1],
+                    inMacroCall
+                );
             }
 
             if (els.isEndMacro(el)) {
@@ -309,7 +338,7 @@ export class Programme {
             if (els.isEndMacroCall(el)) {
                 inMacroCall = false;
             }
-        }    
+        }
     }
 
     /**
@@ -327,7 +356,11 @@ export class Programme {
         this.iterateAst((el, i, prefix, inMacroDef) => {
             if (els.isInclude(el) && !el.included) {
                 if (!this.fileResolver.fileExists(el.include)) {
-                    this.error("File does not exist: " + this.fileResolver.getRealFilename(el.include), el.location);
+                    this.error(
+                        'File does not exist: ' +
+                            this.fileResolver.getRealFilename(el.include),
+                        el.location
+                    );
                     el.included = true;
                     return;
                 }
@@ -341,8 +374,8 @@ export class Programme {
                     location: {
                         line: includeAst.length + 1,
                         column: 0,
-                        source: sourceIndex
-                    }
+                        source: sourceIndex,
+                    },
                 } as els.EndInclude);
                 el.included = true;
             } else if (els.isEndInclude(el)) {
@@ -354,7 +387,7 @@ export class Programme {
 
     /**
      * Look for macrodefs. Don't allow nested macros. Don't allow
-     * a macro to be redefined. 
+     * a macro to be redefined.
      * Store all ast elements until endmacro.
      * Look for endmacros. If not in a macro, throw error. Otherwise
      * store the macro in the list of macros, indexed by macro name.
@@ -366,22 +399,25 @@ export class Programme {
         this.iterateAst((el, i, prefix, inMacroDef) => {
             if (els.isMacroDef(el)) {
                 if (macro) {
-                    this.error("Cannot nest macros", el.location);
+                    this.error('Cannot nest macros', el.location);
                     return;
                 }
                 macroLocation = el.location;
                 macroName = el.macrodef;
                 macro = {
                     ast: [],
-                    params: el.params || []
+                    params: el.params || [],
                 };
                 if (this.macros[macroName]) {
-                    this.error(`Already defined macro '${macroName}'`, el.location);
+                    this.error(
+                        `Already defined macro '${macroName}'`,
+                        el.location
+                    );
                     return;
                 }
             } else if (els.isEndMacro(el)) {
                 if (!macro) {
-                    this.error("Not in a macro", el.location);
+                    this.error('Not in a macro', el.location);
                     return;
                 }
                 this.macros[macroName] = macro;
@@ -401,7 +437,7 @@ export class Programme {
     /**
      * Gets a map of symbols, and updates the parsed objects
      * so the block and endblock objects have prefixes
-     * 
+     *
      * Labels
      *  - don't allow label to redefined in the same block
      *  - don't allow public label to be defined
@@ -422,15 +458,24 @@ export class Programme {
         this.iterateAst((el, i, prefix, inMacroDef) => {
             if (els.isLabel(el) && !inMacroDef) {
                 if (blocks.length > 0 && !el.public) {
-                    if (typeof this.symbols[labelName(blocks, el.label)] !== 'undefined') {
-                        this.error(`Label '${el.label}' already defined at in this block`, el.location);
+                    if (
+                        typeof this.symbols[labelName(blocks, el.label)] !==
+                        'undefined'
+                    ) {
+                        this.error(
+                            `Label '${el.label}' already defined at in this block`,
+                            el.location
+                        );
                         return;
                     }
                     this.symbols[labelName(blocks, el.label)] = null;
                     el.label = labelName(blocks, el.label);
                 } else {
                     if (typeof this.symbols[el.label] !== 'undefined') {
-                        this.error(`Label '${el.label}' already defined`, el.location);
+                        this.error(
+                            `Label '${el.label}' already defined`,
+                            el.location
+                        );
                         return;
                     }
                     this.symbols[el.label] = null;
@@ -463,13 +508,13 @@ export class Programme {
                         ii--;
                     }
                 } else {
-                    this.error("EQU has no label", el.location);
+                    this.error('EQU has no label', el.location);
                     return;
                 }
             }
         });
         if (blocks.length !== 0) {
-            this.error("Mismatch between .block and .endblock statements");
+            this.error('Mismatch between .block and .endblock statements');
         }
         return this.symbols;
     }
@@ -480,7 +525,7 @@ export class Programme {
                 error: message,
                 location: location,
                 source: this.sources[location.source].source[location.line - 1],
-                filename: this.sources[location.source].name
+                filename: this.sources[location.source].name,
             };
             this.logError(error);
         } else {
@@ -488,7 +533,7 @@ export class Programme {
                 error: message,
                 location: undefined,
                 source: undefined,
-                filename: undefined
+                filename: undefined,
             };
             this.logError(error);
         }
@@ -508,16 +553,22 @@ export class Programme {
                     this.error(`Unknown macro '${el.macrocall}'`, el.location);
                     el.params = [];
                     el.expanded = true;
-                    this.ast.splice(i + 1, 0, { 
+                    this.ast.splice(i + 1, 0, {
                         endmacrocall: true,
-                        endprefix: true
+                        endprefix: true,
                     } as els.EndMacroCall);
                     return;
                 }
                 el.params = JSON.parse(JSON.stringify(macro.params));
                 el.expanded = true;
-                this.ast.splice(i + 1, 0, ...(JSON.parse(JSON.stringify(macro.ast))));
-                this.ast.splice(i + 1 + macro.ast.length, 0, { endmacrocall: true } as els.EndMacroCall);
+                this.ast.splice(
+                    i + 1,
+                    0,
+                    ...JSON.parse(JSON.stringify(macro.ast))
+                );
+                this.ast.splice(i + 1 + macro.ast.length, 0, {
+                    endmacrocall: true,
+                } as els.EndMacroCall);
             }
         });
     }
@@ -535,7 +586,8 @@ export class Programme {
         let out = 0;
         this.iterateAst((el, i, prefix, inMacroDef) => {
             // console.log("in: " + JSON.stringify(el, undefined, 2));
-            if (inMacroDef) { // don't need to update things in the macro defs
+            if (inMacroDef) {
+                // don't need to update things in the macro defs
                 return;
             }
             if (els.isLabel(el)) {
@@ -605,7 +657,7 @@ export class Programme {
                 if (els.isDefb(el) || els.isDefw(el)) {
                     this.updateByte(el, prefix, inMacroDef, true);
                 }
-                
+
                 let elementLength = els.isDefw(el) ? 2 : 1;
                 let length = 0;
                 for (const byte of el.bytes) {
@@ -627,7 +679,12 @@ export class Programme {
         });
     }
 
-    private evaluateExpression(prefix = '', expr, evaluated = [], ignoreErrors: boolean = false): number | string {
+    private evaluateExpression(
+        prefix = '',
+        expr,
+        evaluated = [],
+        ignoreErrors: boolean = false
+    ): number | string {
         const variables = expr.vars;
         const subVars = {}; // substitute variables
         if (expr.address !== undefined) {
@@ -636,7 +693,10 @@ export class Programme {
         for (const variable of variables) {
             const subVar = this.findVariable(prefix, variable);
 
-            if (this.symbols[subVar] === undefined || this.symbols[subVar] === null) {
+            if (
+                this.symbols[subVar] === undefined ||
+                this.symbols[subVar] === null
+            ) {
                 if (!ignoreErrors) {
                     this.error(`Symbol '${variable}' not found`, expr.location);
                     subVars[variable] = 0;
@@ -649,7 +709,7 @@ export class Programme {
             }
         }
         try {
-            return Expr.parse(expr.expression, {variables: subVars});
+            return Expr.parse(expr.expression, { variables: subVars });
         } catch (e) {
             if (!ignoreErrors) {
                 this.error(e, expr.location);
@@ -659,12 +719,19 @@ export class Programme {
 
     private evaluateSymbol(symbol, evaluated) {
         if (evaluated.indexOf(symbol) !== -1) {
-            this.error(`Circular symbol dependency while evaluating '${symbol}'`, this.symbols[symbol].location);
+            this.error(
+                `Circular symbol dependency while evaluating '${symbol}'`,
+                this.symbols[symbol].location
+            );
             return;
         }
         evaluated.push(symbol);
         const prefix = getWholePrefix(symbol);
-        this.symbols[symbol] = this.evaluateExpression(prefix, this.symbols[symbol], evaluated)
+        this.symbols[symbol] = this.evaluateExpression(
+            prefix,
+            this.symbols[symbol],
+            evaluated
+        );
     }
 
     private findVariable(prefix, variable) {
@@ -708,7 +775,12 @@ export class Programme {
         });
     }
 
-    public updateByte(el: els.Element, prefix: string, inMacroDef: boolean, ignoreErrors: boolean = false) {
+    public updateByte(
+        el: els.Element,
+        prefix: string,
+        inMacroDef: boolean,
+        ignoreErrors: boolean = false
+    ) {
         let allEvaluated = true;
         if (els.isBytes(el) && el.references && !inMacroDef) {
             this.symbols['$'] = el.address;
@@ -717,7 +789,12 @@ export class Programme {
                 if (byte && els.isRelative(byte)) {
                     let value = byte.relative;
                     if (els.isExpression(value)) {
-                        value = this.evaluateExpression(prefix, value, [], ignoreErrors);
+                        value = this.evaluateExpression(
+                            prefix,
+                            value,
+                            [],
+                            ignoreErrors
+                        );
                     }
                     if (typeof value === 'string') {
                         const utf8 = toUtf8(value);
@@ -727,15 +804,26 @@ export class Programme {
                     const relative = value - (el.address + 2);
                     if (!ignoreErrors) {
                         if (relative > 127) {
-                            this.error(`Relative jump is out of range (${relative} > 127)`, el.location);
+                            this.error(
+                                `Relative jump is out of range (${relative} > 127)`,
+                                el.location
+                            );
                         } else if (relative < -128) {
-                            this.error(`Relative jump is out of range (${relative} < -128)`, el.location);
+                            this.error(
+                                `Relative jump is out of range (${relative} < -128)`,
+                                el.location
+                            );
                         }
                     }
                     el.bytes[i] = relative & 0xff;
                 }
                 if (byte && els.isExpression(byte)) {
-                    const value = this.evaluateExpression(prefix, byte, [], ignoreErrors);
+                    const value = this.evaluateExpression(
+                        prefix,
+                        byte,
+                        [],
+                        ignoreErrors
+                    );
 
                     if (ignoreErrors && value === undefined) {
                         allEvaluated = false;
@@ -791,14 +879,17 @@ export class Programme {
         let ast: any = {};
         this.iterateAst((el, i, prefix, inMacroDef, ifTrue, inMacroCall) => {
             if (el.location) {
-                if ((el.location.line !== line && line !== 0) || (el.location.source !== source)) {
-                    collectedAst.push(ast);                
+                if (
+                    (el.location.line !== line && line !== 0) ||
+                    el.location.source !== source
+                ) {
+                    collectedAst.push(ast);
                     ast = {};
                 }
                 line = el.location.line;
                 source = el.location.source;
             }
-  
+
             Object.assign(ast, el);
             if (inMacroDef) {
                 ast.inMacroDef = true;
@@ -818,7 +909,11 @@ export class Programme {
     public collectErrors(ast) {
         for (const el of ast) {
             for (const error of this.errors) {
-                if ((error.location !== undefined) && (el.location.line === error.location.line) && (el.location.source === error.location.source)) {
+                if (
+                    error.location !== undefined &&
+                    el.location.line === error.location.line &&
+                    el.location.source === error.location.source
+                ) {
                     el.error = error;
                 }
             }
@@ -854,24 +949,32 @@ export class Programme {
             undoc = undoc || el.undoc;
             error = error || el.error;
 
-            this.dumpLine(list, 
-                this.sources[el.location.source].source, 
-                el.location.line, 
-                el.out, 
-                el.address, 
-                el.bytes, 
-                el.inMacroDef, 
+            this.dumpLine(
+                list,
+                this.sources[el.location.source].source,
+                el.location.line,
+                el.out,
+                el.address,
+                el.bytes,
+                el.inMacroDef,
                 el.inMacroCall,
                 el.ifTrue,
-                (warnUndoc && el.undoc) ? 'U' :
-                el.error ? 'E' : ' ');
-                
+                warnUndoc && el.undoc ? 'U' : el.error ? 'E' : ' '
+            );
+
             // if (el.macrocall && !el.inMacroDef) {
             //     list.push('           ' + ' '.repeat(BYTELEN * 2) + '  *UNROLL MACRO')
             // }
 
             if (el.endinclude) {
-                list.push(` ${pad(el.location.line + 1, 4)}                        *END INCLUDE ${this.sources[el.location.source].name}`);
+                list.push(
+                    ` ${pad(
+                        el.location.line + 1,
+                        4
+                    )}                        *END INCLUDE ${
+                        this.sources[el.location.source].name
+                    }`
+                );
                 lastLine = lastLines.pop();
                 lastSource = sources.pop();
             } else if (el.endmacrocall) {
@@ -886,7 +989,7 @@ export class Programme {
         list.push('');
 
         if (warnUndoc && undoc) {
-            list.push('U = Undocumented instruction')
+            list.push('U = Undocumented instruction');
         }
         if (error) {
             list.push('E = Error');
@@ -903,7 +1006,9 @@ export class Programme {
                 } else if (typeof value === 'string') {
                     list.push(`${padr(symbol, 20)} "${value}"`);
                 } else {
-                    list.push(`${padr(symbol, 20)} ${pad(value.toString(16), 4, '0')}`);
+                    list.push(
+                        `${padr(symbol, 20)} ${pad(value.toString(16), 4, '0')}`
+                    );
                 }
             }
         }
@@ -911,11 +1016,22 @@ export class Programme {
         return list;
     }
 
-    private dumpLine(list, lines, line, out, address, bytes, inMacroDef, inMacroCall, ifTrue, letter = ' ') {
+    private dumpLine(
+        list,
+        lines,
+        line,
+        out,
+        address,
+        bytes,
+        inMacroDef,
+        inMacroCall,
+        ifTrue,
+        letter = ' '
+    ) {
         let byteString = '';
         if (bytes && !inMacroDef) {
             for (const byte of bytes) {
-                byteString += pad((byte & 0xFF).toString(16), 2, '0');
+                byteString += pad((byte & 0xff).toString(16), 2, '0');
             }
         }
         let outString = '    ';
@@ -930,9 +1046,21 @@ export class Programme {
             addressString = 'xxxx';
             outString = 'xxxx';
         }
-        list.push(`${letter}${pad(line, 4)} ${address !== out?addressString + '@':''}${outString} ${padr(byteString, BYTELEN * 2).substring(0, BYTELEN * 2)} ${inMacroCall ? 'M' : ' '} ${lines[line - 1]}`);
+        list.push(
+            `${letter}${pad(line, 4)} ${
+                address !== out ? addressString + '@' : ''
+            }${outString} ${padr(byteString, BYTELEN * 2).substring(
+                0,
+                BYTELEN * 2
+            )} ${inMacroCall ? 'M' : ' '} ${lines[line - 1]}`
+        );
         for (let i = BYTELEN * 2; i < byteString.length; i += BYTELEN * 2) {
-            list.push(`           ${padr(byteString.substring(i, i + BYTELEN * 2), BYTELEN * 2).substring(0,BYTELEN * 2)}`)
+            list.push(
+                `           ${padr(
+                    byteString.substring(i, i + BYTELEN * 2),
+                    BYTELEN * 2
+                ).substring(0, BYTELEN * 2)}`
+            );
         }
     }
 
@@ -942,7 +1070,9 @@ export class Programme {
             console.log(chalk.red(e));
         } else if (e.location) {
             if (this.options.brief) {
-                console.log(`${e.filename}:${e.location.line},${e.location.column}: ${e.error}`);
+                console.log(
+                    `${e.filename}:${e.location.line},${e.location.column}: ${e.error}`
+                );
             } else {
                 console.log(chalk.red(e.error));
                 console.log(`  ${e.filename}:${e.location.line}`);
@@ -952,7 +1082,7 @@ export class Programme {
         } else if (e.error) {
             console.log(chalk.red(e.error));
         } else {
-        }        
+        }
     }
 
     public warnUndocumented() {
@@ -963,8 +1093,12 @@ export class Programme {
             }
         });
         if (lines.length > 0) {
-            console.log("Undocumented instructions used on line" + (lines.length > 1 ? "s" : "") + " "
-                + lines.join(', '));
+            console.log(
+                'Undocumented instructions used on line' +
+                    (lines.length > 1 ? 's' : '') +
+                    ' ' +
+                    lines.join(', ')
+            );
         }
     }
 
@@ -989,10 +1123,13 @@ export class Programme {
                     bytes = bytes.concat(el.bytes);
                     out = el.bytes.length + el.out;
                 } else if (el.out < startOut) {
-                    this.error("Cannot ORG to earlier address than first ORG", el.location);
+                    this.error(
+                        'Cannot ORG to earlier address than first ORG',
+                        el.location
+                    );
                 } else if (el.out < end) {
                     for (let i = 0; i < el.bytes.length; i++) {
-                        bytes[(el.out - startOut) + i] = el.bytes[i];
+                        bytes[el.out - startOut + i] = el.bytes[i];
                     }
                     out = el.bytes.length + el.out;
                 }
