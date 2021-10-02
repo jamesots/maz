@@ -3,7 +3,7 @@ Implementation Notes
 
 Disclaimer: I don't know much about parsers, lexers, grammars and the like, so I will probably use all the wrong terms in this document. Also, I can't remember how everything works, so this document is me trying to work it out again.
 
-maz uses pegjs.
+maz uses peggy (previously pegjs).
 
 parser.pegjs parses the z80 source file into what I've called an AST, but I don't think it is really. It's an array of objects which represent the source.
 
