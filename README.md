@@ -152,6 +152,8 @@ Words are stored low-byte first. If the string has an odd length, an extra zero 
 
     .include "something/routines.z80"
 </dd>
+<dt>.incbin <i>filename</i></dt>
+<dd>Include a file and process it as binary data inserted at that point of the programme. The filename is realtive to the current file.</dd>
 <dt>.if <i>expression</i></dt>
 <dd>Assembles the code following the .if statement if the expression evaluates to true, up the next .endif or .else statement.
 

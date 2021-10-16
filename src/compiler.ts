@@ -146,6 +146,7 @@ export function compile(filename, options) {
     const prog = new Programme(options);
     prog.parse(filename);
     prog.processIncludes();
+    prog.processIncbins();
     prog.getMacros();
     prog.expandMacros();
     prog.getSymbols();
@@ -381,6 +382,42 @@ export class Programme {
             } else if (els.isEndInclude(el)) {
                 this.fileResolver.finishFile();
                 sourceIndex = sourceIndices.pop();
+            }
+        });
+    }
+
+    processIncbins() {
+        this.iterateAst((el, i, prefix, inMacroDef) => {
+            if (els.isIncbin(el) && !el.included) {
+                if (!this.fileResolver.fileExists(el.incbin)) {
+                    this.error(
+                        'File does not exist: ' +
+                            this.fileResolver.getRealFilename(el.incbin),
+                        el.location
+                    );
+                    el.included = true;
+                    return;
+                }
+
+                const bin = fs.readFileSync(
+                    this.fileResolver.getRealFilename(el.incbin)
+                );
+                this.ast.splice(i + 1, 0, {
+                    defb: true,
+                    references: false,
+                    location: el.location,
+                    bytes: Array.from(bin),
+                } as els.Defb);
+                this.ast.splice(i + 2, 0, {
+                    endinclude: 0,
+                    location: {
+                        line: 0,
+                        column: 0,
+                        source: 0,
+                    },
+                } as els.EndInclude);
+                el.included = true;
+            } else if (els.isEndIncbin(el)) {
             }
         });
     }

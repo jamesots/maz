@@ -1,0 +1,4 @@
+.org 0
+    db 'hello'
+.incbin 'test.bin'
+    db 'bye'

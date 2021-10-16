@@ -71,7 +71,7 @@ write_char1:
     ret
 .endblock
 
-; HL = address of null terminates string to display
+; HL = address of null terminated string to display
 ; returns with HL pointing at the null terminator
 write_line:
     ld a,(hl)
@@ -83,13 +83,13 @@ write_line:
 
 read_line:
 .block
-    ld b,$ff                   ; b is max line length
+    ld b,$ff                    ; b is max line length
     ld hl,line                  ; hl is where the line will be stored
 read_line_char:
     call read_char
     cp chr_up
     jp nz,check_lf
-    ld a,$ff
+    ld a,$ff                    ; see if line buffer is empty
     cp b
     jp nz,read_line_char
     push hl

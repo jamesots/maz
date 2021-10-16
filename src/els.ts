@@ -40,6 +40,13 @@ export interface Include extends Element {
 export interface EndInclude extends Element {
     endinclude: number;
 }
+export interface Incbin extends Element {
+    incbin: string;
+    included?: true;
+}
+export interface EndIncbin extends Element {
+    endincbin: number;
+}
 export interface EndPrefix extends Element {
     endprefix: true;
 }
@@ -172,6 +179,12 @@ export function isInclude(el: Element): el is Include {
 }
 export function isEndInclude(el: Element): el is EndInclude {
     return (el as EndInclude).endinclude !== undefined;
+}
+export function isIncbin(el: Element): el is Incbin {
+    return (el as Incbin).incbin !== undefined;
+}
+export function isEndIncbin(el: Element): el is EndIncbin {
+    return (el as EndIncbin).endincbin !== undefined;
 }
 export function isIf(el: Element): el is If {
     return (el as If).if !== undefined;

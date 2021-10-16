@@ -86,6 +86,7 @@ separator = [ \t]* [\r\n] [ \t]*
 
 statement = labelled_statement
     / include
+    / incbin
     / labeldef
     / unlabelled_statement
 
@@ -143,6 +144,13 @@ endif = '.endif' {
 else = '.else' {
     return {
         else: true,
+        location: loc()
+    }
+}
+
+incbin = '.incbin' ws path: string {
+    return {
+        incbin: path,
         location: loc()
     }
 }
