@@ -10,6 +10,14 @@ declare function unescape(s: string): string;
 
 const BYTELEN = 8;
 const MAX_PASSES = 10;
+// Register names aren't reserved, so they can be used as labels, but if
+// one is used in an expression without being defined, it was probably
+// meant as a register
+const REGISTERS = new Set([
+    'a', 'b', 'c', 'd', 'e', 'h', 'l', 'i', 'r',
+    'af', 'bc', 'de', 'hl', 'sp', 'ix', 'iy',
+    'ixh', 'ixl', 'iyh', 'iyl',
+]);
 
 export abstract class FileResolver {
     public abstract fileExists(filename: string): boolean;
@@ -865,7 +873,19 @@ export class Programme {
                 this.symbols[subVar] === null
             ) {
                 if (!ignoreErrors) {
-                    this.error(`Symbol '${variable}' not found`, expr.location);
+                    if (
+                        this.symbols[subVar] === undefined &&
+                        REGISTERS.has(variable.toLowerCase())
+                    ) {
+                        // most likely an instruction which doesn't exist,
+                        // e.g. ld hl,(ix), which is parsed as ld hl,(nn)
+                        this.error(
+                            `Register '${variable}' can't be used here`,
+                            expr.location
+                        );
+                    } else {
+                        this.error(`Symbol '${variable}' not found`, expr.location);
+                    }
                     subVars[variable] = 0;
                 }
             } else {

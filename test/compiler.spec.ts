@@ -1175,4 +1175,24 @@ describe('compiler', function() {
             'Value -129 is out of range for an index offset (-128 to 127)',
         ]);
     });
+    it('should report registers used where they are not allowed', function() {
+        const prog = compileLines([
+            '   ld hl,(ix)',
+            '   ld bc,(IY+2)',
+            '   ld a,nothere',
+        ]);
+        expect(errorMessages(prog)).to.eql([
+            "Register 'ix' can't be used here",
+            "Register 'IY' can't be used here",
+            "Symbol 'nothere' not found",
+        ]);
+    });
+    it('should still allow labels with register names', function() {
+        const prog = compileLines([
+            '   ld hl,(ix)',
+            'ix: nop',
+        ]);
+        expect(prog.errors).to.eql([]);
+        expect(prog.getBytes()).to.eql([0x2a, 0x03, 0x00, 0x00]);
+    });
 });
