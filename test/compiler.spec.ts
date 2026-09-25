@@ -1126,4 +1126,53 @@ describe('compiler', function() {
             'Invalid value Infinity for an 8 bit value',
         ]);
     });
+    it('should allow index offsets with + or -', function() {
+        const prog = compileLines([
+            '   ld a,(ix+5)',
+            '   ld a,(ix-5)',
+            '   ld a,(iy - 5)',
+            '   ld a,(ix+-5)',
+            '   ld a,(ix-2+1)',
+            '   ld a,(ix-d+1)',
+            'd: equ 5',
+        ]);
+        expect(prog.errors).to.eql([]);
+        expect(prog.getBytes()).to.eql([
+            0xdd, 0x7e, 0x05,
+            0xdd, 0x7e, 0xfb,
+            0xfd, 0x7e, 0xfb,
+            0xdd, 0x7e, 0xfb,
+            0xdd, 0x7e, 0xff,
+            0xdd, 0x7e, 0xfc,
+        ]);
+    });
+    it('should allow index registers without an offset', function() {
+        const prog = compileLines([
+            '   ld a,(ix)',
+            '   ld ( iy ),b',
+            '   inc (ix)',
+            '   bit 7,(iy)',
+            '   jp (ix)',
+        ]);
+        expect(prog.errors).to.eql([]);
+        expect(prog.getBytes()).to.eql([
+            0xdd, 0x7e, 0x00,
+            0xfd, 0x70, 0x00,
+            0xdd, 0x34, 0x00,
+            0xfd, 0xcb, 0x00, 0x7e,
+            0xdd, 0xe9,
+        ]);
+    });
+    it('should report out of range negative index offsets', function() {
+        const prog = compileLines([
+            '   ld a,(ix-128)',
+            '   ld a,(ix-129)',
+            '   ld a,(iy-d)',
+            'd: equ 129',
+        ]);
+        expect(errorMessages(prog)).to.eql([
+            'Value -129 is out of range for an index offset (-128 to 127)',
+            'Value -129 is out of range for an index offset (-128 to 127)',
+        ]);
+    });
 });
