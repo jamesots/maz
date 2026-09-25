@@ -6,6 +6,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as sourceMapSupport from 'source-map-support';
 
+// relative to lib/maz.js once compiled
+const { version } = require('../package.json');
+
 sourceMapSupport.install();
 
 const optionDefinitions = [
@@ -29,7 +32,7 @@ const optionDefinitions = [
         name: 'undoc',
         alias: 'u',
         type: Boolean,
-        mutliple: false,
+        multiple: false,
         description: 'Warn about undocumented instructions',
     },
     { name: 'help', alias: 'h', type: Boolean, multiple: false },
@@ -47,7 +50,7 @@ function showUsage() {
     console.log(
         commandLineUsage([
             {
-                header: 'MAZ v0.4.6',
+                header: `MAZ v${version}`,
                 content: 'Macro Assembler for Z80',
             },
             {
@@ -63,7 +66,7 @@ if (!options.src || !options.out || options.help) {
     process.exit(-1);
 }
 
-console.log('MAZ v0.4.6');
+console.log(`MAZ v${version}`);
 console.log('WARNING: maz is under development, and likely to break without');
 console.log(
     '         warning, and future versions will probably be completely'
