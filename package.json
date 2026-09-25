@@ -1,6 +1,6 @@
 {
   "name": "maz",
-  "version": "0.5.0",
+  "version": "0.6.0-pre",
   "description": "Macro Assembler for Z80",
   "main": "lib/maz.js",
   "bin": {
@@ -35,18 +35,18 @@
   "devDependencies": {
     "@types/chai": "^4.2.22",
     "@types/chalk": "2.2.0",
-    "@types/command-line-args": "5.2.0",
+    "@types/command-line-args": "5.2.3",
     "@types/mocha": "^9.0.0",
-    "@types/node": "^14.17.20",
+    "@types/node": "^22.14.1",
     "chai": "4.3.4",
     "husky": "^6.0.0",
     "lint-staged": "^11.1.2",
     "mocha": "^9.1.2",
-    "peggy": "^1.2.0",
+    "peggy": "^4.2.0",
     "pegjs-backtrace": "^0.2.1",
     "prettier": "^2.4.1",
-    "ts-node": "^10.2.1",
-    "typescript": "^4.4.3"
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
   },
   "dependencies": {
     "chalk": "^4.1.2",
