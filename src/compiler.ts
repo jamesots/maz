@@ -14,9 +14,26 @@ const MAX_PASSES = 10;
 // one is used in an expression without being defined, it was probably
 // meant as a register
 const REGISTERS = new Set([
-    'a', 'b', 'c', 'd', 'e', 'h', 'l', 'i', 'r',
-    'af', 'bc', 'de', 'hl', 'sp', 'ix', 'iy',
-    'ixh', 'ixl', 'iyh', 'iyl',
+    'a',
+    'b',
+    'c',
+    'd',
+    'e',
+    'h',
+    'l',
+    'i',
+    'r',
+    'af',
+    'bc',
+    'de',
+    'hl',
+    'sp',
+    'ix',
+    'iy',
+    'ixh',
+    'ixl',
+    'iyh',
+    'iyl',
 ]);
 
 export abstract class FileResolver {
@@ -884,7 +901,10 @@ export class Programme {
                             expr.location
                         );
                     } else {
-                        this.error(`Symbol '${variable}' not found`, expr.location);
+                        this.error(
+                            `Symbol '${variable}' not found`,
+                            expr.location
+                        );
                     }
                     subVars[variable] = 0;
                 }
