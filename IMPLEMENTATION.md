@@ -50,8 +50,15 @@ The size of some elements depends on labels defined later, e.g.
 `defw cat(label, "x")`, so passes are repeated, using the values of labels
 from the previous pass for forward references, until nothing moves. Only
 db, dw and instruction operands can use forward references; org, phase,
-align and ds can't, so that the passes settle. Errors from the final pass
-are the ones reported.
+align, ds and .if can't, so that the passes settle. Errors from the final
+pass are the ones reported.
+
+An .if whose condition is a constant is decided before assembling, so it
+can contain anything, including .include. An .if whose condition uses
+symbols is decided in each pass. Before that, both of its branches are
+processed (so a symbol can be defined in each), and the definitions in them
+are marked as conditional. Each pass uses the definition which is
+assembled.
 
 The output (getBytes, getSegments, getLines, getList and symbols) comes
 from the final pass.

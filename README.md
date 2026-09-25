@@ -157,7 +157,24 @@ Words are stored low-byte first. If the string has an odd length, an extra zero 
 <dt>.if <i>expression</i></dt>
 <dd>Assembles the code following the .if statement if the expression evaluates to true, up the next .endif or .else statement.
 
-Note that the if expression must be evaluable on the first pass of assembly. Also, weird things might happen if an .if-.else-.endif block crosses a macro boundary.
+The expression can use EQUs defined anywhere, and labels defined before the .if (like ORG, it can't use labels defined later, as the .if could change their addresses).
+
+    DEBUG: equ 1
+    .if DEBUG
+        call print_state
+    .endif
+
+A symbol can be defined in more than one branch of an .if whose expression uses symbols, and the one which is assembled is used:
+
+    .if BIG_SCREEN
+    width: equ 80
+    .else
+    width: equ 40
+    .endif
+
+An .if whose expression uses symbols can't contain .include, .incbin or macro definitions, as these are processed before the expression is evaluated. An .if whose expression is a constant, such as `.if 0`, can contain anything.
+
+Weird things might happen if an .if-.else-.endif block crosses a macro boundary.
 </dd>
 <dt>.else</dt>
 <dd>If an .if statement's expression evaluted to false, the code following the .else statement is assembled isntead, up to the next .endif statement.</dd>

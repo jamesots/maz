@@ -13,14 +13,17 @@ describe('compiler', function () {
         prog = new compiler.Programme({});
     });
 
-    // how each symbol is defined: 'label', { equ: value } or { arg: value }
+    // how each symbol is defined: 'label', { equ: value } or { arg: value },
+    // or a list of those if it's defined more than once
     function definitions(prog) {
         const result = {};
-        for (const [name, definition] of prog.definitions) {
-            result[name] =
+        for (const [name, list] of prog.definitions) {
+            const described = list.map((definition) =>
                 definition.kind === 'label'
                     ? 'label'
-                    : { [definition.kind]: definition.value };
+                    : { [definition.kind]: definition.value }
+            );
+            result[name] = described.length === 1 ? described[0] : described;
         }
         return result;
     }
@@ -460,7 +463,7 @@ describe('compiler', function () {
     });
     it('should evaluate symbols with scope', function () {
         prog.ast = [];
-        const equ = (value) => ({ kind: 'equ', index: 0, value });
+        const equ = (value) => [{ kind: 'equ', index: 0, value }];
         prog.definitions = new Map([
             ['%1_two', equ({ expression: 'three', vars: ['three'] })],
             ['three', equ(3)],
@@ -1221,6 +1224,133 @@ describe('compiler', function () {
         ]);
         // other values still just use the low byte
         expect(prog.getBytes().slice(-1)).to.eql([0x34]);
+    });
+    describe('.if using symbols', function () {
+        it('should use EQUs defined later', function () {
+            const prog = compileLines([
+                '.if DEBUG',
+                '   nop',
+                '.else',
+                '   halt',
+                '.endif',
+                'DEBUG: equ 1',
+            ]);
+            expect(prog.errors).to.eql([]);
+            expect(prog.getBytes()).to.eql([0x00]);
+        });
+        it('should use labels defined earlier', function () {
+            const prog = compileLines([
+                '   org 10',
+                'start: nop',
+                '.if start = 10',
+                '   db 1',
+                '.else',
+                '   db 2',
+                '.endif',
+            ]);
+            expect(prog.errors).to.eql([]);
+            expect(prog.getBytes()).to.eql([0x00, 1]);
+        });
+        it('should not use labels defined later', function () {
+            const prog = compileLines([
+                '.if later',
+                '   nop',
+                '.endif',
+                'later:',
+            ]);
+            expect(errorMessages(prog)).to.eql(["Symbol 'later' not found"]);
+        });
+        it('should change the addresses of labels', function () {
+            const prog = compileLines([
+                '   db x',
+                'BIG: equ 1',
+                '.if BIG',
+                '   ds 5',
+                '.endif',
+                'x: nop',
+            ]);
+            expect(prog.errors).to.eql([]);
+            expect(prog.getBytes()).to.eql([6, 0, 0, 0, 0, 0, 0]);
+        });
+        it('should allow symbols to be defined in more than one branch', function () {
+            const assemble = (big) =>
+                compileLines([
+                    `BIG: equ ${big}`,
+                    '.if BIG',
+                    'size: equ 100',
+                    'x: nop',
+                    '.else',
+                    'size: equ 10',
+                    'x: halt',
+                    '.endif',
+                    '   db size',
+                    '   dw x',
+                ]);
+            const big = assemble(1);
+            expect(big.errors).to.eql([]);
+            expect(big.getBytes()).to.eql([0x00, 100, 0, 0]);
+            expect(big.symbols).to.eql({ BIG: 1, size: 100, x: 0 });
+            const small = assemble(0);
+            expect(small.errors).to.eql([]);
+            expect(small.getBytes()).to.eql([0x76, 10, 0, 0]);
+        });
+        it('should not allow a symbol to be defined twice in code which is assembled', function () {
+            const prog = compileLines([
+                'F: equ 1',
+                '.if F',
+                'x: nop',
+                '.endif',
+                '.if F',
+                'x: halt',
+                '.endif',
+            ]);
+            expect(errorMessages(prog)).to.eql(["Label 'x' already defined"]);
+        });
+        it('should not define symbols in code which is not assembled', function () {
+            const prog = compileLines([
+                'F: equ 0',
+                '.if F',
+                'x: nop',
+                '.endif',
+                '   jp x',
+            ]);
+            expect(errorMessages(prog)).to.eql(["Symbol 'x' not found"]);
+            expect(prog.symbols).to.eql({ F: 0 });
+        });
+        it('should call macros', function () {
+            const prog = compileLines([
+                'macro m',
+                '   nop',
+                'endm',
+                'YES: equ 1',
+                'NO: equ 0',
+                '.if YES',
+                '   m',
+                '.endif',
+                '.if NO',
+                '   m',
+                '   m',
+                '.endif',
+            ]);
+            expect(prog.errors).to.eql([]);
+            expect(prog.getBytes()).to.eql([0x00]);
+        });
+        it('should not allow includes or macro definitions', function () {
+            const prog = compileLines([
+                'F: equ 0',
+                '.if F',
+                '.include "file"',
+                '.incbin "file"',
+                'macro m',
+                'endm',
+                '.endif',
+            ]);
+            expect(errorMessages(prog)).to.eql([
+                ".include can't be used inside an .if which uses symbols",
+                ".incbin can't be used inside an .if which uses symbols",
+                "Macros can't be defined inside an .if which uses symbols",
+            ]);
+        });
     });
     describe('output', function () {
         const lines = [

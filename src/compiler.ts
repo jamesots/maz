@@ -208,6 +208,11 @@ export interface SymbolDefinition {
     index: number;
     value?: Value | els.Expression;
     location?: els.Location;
+    // true if it's inside an .if whose condition uses symbols, so it may
+    // or may not be assembled
+    conditional?: boolean;
+    // for an equ, the index of the label element
+    labelIndex?: number;
 }
 
 /**
@@ -253,6 +258,8 @@ export class Pass {
     public labels = new Map<string, number>();
     // indexed by the element's index in the ast
     public placements: Placement[] = [];
+    // the conditions of .ifs which use symbols, by index in the ast
+    public conditions = new Map<number, boolean>();
     public errors: els.Error[] = [];
     private errorKeys = new Set<string>();
 
@@ -275,6 +282,14 @@ export class Pass {
         }
         for (const [label, value] of this.labels) {
             if (!Object.is(value, other.labels.get(label))) {
+                return false;
+            }
+        }
+        if (this.conditions.size !== other.conditions.size) {
+            return false;
+        }
+        for (const [index, condition] of this.conditions) {
+            if (condition !== other.conditions.get(index)) {
                 return false;
             }
         }
@@ -310,9 +325,12 @@ export class Evaluator {
     // how many forward references have been found to labels which don't
     // have a value yet, in the first pass
     private unknowns = 0;
+    // how many symbols have been looked up which aren't defined in this
+    // pass, e.g. a label which hasn't been reached yet
+    public missing = 0;
 
     constructor(
-        private definitions: Map<string, SymbolDefinition>,
+        private definitions: Map<string, SymbolDefinition[]>,
         private pass: Pass,
         private previous: Pass | undefined,
         private error: (message: string, location?: els.Location) => void
@@ -372,7 +390,10 @@ export class Evaluator {
         allowForward: boolean,
         evaluating: string[] = []
     ): Value | undefined {
-        const definition = this.definitions.get(name);
+        const definition = this.definitionFor(name, allowForward);
+        if (!definition) {
+            return undefined;
+        }
         if (definition.kind === 'label') {
             if (this.pass.labels.has(name)) {
                 return this.pass.labels.get(name);
@@ -383,8 +404,10 @@ export class Evaluator {
                 }
                 if (!this.previous) {
                     this.unknowns++;
+                    return undefined;
                 }
             }
+            this.missing++;
             return undefined;
         }
         if (evaluating.includes(name)) {
@@ -409,6 +432,42 @@ export class Evaluator {
         return this.cycles > cycles ? undefined : value;
     }
 
+    /**
+     * Gets the definition of a symbol which is being assembled. If it's
+     * defined in .ifs which use symbols, that's the one in the branch which
+     * is assembled, or which was in the previous pass if that branch
+     * hasn't been reached yet.
+     */
+    private definitionFor(
+        name: string,
+        allowForward: boolean
+    ): SymbolDefinition | undefined {
+        const definitions = this.definitions.get(name);
+        if (definitions.length === 1 && !definitions[0].conditional) {
+            return definitions[0];
+        }
+        // each definition is placed when it's assembled
+        const current = definitions.find(
+            (d) => this.pass.placements[d.index] !== undefined
+        );
+        if (current) {
+            return current;
+        }
+        if (this.previous) {
+            const previous = definitions.find(
+                (d) => this.previous.placements[d.index] !== undefined
+            );
+            if (previous && (previous.kind !== 'label' || allowForward)) {
+                return previous;
+            }
+        } else if (allowForward) {
+            this.unknowns++;
+            return undefined;
+        }
+        this.missing++;
+        return undefined;
+    }
+
     private lookup(
         variable: string,
         prefix: string,
@@ -430,12 +489,10 @@ export class Evaluator {
             }
             return undefined;
         }
+        const missing = this.missing;
         const value = this.symbolValue(name, allowForward, evaluating);
-        if (
-            value === undefined &&
-            this.definitions.get(name).kind === 'label'
-        ) {
-            // a label which hasn't been reached yet
+        if (this.missing > missing) {
+            // e.g. a label which hasn't been reached yet
             this.error(`Symbol '${variable}' not found`, location);
         }
         return value;
@@ -463,8 +520,8 @@ export class Evaluator {
         let first = 0;
         for (let i = 1; i < cycle.length; i++) {
             if (
-                this.definitions.get(cycle[i]).index <
-                this.definitions.get(cycle[first]).index
+                this.definitions.get(cycle[i])[0].index <
+                this.definitions.get(cycle[first])[0].index
             ) {
                 first = i;
             }
@@ -475,7 +532,7 @@ export class Evaluator {
             `Circular definition: ${[...ordered, ordered[0]]
                 .map(displayName)
                 .join(' -> ')}`,
-            this.definitions.get(ordered[0]).location
+            this.definitions.get(ordered[0])[0].location
         );
     }
 }
@@ -488,7 +545,9 @@ export class Programme {
     public macros = {};
     public errors = [];
     private fileResolver: FileResolver;
-    private definitions = new Map<string, SymbolDefinition>();
+    // a symbol can have more than one definition, if they are in
+    // different branches of an .if which uses symbols
+    private definitions = new Map<string, SymbolDefinition[]>();
     // the final values of all the symbols
     private values = new Map<string, Value | undefined>();
     private finalPass: Pass | undefined;
@@ -595,6 +654,15 @@ export class Programme {
         return source;
     }
 
+    /**
+     * Calls func for each element in the ast, keeping track of the block
+     * prefix, macros, and .if. Elements in code which isn't assembled
+     * because of an .if are skipped, unless ignoreIf is true.
+     *
+     * An .if whose condition uses symbols is decided by evaluateIf, when
+     * assembling. Before that (with no evaluateIf), both its branches are
+     * treated as being assembled, and func is told they are conditional.
+     */
     private iterateAst(
         func: (
             el: els.Element,
@@ -602,16 +670,30 @@ export class Programme {
             prefix: string,
             inMacroDef: boolean,
             ifTrue: boolean,
-            inMacroCall: boolean
+            inMacroCall: boolean,
+            conditional: boolean
         ) => void,
-        ignoreIf = false
+        ignoreIf = false,
+        evaluateIf?: (el: els.If, index: number, prefix: string) => boolean
     ) {
         let inMacroDef = false;
         let inMacroCall = false;
         const prefixes = [];
-        const ifStack = [true];
+        // state is whether the code is assembled, or 'both' if that isn't
+        // known yet. condition is the .if's own condition.
+        type IfState = boolean | 'both';
+        const combine = (parent: IfState, condition: IfState): IfState =>
+            parent === false || condition === false
+                ? false
+                : parent === 'both' || condition === 'both'
+                ? 'both'
+                : true;
+        const ifStack: { state: IfState; condition: IfState }[] = [
+            { state: true, condition: true },
+        ];
         for (let i = 0; i < this.ast.length; i++) {
             const el = this.ast[i];
+            const prefix = prefixes[prefixes.length - 1] || '';
             if (els.isPrefixed(el)) {
                 prefixes.push(el.prefix);
             }
@@ -630,35 +712,45 @@ export class Programme {
             // unbalanced .if/.else/.endif are reported by checkConditionals,
             // so just ignore them here
             if (els.isIf(el)) {
-                // an .if inside code which isn't being assembled is false,
-                // and isn't evaluated
-                const parentTrue = ifStack[ifStack.length - 1];
-                if (parentTrue && els.isExpression(el.if)) {
-                    el.if = this.evaluator(new Pass(), undefined).evaluate(
-                        el.if,
-                        prefixes[prefixes.length - 1] || '',
-                        undefined,
-                        false
-                    );
+                const parent = ifStack[ifStack.length - 1].state;
+                let condition: IfState;
+                if (parent === false) {
+                    // an .if inside code which isn't being assembled is
+                    // false, and isn't evaluated
+                    condition = false;
+                } else if (!els.isExpression(el.if)) {
+                    condition = el.if !== 0;
+                } else if (evaluateIf) {
+                    condition = evaluateIf(el, i, prefix);
+                } else {
+                    condition = 'both';
                 }
-                ifStack.push(parentTrue && el.if !== 0);
+                ifStack.push({ state: combine(parent, condition), condition });
             }
             if (els.isElse(el) && ifStack.length > 1) {
-                const wasTrue = ifStack.pop();
-                ifStack.push(ifStack[ifStack.length - 1] && !wasTrue);
+                const { condition } = ifStack.pop();
+                const parent = ifStack[ifStack.length - 1].state;
+                const elseCondition =
+                    condition === 'both' ? 'both' : !condition;
+                ifStack.push({
+                    state: combine(parent, elseCondition),
+                    condition: elseCondition,
+                });
             }
             if (els.isEndIf(el) && ifStack.length > 1) {
                 ifStack.pop();
             }
 
-            if (ignoreIf || ifStack[ifStack.length - 1]) {
+            const state = ifStack[ifStack.length - 1].state;
+            if (ignoreIf || state !== false) {
                 func(
                     el,
                     i,
                     prefixes[prefixes.length - 1] || '',
                     inMacroDef,
-                    ifStack[ifStack.length - 1],
-                    inMacroCall
+                    state !== false,
+                    inMacroCall,
+                    state === 'both'
                 );
             }
 
@@ -669,6 +761,28 @@ export class Programme {
                 inMacroCall = false;
             }
         }
+    }
+
+    /**
+     * Like iterateAst, but using the conditions of .ifs from the final
+     * pass of assembling
+     */
+    private iterateAssembled(
+        func: (
+            el: els.Element,
+            index: number,
+            prefix: string,
+            inMacroDef: boolean,
+            ifTrue: boolean,
+            inMacroCall: boolean
+        ) => void,
+        ignoreIf = false
+    ) {
+        this.iterateAst(func, ignoreIf, (el, index) =>
+            this.finalPass
+                ? this.finalPass.conditions.get(index) === true
+                : false
+        );
     }
 
     /**
@@ -683,55 +797,73 @@ export class Programme {
         const sourceIndices = [];
         let sourceIndex = 0;
 
-        this.iterateAst((el, i, prefix, inMacroDef) => {
-            if (els.isInclude(el) && !el.included) {
-                if (!this.fileResolver.fileExists(el.include)) {
+        this.iterateAst(
+            (el, i, prefix, inMacroDef, ifTrue, inMacroCall, conditional) => {
+                if (
+                    (els.isInclude(el) || els.isIncbin(el)) &&
+                    !el.included &&
+                    conditional
+                ) {
+                    // files are included before .ifs which use symbols are
+                    // evaluated
                     this.error(
-                        'File does not exist: ' +
-                            this.fileResolver.getRealFilename(el.include),
+                        `${
+                            els.isInclude(el) ? '.include' : '.incbin'
+                        } can't be used inside an .if which uses symbols`,
                         el.location
                     );
                     el.included = true;
                     return;
                 }
-                const source = this.readSource(el.include);
-                sourceIndices.push(sourceIndex);
-                sourceIndex = this.sources.length - 1;
-                const includeAst = this.parseLines(source, sourceIndex);
-                this.ast.splice(i + 1, 0, ...includeAst);
-                this.ast.splice(i + 1 + includeAst.length, 0, {
-                    endinclude: sourceIndex,
-                    location: {
-                        line: includeAst.length + 1,
-                        column: 0,
-                        source: sourceIndex,
-                    },
-                } as els.EndInclude);
-                el.included = true;
-            } else if (els.isIncbin(el) && !el.included) {
-                // done here, while the file resolver knows which file we're
-                // in, so the filename is relative to the current file
-                if (!this.fileResolver.fileExists(el.incbin)) {
-                    this.error(
-                        'File does not exist: ' +
-                            this.fileResolver.getRealFilename(el.incbin),
-                        el.location
-                    );
+                if (els.isInclude(el) && !el.included) {
+                    if (!this.fileResolver.fileExists(el.include)) {
+                        this.error(
+                            'File does not exist: ' +
+                                this.fileResolver.getRealFilename(el.include),
+                            el.location
+                        );
+                        el.included = true;
+                        return;
+                    }
+                    const source = this.readSource(el.include);
+                    sourceIndices.push(sourceIndex);
+                    sourceIndex = this.sources.length - 1;
+                    const includeAst = this.parseLines(source, sourceIndex);
+                    this.ast.splice(i + 1, 0, ...includeAst);
+                    this.ast.splice(i + 1 + includeAst.length, 0, {
+                        endinclude: sourceIndex,
+                        location: {
+                            line: includeAst.length + 1,
+                            column: 0,
+                            source: sourceIndex,
+                        },
+                    } as els.EndInclude);
                     el.included = true;
-                    return;
+                } else if (els.isIncbin(el) && !el.included) {
+                    // done here, while the file resolver knows which file we're
+                    // in, so the filename is relative to the current file
+                    if (!this.fileResolver.fileExists(el.incbin)) {
+                        this.error(
+                            'File does not exist: ' +
+                                this.fileResolver.getRealFilename(el.incbin),
+                            el.location
+                        );
+                        el.included = true;
+                        return;
+                    }
+                    this.ast.splice(i + 1, 0, {
+                        defb: true,
+                        references: false,
+                        location: el.location,
+                        bytes: this.fileResolver.readBinaryFile(el.incbin),
+                    } as els.Defb);
+                    el.included = true;
+                } else if (els.isEndInclude(el)) {
+                    this.fileResolver.finishFile();
+                    sourceIndex = sourceIndices.pop();
                 }
-                this.ast.splice(i + 1, 0, {
-                    defb: true,
-                    references: false,
-                    location: el.location,
-                    bytes: this.fileResolver.readBinaryFile(el.incbin),
-                } as els.Defb);
-                el.included = true;
-            } else if (els.isEndInclude(el)) {
-                this.fileResolver.finishFile();
-                sourceIndex = sourceIndices.pop();
             }
-        });
+        );
     }
 
     /**
@@ -774,38 +906,48 @@ export class Programme {
         let macro = undefined;
         let macroName = undefined;
         let macroLocation = undefined;
-        this.iterateAst((el, i, prefix, inMacroDef) => {
-            if (els.isMacroDef(el)) {
-                if (macro) {
-                    this.error('Cannot nest macros', el.location);
-                    return;
+        this.iterateAst(
+            (el, i, prefix, inMacroDef, ifTrue, inMacroCall, conditional) => {
+                if (els.isMacroDef(el)) {
+                    if (macro) {
+                        this.error('Cannot nest macros', el.location);
+                        return;
+                    }
+                    if (conditional) {
+                        // macros are expanded before .ifs which use symbols are
+                        // evaluated
+                        this.error(
+                            "Macros can't be defined inside an .if which uses symbols",
+                            el.location
+                        );
+                    }
+                    macroLocation = el.location;
+                    macroName = el.macrodef;
+                    macro = {
+                        ast: [],
+                        params: el.params || [],
+                    };
+                    if (this.macros[macroName]) {
+                        this.error(
+                            `Already defined macro '${macroName}'`,
+                            el.location
+                        );
+                        return;
+                    }
+                } else if (els.isEndMacro(el)) {
+                    if (!macro) {
+                        this.error('Not in a macro', el.location);
+                        return;
+                    }
+                    this.macros[macroName] = macro;
+                    macro = undefined;
+                    macroName = undefined;
                 }
-                macroLocation = el.location;
-                macroName = el.macrodef;
-                macro = {
-                    ast: [],
-                    params: el.params || [],
-                };
-                if (this.macros[macroName]) {
-                    this.error(
-                        `Already defined macro '${macroName}'`,
-                        el.location
-                    );
-                    return;
+                if (macro && !els.isMacroDef(el) && !els.isEndMacro(el)) {
+                    macro.ast.push(el);
                 }
-            } else if (els.isEndMacro(el)) {
-                if (!macro) {
-                    this.error('Not in a macro', el.location);
-                    return;
-                }
-                this.macros[macroName] = macro;
-                macro = undefined;
-                macroName = undefined;
             }
-            if (macro && !els.isMacroDef(el) && !els.isEndMacro(el)) {
-                macro.ast.push(el);
-            }
-        });
+        );
         if (macro) {
             this.error(`Macro '${macroName}' doesn't finish`, macroLocation);
         }
@@ -832,68 +974,93 @@ export class Programme {
     public getSymbols() {
         let nextBlock = 0;
         let blocks = [];
-        this.iterateAst((el, i, prefix, inMacroDef) => {
-            if (els.isLabel(el) && !inMacroDef) {
-                let name = el.label;
-                if (blocks.length > 0 && !el.public) {
-                    name = labelName(blocks, el.label);
-                }
-                if (this.definitions.has(name)) {
-                    this.error(
-                        blocks.length > 0 && !el.public
-                            ? `Label '${el.label}' already defined at in this block`
-                            : `Label '${el.label}' already defined`,
-                        el.location
-                    );
-                    return;
-                }
-                el.label = name;
-                this.definitions.set(name, {
-                    kind: 'label',
-                    index: i,
-                    location: el.location,
-                });
-            } else if (els.isBlock(el)) {
-                blocks.push(nextBlock);
-                el.prefix = labelPrefix(blocks);
-                nextBlock++;
-            } else if (els.isEndBlock(el) || els.isEndMacroCall(el)) {
-                blocks.pop();
-            } else if (els.isMacroCall(el) && !inMacroDef) {
-                blocks.push(nextBlock);
-                el.prefix = labelPrefix(blocks);
-                nextBlock++;
-                for (let j = 0; j < el.params.length; j++) {
-                    const param = labelName(blocks, el.params[j]);
-                    el.params[j] = param;
-                    if (el.args && el.args[j] !== undefined) {
-                        this.definitions.set(param, {
-                            kind: 'arg',
-                            index: i,
-                            value: el.args[j],
-                            location: el.location,
-                        });
+        const define = (name: string, definition: SymbolDefinition) => {
+            if (!this.definitions.has(name)) {
+                this.definitions.set(name, []);
+            }
+            this.definitions.get(name).push(definition);
+        };
+        this.iterateAst(
+            (el, i, prefix, inMacroDef, ifTrue, inMacroCall, conditional) => {
+                if (els.isLabel(el) && !inMacroDef) {
+                    let name = el.label;
+                    if (blocks.length > 0 && !el.public) {
+                        name = labelName(blocks, el.label);
                     }
-                }
-            } else if (els.isEqu(el)) {
-                if (i > 0 && els.isLabel(this.ast[i - 1])) {
-                    let ii = i - 1;
-                    let el2;
-                    while ((el2 = this.ast[ii]) && els.isLabel(el2)) {
-                        this.definitions.set(el2.label, {
-                            kind: 'equ',
-                            index: i,
-                            value: el.equ,
-                            location: el.location,
-                        });
-                        ii--;
+                    // a symbol can be defined more than once in .ifs which use
+                    // symbols, and it's an error if more than one is assembled
+                    const existing = this.definitions.get(name);
+                    if (
+                        existing &&
+                        !(conditional && existing.every((d) => d.conditional))
+                    ) {
+                        this.error(
+                            blocks.length > 0 && !el.public
+                                ? `Label '${el.label}' already defined at in this block`
+                                : `Label '${el.label}' already defined`,
+                            el.location
+                        );
+                        return;
                     }
-                } else {
-                    this.error('EQU has no label', el.location);
-                    return;
+                    el.label = name;
+                    define(name, {
+                        kind: 'label',
+                        index: i,
+                        location: el.location,
+                        conditional,
+                    });
+                } else if (els.isBlock(el)) {
+                    blocks.push(nextBlock);
+                    el.prefix = labelPrefix(blocks);
+                    nextBlock++;
+                } else if (els.isEndBlock(el) || els.isEndMacroCall(el)) {
+                    blocks.pop();
+                } else if (els.isMacroCall(el) && !inMacroDef) {
+                    blocks.push(nextBlock);
+                    el.prefix = labelPrefix(blocks);
+                    nextBlock++;
+                    for (let j = 0; j < el.params.length; j++) {
+                        const param = labelName(blocks, el.params[j]);
+                        el.params[j] = param;
+                        if (el.args && el.args[j] !== undefined) {
+                            define(param, {
+                                kind: 'arg',
+                                index: i,
+                                value: el.args[j],
+                                location: el.location,
+                                conditional,
+                            });
+                        }
+                    }
+                } else if (els.isEqu(el)) {
+                    if (i > 0 && els.isLabel(this.ast[i - 1])) {
+                        let ii = i - 1;
+                        let el2;
+                        while ((el2 = this.ast[ii]) && els.isLabel(el2)) {
+                            // the label is defined by the equ instead
+                            const definitions = this.definitions.get(el2.label);
+                            const index = definitions
+                                ? definitions.findIndex((d) => d.index === ii)
+                                : -1;
+                            if (index !== -1) {
+                                definitions[index] = {
+                                    kind: 'equ',
+                                    index: i,
+                                    value: el.equ,
+                                    location: el.location,
+                                    conditional,
+                                    labelIndex: ii,
+                                };
+                            }
+                            ii--;
+                        }
+                    } else {
+                        this.error('EQU has no label', el.location);
+                        return;
+                    }
                 }
             }
-        });
+        );
         if (blocks.length !== 0) {
             this.error('Mismatch between .block and .endblock statements');
         }
@@ -984,7 +1151,13 @@ export class Programme {
         this.currentPass = pass;
         const evaluator = this.evaluator(pass, previous);
         for (const name of this.definitions.keys()) {
-            this.values.set(name, evaluator.symbolValue(name, true));
+            const missing = evaluator.missing;
+            const value = evaluator.symbolValue(name, true);
+            // not including symbols which are only defined in code which
+            // isn't assembled
+            if (evaluator.missing === missing) {
+                this.values.set(name, value);
+            }
         }
         if (!settled) {
             const changed = [...pass.labels.keys()].filter(
@@ -1044,56 +1217,89 @@ export class Programme {
         let pc = 0;
         let out = 0;
         let origin: number | undefined;
-        this.iterateAst((el, i, prefix, inMacroDef) => {
-            if (inMacroDef) {
-                // macro definitions are assembled where they're called
-                return;
-            }
-            if (els.isLabel(el)) {
-                const definition = this.definitions.get(el.label);
-                if (definition?.kind === 'label' && definition.index === i) {
-                    pass.labels.set(el.label, pc);
+        // .ifs which use symbols can't use forward references either
+        const evaluateIf = (el: els.If, i: number, prefix: string) => {
+            const value = evaluator.evaluate(el.if, prefix, pc, false);
+            const condition = value !== undefined && value !== 0;
+            pass.conditions.set(i, condition);
+            return condition;
+        };
+        // symbols defined so far in this pass
+        const defined = new Set<string>();
+        this.iterateAst(
+            (el, i, prefix, inMacroDef) => {
+                if (inMacroDef) {
+                    // macro definitions are assembled where they're called
+                    return;
                 }
-            } else if (els.isEqu(el) || els.isMacroCall(el)) {
-                // so $ can be evaluated in the equ or macro arguments
-                pass.placements[i] = { address: pc, out };
-            } else if (els.isDefs(el)) {
-                const size = pcValue(el.defs, prefix, pc);
-                // TODO what if size can't be evaluated
-                pass.placements[i] = { address: pc, out, size };
-                pc += size;
-                out += size;
-            } else if (els.isOrg(el)) {
-                pc = pcValue(el.org, prefix, pc);
-                out = pc;
-            } else if (els.isPhase(el)) {
-                pc = pcValue(el.phase, prefix, pc);
-            } else if (els.isEndPhase(el)) {
-                pc = out;
-            } else if (els.isAlign(el)) {
-                const align = pcValue(el.align, prefix, pc);
-                const add = align - (pc % align);
-                if (add !== align) {
-                    pc += add;
-                    out += add;
-                }
-            } else if (els.isBytes(el)) {
-                const bytes = this.encode(evaluator, el, prefix, pc);
-                if (bytes.length > 0) {
-                    if (origin === undefined) {
-                        origin = out;
-                    } else if (out < origin) {
+                if (els.isLabel(el)) {
+                    const definition = this.definitions
+                        .get(el.label)
+                        ?.find(
+                            (d) =>
+                                (d.kind === 'equ' ? d.labelIndex : d.index) ===
+                                i
+                        );
+                    if (!definition) {
+                        // an error was reported when getting the symbols
+                        return;
+                    }
+                    if (defined.has(el.label)) {
+                        // defined in more than one .if branch which is assembled
                         this.error(
-                            'Cannot ORG to earlier address than first ORG',
+                            `Label '${displayName(el.label)}' already defined`,
                             el.location
                         );
+                        return;
                     }
+                    defined.add(el.label);
+                    if (definition.kind === 'label') {
+                        pass.labels.set(el.label, pc);
+                        pass.placements[i] = { address: pc, out };
+                    }
+                } else if (els.isEqu(el) || els.isMacroCall(el)) {
+                    // so $ can be evaluated in the equ or macro arguments
+                    pass.placements[i] = { address: pc, out };
+                } else if (els.isDefs(el)) {
+                    const size = pcValue(el.defs, prefix, pc);
+                    // TODO what if size can't be evaluated
+                    pass.placements[i] = { address: pc, out, size };
+                    pc += size;
+                    out += size;
+                } else if (els.isOrg(el)) {
+                    pc = pcValue(el.org, prefix, pc);
+                    out = pc;
+                } else if (els.isPhase(el)) {
+                    pc = pcValue(el.phase, prefix, pc);
+                } else if (els.isEndPhase(el)) {
+                    pc = out;
+                } else if (els.isAlign(el)) {
+                    const align = pcValue(el.align, prefix, pc);
+                    const add = align - (pc % align);
+                    if (add !== align) {
+                        pc += add;
+                        out += add;
+                    }
+                } else if (els.isBytes(el)) {
+                    const bytes = this.encode(evaluator, el, prefix, pc);
+                    if (bytes.length > 0) {
+                        if (origin === undefined) {
+                            origin = out;
+                        } else if (out < origin) {
+                            this.error(
+                                'Cannot ORG to earlier address than first ORG',
+                                el.location
+                            );
+                        }
+                    }
+                    pass.placements[i] = { address: pc, out, bytes };
+                    pc += bytes.length;
+                    out += bytes.length;
                 }
-                pass.placements[i] = { address: pc, out, bytes };
-                pc += bytes.length;
-                out += bytes.length;
-            }
-        });
+            },
+            false,
+            evaluateIf
+        );
         this.currentPass = undefined;
         return pass;
     }
@@ -1226,47 +1432,50 @@ export class Programme {
         let line = 0;
         let source = 0;
         let ast: any = {};
-        this.iterateAst((el, i, prefix, inMacroDef, ifTrue, inMacroCall) => {
-            if (el.location) {
-                if (
-                    (el.location.line !== line && line !== 0) ||
-                    el.location.source !== source
-                ) {
-                    collectedAst.push(ast);
-                    ast = {};
+        this.iterateAssembled(
+            (el, i, prefix, inMacroDef, ifTrue, inMacroCall) => {
+                if (el.location) {
+                    if (
+                        (el.location.line !== line && line !== 0) ||
+                        el.location.source !== source
+                    ) {
+                        collectedAst.push(ast);
+                        ast = {};
+                    }
+                    line = el.location.line;
+                    source = el.location.source;
+                    ast.location = el.location;
                 }
-                line = el.location.line;
-                source = el.location.source;
-                ast.location = el.location;
-            }
-            for (const key of [
-                'macrocall',
-                'endinclude',
-                'endmacrocall',
-                'undoc',
-                'error',
-            ]) {
-                if (key in el) {
-                    ast[key] = el[key];
+                for (const key of [
+                    'macrocall',
+                    'endinclude',
+                    'endmacrocall',
+                    'undoc',
+                    'error',
+                ]) {
+                    if (key in el) {
+                        ast[key] = el[key];
+                    }
                 }
-            }
-            const placement = placements[i];
-            if (els.isBytes(el)) {
-                ast.bytes = placement ? placement.bytes : el.bytes;
-            }
-            if ((els.isBytes(el) || els.isDefs(el)) && placement) {
-                ast.address = placement.address;
-                ast.out = placement.out;
-            }
-            if (inMacroDef) {
-                ast.inMacroDef = true;
-            }
-            if (inMacroCall) {
-                ast.inMacroCall = true;
-            }
-            ast.ifTrue = ifTrue;
-            ast.prefix = prefix;
-        }, true);
+                const placement = placements[i];
+                if (els.isBytes(el)) {
+                    ast.bytes = placement ? placement.bytes : el.bytes;
+                }
+                if ((els.isBytes(el) || els.isDefs(el)) && placement) {
+                    ast.address = placement.address;
+                    ast.out = placement.out;
+                }
+                if (inMacroDef) {
+                    ast.inMacroDef = true;
+                }
+                if (inMacroCall) {
+                    ast.inMacroCall = true;
+                }
+                ast.ifTrue = ifTrue;
+                ast.prefix = prefix;
+            },
+            true
+        );
         if (Object.keys(ast).length !== 0) {
             collectedAst.push(ast);
         }
@@ -1453,7 +1662,7 @@ export class Programme {
 
     public warnUndocumented() {
         let lines = [];
-        this.iterateAst((el) => {
+        this.iterateAssembled((el) => {
             if (els.isUndocumented(el)) {
                 lines.push(el.location.line);
             }
@@ -1599,7 +1808,7 @@ export class Programme {
             return;
         }
         const placements = this.finalPass.placements;
-        this.iterateAst((el, i, prefix, inMacroDef) => {
+        this.iterateAssembled((el, i, prefix, inMacroDef) => {
             if (inMacroDef) {
                 return;
             }
