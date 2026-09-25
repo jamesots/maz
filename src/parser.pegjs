@@ -335,13 +335,19 @@ dbyte = ex:expr {
         return bytes;
     } else if (!Array.isArray(ex)) {
         if (typeof ex === 'number') {
+            if (!Number.isFinite(ex)) {
+                // so the compiler can report it
+                return [constExpr(ex)];
+            }
             return [ex & 0xff];
         }
         return ex;
     }
     const bytes = [];
     for (let i = 0; i < ex.length; i++) {
-        if (typeof ex[i] === 'number') {
+        if (typeof ex[i] === 'number' && !Number.isFinite(ex[i])) {
+            bytes.push(constExpr(ex[i]));
+        } else if (typeof ex[i] === 'number') {
             bytes.push(ex[i] & 0xff);
         } else {
             bytes.push(ex[i]);
@@ -373,13 +379,19 @@ dword = ex:expr {
         return bytes;
     } else if (!Array.isArray(ex)) {
         if (typeof ex === 'number') {
+            if (!Number.isFinite(ex)) {
+                // so the compiler can report it
+                return [constExpr(ex)];
+            }
             return [ex & 0xff, (ex >> 8) & 0xff];
         }
         return [ex];
     } 
     const bytes = [];
     for (let i = 0; i < ex.length; i++) {
-        if (typeof ex[i] === 'number') {
+        if (typeof ex[i] === 'number' && !Number.isFinite(ex[i])) {
+            bytes.push(constExpr(ex[i]));
+        } else if (typeof ex[i] === 'number') {
             bytes.push(ex[i] & 0xff);
             bytes.push((ex[i] >> 8) & 0xff);
         } else {

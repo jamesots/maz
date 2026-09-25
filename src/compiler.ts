@@ -1159,10 +1159,21 @@ export class Programme {
                             bytes.push(utf8.charCodeAt(1));
                         }
                     }
-                } else if (els.isDefb(el)) {
+                } else if (els.isDefb(el) || els.isDefw(el)) {
+                    // db and dw just use the low byte or word, but
+                    // division by zero is still an error
+                    if (value !== undefined && !Number.isFinite(value)) {
+                        this.error(
+                            `Invalid value ${value} in ${
+                                els.isDefb(el) ? 'db' : 'dw'
+                            }`,
+                            byte.location || el.location
+                        );
+                    }
                     bytes.push(value & 0xff);
-                } else if (els.isDefw(el)) {
-                    bytes.push(value & 0xff, (value >> 8) & 0xff);
+                    if (els.isDefw(el)) {
+                        bytes.push((value >> 8) & 0xff);
+                    }
                 } else {
                     this.checkRange(
                         value,

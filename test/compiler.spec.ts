@@ -1206,6 +1206,22 @@ describe('compiler', function () {
         expect(prog.errors).to.eql([]);
         expect(prog.getBytes()).to.eql([0x2a, 0x03, 0x00, 0x00]);
     });
+    it('should report division by zero in db and dw', function () {
+        const prog = compileLines([
+            '   db 1, 1/0',
+            '   dw 0/0',
+            '   db x/0',
+            'x: equ 5',
+            '   db $1234',
+        ]);
+        expect(errorMessages(prog)).to.eql([
+            'Invalid value Infinity in db',
+            'Invalid value NaN in dw',
+            'Invalid value Infinity in db',
+        ]);
+        // other values still just use the low byte
+        expect(prog.getBytes().slice(-1)).to.eql([0x34]);
+    });
     describe('output', function () {
         const lines = [
             'org 100h',
