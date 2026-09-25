@@ -1,0 +1,43 @@
+{
+  "errors": [],
+  "bytes": [
+    "3a28000068656c6c6f0a210005"
+  ],
+  "list": [
+    "    1                         thing:",
+    "    2                         bdos: equ 5",
+    "    3                         blob: equ glop",
+    "    4                         glop: equ bdos",
+    "    5                         a: equ 100",
+    "    6                         .block",
+    "    7                             a: equ 2",
+    "    8                         .block",
+    "    9                             bdos: equ 6",
+    "   10                             blah: equ bdos",
+    "   11                             b: equ a",
+    "   12                         .endblock",
+    "   13                             bdos: equ 7",
+    "   14                         .endblock",
+    "   15                         start:",
+    "   16 0000 3a2800                 ld a,(end - start)",
+    "   17 0003 00                 data: nop",
+    "   18 0004 68656c6c6f0a2100       defb \"hello\",10,\"!\",start,bdos",
+    "           05              ",
+    "   19                         org 40",
+    "   20                         .block",
+    "   21                             bdos: equ 8",
+    "   22                             b: equ a",
+    "   23                         .endblock",
+    "   24                         end:",
+    "",
+    "thing                0005",
+    "bdos                 0005",
+    "blob                 0005",
+    "glop                 0005",
+    "a                    0064",
+    "start                0000",
+    "data                 0003",
+    "end                  0028",
+    "$                    0004"
+  ]
+}

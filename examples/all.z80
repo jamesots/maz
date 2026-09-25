@@ -13,15 +13,15 @@ here:
     ld a,rpt(one, 2); 3e 02
     ld a,"one"      ; 3e 6f
     ld a,rpt("one", 2)  ; 3e 6f
-    ld a,$1234      ; 3e 34
-    ld a,$1234 * 2  ; 3e 68
+    ld a,$34        ; 3e 34
+    ld a,$34 * 2    ; 3e 68
     ld a,one_s      ; 3e 6f
     ld a,rpt(one_s, 2)  ; 3e 6f
     ld a,-2         ; 3e fe
 
     ld hl,$1234     ; 21 34 12
     ld hl,$1234 * 2 ; 21 68 24
-    ld hl,$123456   ; 21 56 34
+    ld hl,$3456     ; 21 56 34
     ld hl,"one"     ; 21 6f 6e
     ld hl,rpt("one", 2) ; 21 6f 6e
     ld hl,one_s     ; 21 6f 6e
@@ -67,7 +67,7 @@ here:
     jp rpt(one_s, 2)    ; c3 6f 6e
     jp $123         ; c3 23 01
     jp $1234        ; c3 34 12
-    jp $12345       ; c3 45 23
+    jp $2345        ; c3 45 23
     jp -2           ; c3 fe ff
 
     jr $            ; 18 00
