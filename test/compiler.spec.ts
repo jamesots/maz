@@ -935,6 +935,45 @@ describe('compiler', function() {
         const bytes = prog.getBytes();
         expect(bytes).to.eql([54, 52, 52, 0, 8, 0, 5, 6, 0, 6, 0]);
     });
+    it('should handle defw properly - forward references through equs should not be errors', function() {
+        const prog = compiler.compile('test', {
+            fileResolver: new compiler.StringFileResolver('test',
+                [
+                    '   defw cat(x, "44"), 8',
+                    'x: equ more + 1',
+                    'more:',
+                    '   defb 5',
+                ])
+        });
+        expect(prog.errors).to.eql([]);
+        const bytes = prog.getBytes();
+        expect(bytes).to.eql([55, 52, 52, 0, 8, 0, 5]);
+    });
+    it('should re-evaluate align after earlier labels move', function() {
+        const prog = compiler.compile('test', {
+            fileResolver: new compiler.StringFileResolver('test',
+                [
+                    '   defw cat(more, "44")',
+                    'more:',
+                    '   .align more + 1',
+                    '   defb 1',
+                ])
+        });
+        expect(prog.errors).to.eql([]);
+        const bytes = prog.getBytes();
+        expect(bytes).to.eql([52, 52, 52, 0, 0, 1]);
+    });
+    it('should only report layout errors once', function() {
+        const prog = compiler.compile('test', {
+            fileResolver: new compiler.StringFileResolver('test',
+                [
+                    '   defw cat(more, "44")',
+                    'more:',
+                    '   defs nothere',
+                ])
+        });
+        expect(prog.errors.length).to.equal(1);
+    });
     it('should handle defb properly - some forward references should be errors', function() {
         const prog = compiler.compile('test', {
             fileResolver: new compiler.StringFileResolver('test',
@@ -964,5 +1003,127 @@ describe('compiler', function() {
                 ]
             })
         });
+    });
+    it('should find incbin files relative to the file they are in', function() {
+        const prog = compiler.compile('test', {
+            fileResolver: new compiler.StringFileResolvers({
+                'test': [
+                    '.include "src/one"',
+                ],
+                'src/one': [
+                    '.include "deeper/two"',
+                    '.incbin "data"',
+                ],
+                'src/deeper/two': [
+                    '   nop',
+                ],
+                'src/data': [
+                    'hi',
+                ],
+            })
+        });
+        expect(prog.errors).to.eql([]);
+        expect(prog.getBytes()).to.eql([0, 0x68, 0x69]);
+    });
+    function compileLines(lines: string[]) {
+        return compiler.compile('test', {
+            fileResolver: new compiler.StringFileResolver('test', lines)
+        });
+    }
+    function errorMessages(prog) {
+        return prog.errors.map(e => e.error);
+    }
+    it('should not assemble an .if nested in a false .if', function() {
+        const prog = compileLines([
+            '.if 0',
+            '.if 1',
+            '   nop',
+            '.else',
+            '   halt',
+            '.endif',
+            '.else',
+            '   di',
+            '.endif',
+        ]);
+        expect(prog.errors).to.eql([]);
+        expect(prog.getBytes()).to.eql([0xf3]);
+    });
+    it('should not evaluate an .if nested in a false .if', function() {
+        const prog = compileLines([
+            '.if 0',
+            '.if nothere',
+            '   nop',
+            '.endif',
+            '.endif',
+            '   di',
+        ]);
+        expect(prog.errors).to.eql([]);
+        expect(prog.getBytes()).to.eql([0xf3]);
+    });
+    it('should report .if without .endif', function() {
+        const prog = compileLines(['.if 1', '   nop']);
+        expect(errorMessages(prog)).to.eql(['.if without .endif']);
+    });
+    it('should report .endif without .if', function() {
+        const prog = compileLines(['   nop', '.endif']);
+        expect(errorMessages(prog)).to.eql(['.endif without .if']);
+    });
+    it('should report .else without .if', function() {
+        const prog = compileLines(['   nop', '.else']);
+        expect(errorMessages(prog)).to.eql(['.else without .if']);
+    });
+    it('should report more than one .else', function() {
+        const prog = compileLines(['.if 1', '.else', '.else', '.endif']);
+        expect(errorMessages(prog)).to.eql(['More than one .else for .if']);
+    });
+    it('should allow 8 bit values from -128 to 255', function() {
+        const prog = compileLines(['   ld a,-128', '   ld a,255']);
+        expect(prog.errors).to.eql([]);
+        expect(prog.getBytes()).to.eql([0x3e, 0x80, 0x3e, 0xff]);
+    });
+    it('should report out of range 8 bit values', function() {
+        const prog = compileLines([
+            '   ld a,256',
+            '   ld a,-129',
+            '   ld a,x',
+            'x: equ 300',
+        ]);
+        expect(errorMessages(prog)).to.eql([
+            'Value 256 is out of range for an 8 bit value (-128 to 255)',
+            'Value -129 is out of range for an 8 bit value (-128 to 255)',
+            'Value 300 is out of range for an 8 bit value (-128 to 255)',
+        ]);
+    });
+    it('should report out of range 16 bit values', function() {
+        const prog = compileLines([
+            '   ld hl,65535',
+            '   ld hl,-32768',
+            '   ld hl,65536',
+            '   ld hl,x',
+            'x: equ -32769',
+        ]);
+        expect(errorMessages(prog)).to.eql([
+            'Value 65536 is out of range for a 16 bit value (-32768 to 65535)',
+            'Value -32769 is out of range for a 16 bit value (-32768 to 65535)',
+        ]);
+    });
+    it('should report out of range index offsets', function() {
+        const prog = compileLines([
+            '   ld a,(ix+127)',
+            '   ld a,(ix+-128)',
+            '   ld a,(ix+128)',
+            '   bit 3,(iy+d)',
+            'd: equ 200',
+        ]);
+        expect(errorMessages(prog)).to.eql([
+            'Value 128 is out of range for an index offset (-128 to 127)',
+            'Value 200 is out of range for an index offset (-128 to 127)',
+        ]);
+    });
+    it('should report division by zero in instructions', function() {
+        const prog = compileLines(['   ld a,1/0']);
+        expect(errorMessages(prog)).to.eql([
+            'Invalid value Infinity for an 8 bit value',
+        ]);
     });
 });

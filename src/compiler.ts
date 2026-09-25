@@ -9,11 +9,13 @@ import * as els from './els';
 declare function unescape(s: string): string;
 
 const BYTELEN = 8;
+const MAX_PASSES = 10;
 
 export abstract class FileResolver {
     public abstract fileExists(filename: string): boolean;
     public abstract readFile(filename: string): string[];
-    public abstract finishFile();
+    public abstract readBinaryFile(filename: string): number[];
+    public abstract finishFile(): void;
     public abstract getRealFilename(filename: string): string;
     public readonly filename: string;
 }
@@ -29,8 +31,12 @@ export class DefaultFileResolver implements FileResolver {
 
     public readFile(filename: string): string[] {
         this._filename = this.getFilename(filename);
-        this.files.push(filename);
+        this.files.push(this._filename);
         return fs.readFileSync(this._filename).toString().split('\n');
+    }
+
+    public readBinaryFile(filename: string): number[] {
+        return Array.from(fs.readFileSync(this.getFilename(filename)));
     }
 
     public finishFile() {
@@ -68,31 +74,30 @@ export class StringFileResolvers implements FileResolver {
     constructor(private fileContent: { [filename: string]: string[] }) {}
 
     public fileExists(filename: string): boolean {
-        console.log(`fileExists ${filename}`);
         return this.fileContent[this.getFilename(filename)] !== undefined;
     }
 
     public readFile(filename: string): string[] {
-        console.log(`readFile ${filename}`);
         this._filename = this.getFilename(filename);
-        this.files.push(filename);
+        this.files.push(this._filename);
         return this.fileContent[this._filename];
     }
 
+    public readBinaryFile(filename: string): number[] {
+        const content = this.fileContent[this.getFilename(filename)];
+        return Array.from(Buffer.from(content.join('\n')));
+    }
+
     public finishFile() {
-        console.log('finishFile');
         this.files.pop();
         this._filename = this.files[this.files.length - 1];
-        console.log(`finishFile - _filename = ${this._filename}`);
     }
 
     public getRealFilename(filename: string): string {
-        console.log(`getRealFilename: ${filename}`);
         return this.getFilename(filename);
     }
 
     private getFilename(filename: string): string {
-        console.log(`getFilename: ${filename}`);
         for (const searchPath of this.searchPaths) {
             const newFilename = searchPath + '/' + filename;
             if (this.fileContent[newFilename] !== undefined) {
@@ -106,7 +111,7 @@ export class StringFileResolvers implements FileResolver {
         if (index === -1) {
             return filename;
         }
-        return this._filename.substring(index + 1) + '/' + filename;
+        return this._filename.substring(0, index) + '/' + filename;
     }
 
     public get filename(): string {
@@ -124,6 +129,9 @@ export class StringFileResolver implements FileResolver {
             return this.code;
         }
         throw 'File not found: ' + filename;
+    }
+    public readBinaryFile(filename: string): number[] {
+        return Array.from(Buffer.from(this.readFile(filename).join('\n')));
     }
     public finishFile() {}
     public getRealFilename(filename: string): string {
@@ -146,7 +154,7 @@ export function compile(filename, options) {
     const prog = new Programme(options);
     prog.parse(filename);
     prog.processIncludes();
-    prog.processIncbins();
+    prog.checkConditionals();
     prog.getMacros();
     prog.expandMacros();
     prog.getSymbols();
@@ -173,6 +181,12 @@ export class Programme {
     public macros = {};
     public errors = [];
     private fileResolver: FileResolver;
+    private originalBytes = new WeakMap<els.Bytes, els.Bytes['bytes']>();
+    private originalValues = new WeakMap<els.Element, any>();
+    private deferredErrors: (els.Error | string)[] | undefined;
+    // label values from the previous pass, used for forward references
+    private forwardLabels: { [label: string]: number } | undefined;
+    private allowForwardLabels = false;
 
     constructor(private options) {
         if (options && options.fileResolver) {
@@ -221,7 +235,7 @@ export class Programme {
                     line: i + 1,
                 });
                 if (els !== null) {
-                    ast = ast.concat(els);
+                    ast.push(...els);
                 }
             } catch (e) {
                 if (e.name === 'SyntaxError') {
@@ -306,19 +320,25 @@ export class Programme {
                 inMacroCall = true;
             }
 
+            // unbalanced .if/.else/.endif are reported by checkConditionals,
+            // so just ignore them here
             if (els.isIf(el)) {
-                if (els.isExpression(el.if)) {
+                // an .if inside code which isn't being assembled is false,
+                // and isn't evaluated
+                const parentTrue = ifStack[ifStack.length - 1];
+                if (parentTrue && els.isExpression(el.if)) {
                     el.if = this.evaluateExpression(
                         prefixes[prefixes.length - 1],
                         el.if
                     );
                 }
-                ifStack.push(el.if !== 0);
+                ifStack.push(parentTrue && el.if !== 0);
             }
-            if (els.isElse(el)) {
-                ifStack.push(!ifStack.pop());
+            if (els.isElse(el) && ifStack.length > 1) {
+                const wasTrue = ifStack.pop();
+                ifStack.push(ifStack[ifStack.length - 1] && !wasTrue);
             }
-            if (els.isEndIf(el)) {
+            if (els.isEndIf(el) && ifStack.length > 1) {
                 ifStack.pop();
             }
 
@@ -379,16 +399,9 @@ export class Programme {
                     },
                 } as els.EndInclude);
                 el.included = true;
-            } else if (els.isEndInclude(el)) {
-                this.fileResolver.finishFile();
-                sourceIndex = sourceIndices.pop();
-            }
-        });
-    }
-
-    processIncbins() {
-        this.iterateAst((el, i, prefix, inMacroDef) => {
-            if (els.isIncbin(el) && !el.included) {
+            } else if (els.isIncbin(el) && !el.included) {
+                // done here, while the file resolver knows which file we're
+                // in, so the filename is relative to the current file
                 if (!this.fileResolver.fileExists(el.incbin)) {
                     this.error(
                         'File does not exist: ' +
@@ -398,28 +411,47 @@ export class Programme {
                     el.included = true;
                     return;
                 }
-
-                const bin = fs.readFileSync(
-                    this.fileResolver.getRealFilename(el.incbin)
-                );
                 this.ast.splice(i + 1, 0, {
                     defb: true,
                     references: false,
                     location: el.location,
-                    bytes: Array.from(bin),
+                    bytes: this.fileResolver.readBinaryFile(el.incbin),
                 } as els.Defb);
-                this.ast.splice(i + 2, 0, {
-                    endinclude: 0,
-                    location: {
-                        line: 0,
-                        column: 0,
-                        source: 0,
-                    },
-                } as els.EndInclude);
                 el.included = true;
-            } else if (els.isEndIncbin(el)) {
+            } else if (els.isEndInclude(el)) {
+                this.fileResolver.finishFile();
+                sourceIndex = sourceIndices.pop();
             }
         });
+    }
+
+    /**
+     * Check that .if, .else and .endif are balanced
+     */
+    public checkConditionals() {
+        const ifs: { location: els.Location; hadElse: boolean }[] = [];
+        for (const el of this.ast) {
+            if (els.isIf(el)) {
+                ifs.push({ location: el.location, hadElse: false });
+            } else if (els.isElse(el)) {
+                if (ifs.length === 0) {
+                    this.error('.else without .if', el.location);
+                } else if (ifs[ifs.length - 1].hadElse) {
+                    this.error('More than one .else for .if', el.location);
+                } else {
+                    ifs[ifs.length - 1].hadElse = true;
+                }
+            } else if (els.isEndIf(el)) {
+                if (ifs.length === 0) {
+                    this.error('.endif without .if', el.location);
+                } else {
+                    ifs.pop();
+                }
+            }
+        }
+        for (const unclosed of ifs) {
+            this.error('.if without .endif', unclosed.location);
+        }
     }
 
     /**
@@ -618,6 +650,96 @@ export class Programme {
      * the symbol
      */
     public assignPCandEQU() {
+        // labels whose value comes from the pc (rather than from an equ)
+        const pcLabels = new Set<string>();
+        for (const symbol in this.symbols) {
+            if (this.symbols[symbol] === null) {
+                pcLabels.add(symbol);
+            }
+        }
+
+        // symbols (equs and macro arguments) which are expressions. These
+        // get replaced by their values when evaluated, so keep the originals
+        const symbolExpressions = {};
+        for (const symbol in this.symbols) {
+            if (this.symbols[symbol] && this.symbols[symbol].expression) {
+                symbolExpressions[symbol] = this.symbols[symbol];
+            }
+        }
+
+        // The size of some elements (e.g. defw cat(label, "x")) can depend
+        // on the value of labels defined later, so keep assigning addresses
+        // until the labels stop moving. Each pass lets defb and defw use the
+        // label values from the previous pass for forward references; other
+        // things which affect the pc (org, align, etc.) can't use forward
+        // references. Only errors from the last pass are reported, as
+        // earlier passes may not have known the values of all the labels.
+        let changed: string[] = [];
+        for (let pass = 0; pass < MAX_PASSES; pass++) {
+            const previous = {};
+            for (const label of pcLabels) {
+                previous[label] = this.symbols[label];
+                this.symbols[label] = null;
+            }
+            this.forwardLabels = previous;
+            Object.assign(this.symbols, symbolExpressions);
+            this.restoreExpressions();
+            this.deferredErrors = [];
+            this.assignPCandEQUPass(pcLabels);
+            changed = [...pcLabels].filter(
+                (label) => !Object.is(this.symbols[label], previous[label])
+            );
+            if (changed.length === 0) {
+                break;
+            }
+        }
+        const errors = this.deferredErrors;
+        this.deferredErrors = undefined;
+        this.forwardLabels = undefined;
+        for (const error of errors) {
+            this.logError(error);
+        }
+        if (changed.length !== 0) {
+            this.error(
+                `Could not resolve address of '${changed[0]}' - ` +
+                    'forward references keep changing the size of the code'
+            );
+        }
+    }
+
+    /**
+     * Put back any expressions which were replaced by their values
+     * in a previous pass, so they can be evaluated again
+     */
+    private restoreExpressions() {
+        for (const el of this.ast) {
+            if (els.isBytes(el)) {
+                if (!this.originalBytes.has(el)) {
+                    this.originalBytes.set(el, el.bytes.slice());
+                } else {
+                    el.bytes = this.originalBytes.get(el).slice();
+                }
+                continue;
+            }
+            let key: string;
+            if (els.isOrg(el)) {
+                key = 'org';
+            } else if (els.isPhase(el)) {
+                key = 'phase';
+            } else if (els.isAlign(el)) {
+                key = 'align';
+            } else {
+                continue;
+            }
+            if (!this.originalValues.has(el)) {
+                this.originalValues.set(el, el[key]);
+            } else {
+                el[key] = this.originalValues.get(el);
+            }
+        }
+    }
+
+    private assignPCandEQUPass(pcLabels: Set<string>) {
         // pc starts at 0 unless org or phase changes it
         let pc = 0;
         let out = 0;
@@ -692,7 +814,9 @@ export class Programme {
                 el.out = out;
 
                 if (els.isDefb(el) || els.isDefw(el)) {
+                    this.allowForwardLabels = true;
                     this.updateByte(el, prefix, inMacroDef, true);
+                    this.allowForwardLabels = false;
                 }
 
                 let elementLength = els.isDefw(el) ? 2 : 1;
@@ -731,6 +855,12 @@ export class Programme {
             const subVar = this.findVariable(prefix, variable);
 
             if (
+                this.symbols[subVar] === null &&
+                this.allowForwardLabels &&
+                this.forwardLabels[subVar] !== null
+            ) {
+                subVars[variable] = this.forwardLabels[subVar];
+            } else if (
                 this.symbols[subVar] === undefined ||
                 this.symbols[subVar] === null
             ) {
@@ -897,6 +1027,17 @@ export class Programme {
                             el.bytes[i] = value & 0xff;
                             el.bytes.splice(i + 1, 0, (value >> 8) & 0xff);
                         } else {
+                            if (!ignoreErrors) {
+                                this.checkRange(
+                                    value,
+                                    byte.offset
+                                        ? 'offset'
+                                        : el.bytes[i + 1] === null
+                                        ? 'word'
+                                        : 'byte',
+                                    byte.location || el.location
+                                );
+                            }
                             el.bytes[i] = value & 0xff;
                             if (el.bytes[i + 1] === null) {
                                 el.bytes[i + 1] = (value >> 8) & 0xff;
@@ -907,6 +1048,30 @@ export class Programme {
             }
         }
         return allEvaluated;
+    }
+
+    private checkRange(
+        value: number,
+        size: 'byte' | 'word' | 'offset',
+        location: els.Location
+    ) {
+        const [min, max, description] = {
+            byte: [-0x80, 0xff, 'an 8 bit value'],
+            word: [-0x8000, 0xffff, 'a 16 bit value'],
+            offset: [-0x80, 0x7f, 'an index offset'],
+        }[size] as [number, number, string];
+        if (value === undefined) {
+            // couldn't be evaluated, and that has already been reported
+            return;
+        } else if (!Number.isFinite(value)) {
+            this.error(`Invalid value ${value} for ${description}`, location);
+        } else if (value < min || value > max) {
+            this.error(
+                `Value ${value} is out of range for ${description} ` +
+                    `(${min} to ${max})`,
+                location
+            );
+        }
     }
 
     public collectAst() {
@@ -1102,6 +1267,10 @@ export class Programme {
     }
 
     public logError(e: els.Error | string) {
+        if (this.deferredErrors) {
+            this.deferredErrors.push(e);
+            return;
+        }
         this.errors.push(e);
         if (typeof e === 'string') {
             console.log(chalk.red(e));
@@ -1152,12 +1321,18 @@ export class Programme {
                         startOut = el.out;
                     }
                     out = el.bytes.length + el.out;
-                    bytes = bytes.concat(el.bytes);
+                    // not using concat or push(...), as they are slow or
+                    // can overflow the stack with large arrays
+                    for (const byte of el.bytes) {
+                        bytes.push(byte);
+                    }
                 } else if (el.out > end) {
-                    for (let i = out; i < el.out; i++) {
+                    for (let i = end; i < el.out; i++) {
                         bytes.push(0);
                     }
-                    bytes = bytes.concat(el.bytes);
+                    for (const byte of el.bytes) {
+                        bytes.push(byte);
+                    }
                     out = el.bytes.length + el.out;
                 } else if (el.out < startOut) {
                     this.error(

@@ -205,4 +205,6 @@ Instructions
 
 Maz supports all undocumented Z80 instructions. See this website for a list of undocumented instructions: http://clrhome.org/table/
 
+Instruction operands are checked to make sure they fit: 8 bit values must be between -128 and 255, 16 bit values between -32768 and 65535, and index register offsets, such as the d in (ix+d), between -128 and 127. (DB and DW are not checked, and just use the low byte or word, as described above.)
+
 The Z80 instruction syntax is a little inconsitent around some 8-bit instructions, for example ADD A,B includes the accumulator, but SUB B doesn't. When using Maz the "A," is optional for all of the following instructions: ADD, ADC, SUB, SBC, AND, XOR, OR, CP.

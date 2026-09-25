@@ -17,6 +17,22 @@
         return varlist;
     }
 
+    // Out of range constants are turned back into expressions, so that
+    // the compiler can report the error when it evaluates them
+    function constExpr(value) {
+        let expression = String(value);
+        if (Number.isNaN(value)) {
+            expression = '0/0';
+        } else if (!Number.isFinite(value)) {
+            expression = value > 0 ? '1/0' : '-1/0';
+        }
+        return {
+            expression: expression,
+            vars: [],
+            location: loc()
+        };
+    }
+
     function expr16(expr) {
         if (expr.expression) {
             return [expr, null]
@@ -26,6 +42,9 @@
                     toUtf8(expr).charCodeAt(0),
                     toUtf8(expr).charCodeAt(1)
                 ];
+            }
+            if (!Number.isFinite(expr) || expr < -0x8000 || expr > 0xFFFF) {
+                return [constExpr(expr), null];
             }
             return [expr & 0xFF, (expr & 0xFF00) >> 8]
         }
@@ -38,8 +57,25 @@
             if (typeof expr === 'string') {
                 return [toUtf8(expr).charCodeAt(0)];
             }
+            if (!Number.isFinite(expr) || expr < -0x80 || expr > 0xFF) {
+                return [constExpr(expr)];
+            }
             return [expr & 0xFF]
         }
+    }
+
+    // index register offset, e.g. the d in (ix+d), which is signed
+    function offset8(expr) {
+        if (expr.expression) {
+            expr.offset = true;
+            return [expr];
+        }
+        if (typeof expr === 'number' && (!Number.isFinite(expr) || expr < -0x80 || expr > 0x7F)) {
+            const result = constExpr(expr);
+            result.offset = true;
+            return [result];
+        }
+        return expr8(expr);
     }
 
     function rel(expr) {
@@ -653,7 +689,7 @@ ld_ixy_addr = 'ld'i ws xy:ixiy ws? ',' ws? '(' ws? expr:expr ws? ')' {
     return res([xy, 0x2a].concat(expr16(expr)));
 }
 ld_ixyaddr_n = 'ld'i ws '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' ws? ',' ws? n:expr {
-    return res([xy, 0x36].concat(expr8(expr)).concat(expr8(n)));
+    return res([xy, 0x36].concat(offset8(expr)).concat(expr8(n)));
 }
 ld_ixy_nn = 'ld'i ws xy:ixiy ws? ',' ws? expr:expr {
     return res([xy, 0x21].concat(expr16(expr)));
@@ -662,97 +698,97 @@ add_a_ixyhl = 'add'i ws 'a'i ws? ',' ws? xy:ixyhl {
     return res([xy[0], 0x84 + xy[1]], true);
 }
 add_a_ixy = 'add'i ws 'a'i ws? ',' ws? '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
-    return res([xy, 0x86].concat(expr8(expr)));
+    return res([xy, 0x86].concat(offset8(expr)));
 }
 add_ixyhl = 'add'i ws ws? xy:ixyhl {
     return res([xy[0], 0x84 + xy[1]], true);
 }
 add_ixy = 'add'i ws '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
-    return res([xy, 0x86].concat(expr8(expr)));
+    return res([xy, 0x86].concat(offset8(expr)));
 }
 adc_a_ixyhl = 'adc'i ws 'a'i ws? ',' ws? xy:ixyhl {
     return res([xy[0], 0x8c + xy[1]], true);
 }
 adc_a_ixy = 'adc'i ws 'a'i ws? ',' ws? '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
-    return res([xy, 0x8e].concat(expr8(expr)));
+    return res([xy, 0x8e].concat(offset8(expr)));
 }
 adc_ixyhl = 'adc'i ws xy:ixyhl {
     return res([xy[0], 0x8c + xy[1]], true);
 }
 adc_ixy = 'adc'i ws '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
-    return res([xy, 0x8e].concat(expr8(expr)));
+    return res([xy, 0x8e].concat(offset8(expr)));
 }
 sub_a_ixyhl = 'sub'i ws 'a'i ws? ',' ws? xy:ixyhl {
     return res([xy[0], 0x94 + xy[1]], true);
 }
 sub_a_ixy = 'sub'i ws 'a'i ws? ',' ws? '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
-    return res([xy, 0x96].concat(expr8(expr)));
+    return res([xy, 0x96].concat(offset8(expr)));
 }
 sub_ixyhl = 'sub'i ws  ws? xy:ixyhl {
     return res([xy[0], 0x94 + xy[1]], true);
 }
 sub_ixy = 'sub'i ws '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
-    return res([xy, 0x96].concat(expr8(expr)));
+    return res([xy, 0x96].concat(offset8(expr)));
 }
 sbc_a_ixyhl = 'sbc'i ws 'a'i ws? ',' ws? xy:ixyhl {
     return res([xy[0], 0x9c + xy[1]], true);
 }
 sbc_a_ixy = 'sbc'i ws 'a'i ws? ',' ws? '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
-    return res([xy, 0x9e].concat(expr8(expr)));
+    return res([xy, 0x9e].concat(offset8(expr)));
 }
 sbc_ixyhl = 'sbc'i ws ws? xy:ixyhl {
     return res([xy[0], 0x9c + xy[1]], true);
 }
 sbc_ixy = 'sbc'i ws '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
-    return res([xy, 0x9e].concat(expr8(expr)));
+    return res([xy, 0x9e].concat(offset8(expr)));
 }
 and_a_ixyhl = 'and'i ws 'a'i ws? ',' ws? xy:ixyhl {
     return res([xy[0], 0xa4 + xy[1]], true);
 }
 and_a_ixy = 'and'i ws 'a'i ws? ',' ws? '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
-    return res([xy, 0xa6].concat(expr8(expr)));
+    return res([xy, 0xa6].concat(offset8(expr)));
 }
 and_ixyhl = 'and'i ws ws? xy:ixyhl {
     return res([xy[0], 0xa4 + xy[1]], true);
 }
 and_ixy = 'and'i ws '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
-    return res([xy, 0xa6].concat(expr8(expr)));
+    return res([xy, 0xa6].concat(offset8(expr)));
 }
 xor_a_ixyhl = 'xor'i ws 'a'i ws? ',' ws? xy:ixyhl {
     return res([xy[0], 0xac + xy[1]], true);
 }
 xor_a_ixy = 'xor'i ws 'a'i ws? ',' ws? '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
-    return res([xy, 0xae].concat(expr8(expr)));
+    return res([xy, 0xae].concat(offset8(expr)));
 }
 xor_ixyhl = 'xor'i ws xy:ixyhl {
     return res([xy[0], 0xac + xy[1]], true);
 }
 xor_ixy = 'xor'i ws '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
-    return res([xy, 0xae].concat(expr8(expr)));
+    return res([xy, 0xae].concat(offset8(expr)));
 }
 or_a_ixyhl = 'or'i ws 'a'i ws? ',' ws? xy:ixyhl {
     return res([xy[0], 0xb4 + xy[1]], true);
 }
 or_a_ixy = 'or'i ws 'a'i ws? ',' ws? '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
-    return res([xy, 0xb6].concat(expr8(expr)));
+    return res([xy, 0xb6].concat(offset8(expr)));
 }
 or_ixyhl = 'or'i ws ws? xy:ixyhl {
     return res([xy[0], 0xb4 + xy[1]], true);
 }
 or_ixy = 'or'i ws '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
-    return res([xy, 0xb6].concat(expr8(expr)));
+    return res([xy, 0xb6].concat(offset8(expr)));
 }
 cp_a_ixyhl = 'cp'i ws 'a'i ws? ',' ws? xy:ixyhl {
     return res([xy[0], 0xbc + xy[1]], true);
 }
 cp_a_ixy = 'cp'i ws 'a'i ws? ',' ws? '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
-    return res([xy, 0xbe].concat(expr8(expr)));
+    return res([xy, 0xbe].concat(offset8(expr)));
 }
 cp_ixyhl = 'cp'i ws xy:ixyhl {
     return res([xy[0], 0xbc + xy[1]], true);
 }
 cp_ixy = 'cp'i ws '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' {
-    return res([xy, 0xbe].concat(expr8(expr)));
+    return res([xy, 0xbe].concat(offset8(expr)));
 }
 ld_bd_ixyhl = 'ld'i ws reg:bd ws? ',' ws? xy:ixyhl {
     return res([xy[0], 0x44 + xy[1] + (reg << 4)], true);
@@ -764,13 +800,13 @@ ld_ixyhl_bcdehla = 'ld'i ws xy:ixyhl ws? ',' ws? reg:bcdehla {
     return res([xy[0], 0x60 + reg + (xy[1] << 3)], true);
 }
 ld_ixyaddr_bcdehla = 'ld'i ws '(' xy:ixiy ws? '+' ws? expr:expr ws? ')' ws? ',' ws? reg:bcdehla {
-    return res([xy, 0x70 + reg].concat(expr8(expr)));
+    return res([xy, 0x70 + reg].concat(offset8(expr)));
 }
 ld_bdh_ixy = 'ld'i ws reg:bdh ws? ',' ws? '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' {
-    return res([xy, 0x46 + (reg << 4)].concat(expr8(expr)));
+    return res([xy, 0x46 + (reg << 4)].concat(offset8(expr)));
 }
 ld_cela_ixy = 'ld'i ws reg:cela ws? ',' ws? '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' {
-    return res([xy, 0x4e + (reg << 4)].concat(expr8(expr)));
+    return res([xy, 0x4e + (reg << 4)].concat(offset8(expr)));
 }
 ld_ixyh_n = 'ld'i ws xy:ixhiyh ws? ',' ws? expr:expr {
     return res([xy, 0x26].concat(expr8(expr)), true);
@@ -782,7 +818,7 @@ ld_nn_ixy = 'ld'i ws '(' ws? expr:expr ws? ')' ws? ',' ws? xy:ixiy {
     return res([xy, 0x22].concat(expr16(expr)));
 }
 inc_ixyaddr = 'inc'i ws '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' {
-    return res([xy, 0x34].concat(expr8(expr)));
+    return res([xy, 0x34].concat(offset8(expr)));
 }
 inc_ixy = 'inc'i ws xy:ixiy {
     return res([xy, 0x23]);
@@ -794,7 +830,7 @@ inc_ixyl = 'inc'i ws xy:ixliyl {
     return res([xy, 0x2c], true);
 }
 dec_ixyaddr = 'dec'i ws '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' {
-    return res([xy, 0x35].concat(expr8(expr)));
+    return res([xy, 0x35].concat(offset8(expr)));
 }
 dec_ixy = 'dec'i ws xy:ixiy {
     return res([xy, 0x2b]);
@@ -809,73 +845,73 @@ rlc_reg = 'rlc'i ws reg:reg {
     return res([0xcb, 0x00 + reg]);
 }
 rlc_ixy_reg = 'rlc'i ws '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' ws? ',' ws? reg:bcdehla {
-    return res([xy, 0xcb].concat(expr8(expr)).concat([0x00 + reg]), true);
+    return res([xy, 0xcb].concat(offset8(expr)).concat([0x00 + reg]), true);
 }
 rlc_ixy = 'rlc'i ws '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' {
-    return res([xy, 0xcb].concat(expr8(expr)).concat([0x06]));
+    return res([xy, 0xcb].concat(offset8(expr)).concat([0x06]));
 }
 rrc_reg = 'rrc'i ws reg:reg {
     return res([0xcb, 0x08 + reg]);
 }
 rrc_ixy_reg = 'rrc'i ws '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' ws? ',' ws? reg:bcdehla {
-    return res([xy, 0xcb].concat(expr8(expr)).concat([0x08 + reg]), true);
+    return res([xy, 0xcb].concat(offset8(expr)).concat([0x08 + reg]), true);
 }
 rrc_ixy = 'rrc'i ws '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' {
-    return res([xy, 0xcb].concat(expr8(expr)).concat([0x0e]));
+    return res([xy, 0xcb].concat(offset8(expr)).concat([0x0e]));
 }
 rl_reg = 'rl'i ws reg:reg {
     return res([0xcb, 0x10 + reg]);
 }
 rl_ixy_reg = 'rl'i ws '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' ws? ',' ws? reg:bcdehla {
-    return res([xy, 0xcb].concat(expr8(expr)).concat([0x10 + reg]), true);
+    return res([xy, 0xcb].concat(offset8(expr)).concat([0x10 + reg]), true);
 }
 rl_ixy = 'rl'i ws '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' {
-    return res([xy, 0xcb].concat(expr8(expr)).concat([0x16]));
+    return res([xy, 0xcb].concat(offset8(expr)).concat([0x16]));
 }
 rr_reg = 'rr'i ws reg:reg {
     return res([0xcb, 0x18 + reg]);
 }
 rr_ixy_reg = 'rr'i ws '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' ws? ',' ws? reg:bcdehla {
-    return res([xy, 0xcb].concat(expr8(expr)).concat([0x18 + reg]), true);
+    return res([xy, 0xcb].concat(offset8(expr)).concat([0x18 + reg]), true);
 }
 rr_ixy = 'rr'i ws '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' {
-    return res([xy, 0xcb].concat(expr8(expr)).concat([0x1e]));
+    return res([xy, 0xcb].concat(offset8(expr)).concat([0x1e]));
 }
 sla_reg = 'sla'i ws reg:reg {
     return res([0xcb, 0x20 + reg]);
 }
 sla_ixy_reg = 'sla'i ws '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' ws? ',' ws? reg:bcdehla {
-    return res([xy, 0xcb].concat(expr8(expr)).concat([0x20 + reg]), true);
+    return res([xy, 0xcb].concat(offset8(expr)).concat([0x20 + reg]), true);
 }
 sla_ixy = 'sla'i ws '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' {
-    return res([xy, 0xcb].concat(expr8(expr)).concat([0x26]));
+    return res([xy, 0xcb].concat(offset8(expr)).concat([0x26]));
 }
 sra_reg = 'sra'i ws reg:reg {
     return res([0xcb, 0x28 + reg]);
 }
 sra_ixy_reg = 'sra'i ws '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' ws? ',' ws? reg:bcdehla {
-    return res([xy, 0xcb].concat(expr8(expr)).concat([0x28 + reg]), true);
+    return res([xy, 0xcb].concat(offset8(expr)).concat([0x28 + reg]), true);
 }
 sra_ixy = 'sra'i ws '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' {
-    return res([xy, 0xcb].concat(expr8(expr)).concat([0x2e]));
+    return res([xy, 0xcb].concat(offset8(expr)).concat([0x2e]));
 }
 sll_reg = 'sll'i ws reg:reg {
     return res([0xcb, 0x30 + reg], true);
 }
 sll_ixy_reg = 'sll'i ws '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' ws? ',' ws? reg:bcdehla {
-    return res([xy, 0xcb].concat(expr8(expr)).concat([0x30 + reg]), true);
+    return res([xy, 0xcb].concat(offset8(expr)).concat([0x30 + reg]), true);
 }
 sll_ixy = 'sll'i ws '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' {
-    return res([xy, 0xcb].concat(expr8(expr)).concat([0x36]), true);
+    return res([xy, 0xcb].concat(offset8(expr)).concat([0x36]), true);
 }
 srl_reg = 'srl'i ws reg:reg {
     return res([0xcb, 0x38 + reg]);
 }
 srl_ixy_reg = 'srl'i ws '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' ws? ',' ws? reg:bcdehla {
-    return res([xy, 0xcb].concat(expr8(expr)).concat([0x38 + reg]), true);
+    return res([xy, 0xcb].concat(offset8(expr)).concat([0x38 + reg]), true);
 }
 srl_ixy = 'srl'i ws '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' {
-    return res([xy, 0xcb].concat(expr8(expr)).concat([0x3e]));
+    return res([xy, 0xcb].concat(offset8(expr)).concat([0x3e]));
 }
 bit_n_reg = 'bit'i ws n:n0246 ws? ',' ws? reg:reg {
         return res([0xcb, 0x40 + reg + (n << 4)]);
@@ -884,10 +920,10 @@ bit_n_reg = 'bit'i ws n:n0246 ws? ',' ws? reg:reg {
         return res([0xcb, 0x48 + reg + (n << 4)]);
     }
 bit_n_ixy = 'bit'i ws n:n0246 ws? ',' ws? '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' {
-        return res([xy, 0xcb].concat(expr8(expr)).concat([0x46 + (n << 4)]));
+        return res([xy, 0xcb].concat(offset8(expr)).concat([0x46 + (n << 4)]));
     }
     / 'bit'i ws n:n1357 ws? ',' ws? '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' {
-        return res([xy, 0xcb].concat(expr8(expr)).concat([0x4e + (n << 4)]));
+        return res([xy, 0xcb].concat(offset8(expr)).concat([0x4e + (n << 4)]));
     }
 res_n_reg = 'res'i ws n:n0246 ws? ',' ws? reg:reg {
         return res([0xcb, 0x80 + reg + (n << 4)]);
@@ -896,16 +932,16 @@ res_n_reg = 'res'i ws n:n0246 ws? ',' ws? reg:reg {
         return res([0xcb, 0x88 + reg + (n << 4)]);
     }
 res_n_ixy_reg = 'res'i ws n:n0246 ws? ',' ws? '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' ws? ',' ws? reg:bcdehla {
-        return res([xy, 0xcb].concat(expr8(expr)).concat([0x80 + reg + (n << 4)]), true);
+        return res([xy, 0xcb].concat(offset8(expr)).concat([0x80 + reg + (n << 4)]), true);
     }
     / 'res'i ws n:n1357 ws? ',' ws? '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' ws? ',' ws? reg:bcdehla {
-        return res([xy, 0xcb].concat(expr8(expr)).concat([0x88 + reg + (n << 4)]), true);
+        return res([xy, 0xcb].concat(offset8(expr)).concat([0x88 + reg + (n << 4)]), true);
     }
 res_n_ixy = 'res'i ws n:n0246 ws? ',' ws? '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' {
-        return res([xy, 0xcb].concat(expr8(expr)).concat([0x86 + (n << 4)]));
+        return res([xy, 0xcb].concat(offset8(expr)).concat([0x86 + (n << 4)]));
     }
     / 'res'i ws n:n1357 ws? ',' ws? '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' {
-        return res([xy, 0xcb].concat(expr8(expr)).concat([0x8e + (n << 4)]));
+        return res([xy, 0xcb].concat(offset8(expr)).concat([0x8e + (n << 4)]));
     }
 set_n_reg = 'set'i ws n:n0246 ws? ',' ws? reg:reg {
         return res([0xcb, 0xc0 + reg + (n << 4)]);
@@ -914,16 +950,16 @@ set_n_reg = 'set'i ws n:n0246 ws? ',' ws? reg:reg {
         return res([0xcb, 0xc8 + reg + (n << 4)]);
     }
 set_n_ixy_reg = 'set'i ws n:n0246 ws? ',' ws? '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' ws? ',' ws? reg:bcdehla {
-        return res([xy, 0xcb].concat(expr8(expr)).concat([0xc0 + reg + (n << 4)]), true);
+        return res([xy, 0xcb].concat(offset8(expr)).concat([0xc0 + reg + (n << 4)]), true);
     }
     / 'set'i ws n:n1357 ws? ',' ws? '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' ws? ',' ws? reg:bcdehla {
-        return res([xy, 0xcb].concat(expr8(expr)).concat([0xc8 + reg + (n << 4)]), true);
+        return res([xy, 0xcb].concat(offset8(expr)).concat([0xc8 + reg + (n << 4)]), true);
     }
 set_n_ixy = 'set'i ws n:n0246 ws? ',' ws? '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' {
-        return res([xy, 0xcb].concat(expr8(expr)).concat([0xc6 + (n << 4)]));
+        return res([xy, 0xcb].concat(offset8(expr)).concat([0xc6 + (n << 4)]));
     }
     / 'set'i ws n:n1357 ws? ',' ws? '(' ws? xy:ixiy ws? '+' ws? expr:expr ws? ')' {
-        return res([xy, 0xcb].concat(expr8(expr)).concat([0xce + (n << 4)]));
+        return res([xy, 0xcb].concat(offset8(expr)).concat([0xce + (n << 4)]));
     }
 ex_afaf = 'ex'i ws 'af'i ws? ',' ws? 'af\''i {
     return res([0x08]);

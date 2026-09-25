@@ -8,6 +8,8 @@ export interface Expression {
     vars: string[];
     location: Location;
     address: number;
+    // true if this is an index register offset, e.g. the d in (ix+d)
+    offset?: boolean;
 }
 export interface Relative {
     relative: Expression | number | string;
