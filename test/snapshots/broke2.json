@@ -1,12 +1,10 @@
 {
   "errors": [
     "examples/broke2.z80:24: Syntax Error: Expected \"!=\", \"&\", \"&&\", \",\", \";\", \"<<\", \"<=\", \"<>\", \"=\", \"==\", \">=\", \">>\", \"?\", \"^\", \"and\", \"eq\", \"ge\", \"gt\", \"le\", \"lt\", \"ne\", \"or\", \"shl\", \"shr\", \"xor\", \"|\", \"||\", [ \\t\\r\\n], [ \\t], [*/%], [+\\-], [<>], [\\r\\n], or end of input but \"1\" found.",
-    "examples/broke2.z80:2: Symbol 'end' not found",
-    "examples/broke2.z80:65: Circular symbol dependency while evaluating 'a1'",
-    "Symbol 'a1' cannot be calculated",
-    "Symbol 'a2' cannot be calculated",
     "examples/broke2.z80:33: Symbol 'end' not found",
-    "examples/broke2.z80:53: Relative jump is out of range (4027 > 127)"
+    "examples/broke2.z80:53: Relative jump is out of range (4027 > 127)",
+    "examples/broke2.z80:2: Symbol 'end' not found",
+    "examples/broke2.z80:65: Circular definition: a1 -> a2 -> a1"
   ],
   "bytes": [
     "0102003e0b0000000000686579796f686f3e1e3e1f0613ed703e1901021b003e",
@@ -135,7 +133,6 @@
     "jumphere             003f",
     "jumpforward          004a",
     "a1                   unknown value",
-    "a2                   unknown value",
-    "$                    0063"
+    "a2                   unknown value"
   ]
 }

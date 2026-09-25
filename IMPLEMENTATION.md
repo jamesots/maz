@@ -31,3 +31,27 @@ A location object is:
 }
 
 See els.ts for all the objects that are produced.
+
+Compiler
+--------
+
+The compiler (compiler.ts) first changes the structure of the AST: it
+parses included files and inserts them, expands macros, and gives labels in
+blocks and macro calls a prefix (e.g. %0_label). getSymbols then records
+where each symbol is defined: a label, an equ, or a macro argument.
+
+After that the AST isn't changed. assemble() runs passes over it, each of
+which works out the address of every element, the value of every label,
+and the bytes for every instruction, db and dw, and keeps them in a Pass
+object. Expressions are evaluated by an Evaluator for that pass, which
+evaluates equs when they are used.
+
+The size of some elements depends on labels defined later, e.g.
+`defw cat(label, "x")`, so passes are repeated, using the values of labels
+from the previous pass for forward references, until nothing moves. Only
+db, dw and instruction operands can use forward references; org, phase,
+align and ds can't, so that the passes settle. Errors from the final pass
+are the ones reported.
+
+The output (getBytes, getSegments, getLines, getList and symbols) comes
+from the final pass.

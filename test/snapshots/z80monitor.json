@@ -2061,7 +2061,6 @@
     "source               0eb8",
     "dest                 0eba",
     "pagesize             0ebc",
-    "end                  0ebe",
-    "$                    0d2a"
+    "end                  0ebe"
   ]
 }

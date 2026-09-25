@@ -13,12 +13,41 @@ describe('compiler', function () {
         prog = new compiler.Programme({});
     });
 
+    // how each symbol is defined: 'label', { equ: value } or { arg: value }
+    function definitions(prog) {
+        const result = {};
+        for (const [name, definition] of prog.definitions) {
+            result[name] =
+                definition.kind === 'label'
+                    ? 'label'
+                    : { [definition.kind]: definition.value };
+        }
+        return result;
+    }
+    function assemble(prog) {
+        prog.getSymbols();
+        prog.assemble();
+    }
+    function values(prog) {
+        const result = {};
+        for (const [name, value] of prog.values) {
+            result[name] = value;
+        }
+        return result;
+    }
+    function placement(prog, index) {
+        return prog.finalPass.placements[index];
+    }
+    function copy(ast) {
+        return JSON.parse(JSON.stringify(ast));
+    }
+
     it('should get symbols', function () {
         prog.ast = [{ label: 'one' }, { label: 'two' }];
-        prog.symbols = prog.getSymbols();
-        expect(prog.symbols).to.eql({
-            one: null,
-            two: null,
+        prog.getSymbols();
+        expect(definitions(prog)).to.eql({
+            one: 'label',
+            two: 'label',
         });
     });
     it('should get symbols in a block', function () {
@@ -29,11 +58,11 @@ describe('compiler', function () {
             { endblock: true, endprefix: true },
             { label: 'two' },
         ];
-        prog.symbols = prog.getSymbols();
-        expect(prog.symbols).to.eql({
-            one: null,
-            '%0_one': null,
-            two: null,
+        prog.getSymbols();
+        expect(definitions(prog)).to.eql({
+            one: 'label',
+            '%0_one': 'label',
+            two: 'label',
         });
         expect(prog.ast[1].prefix).to.equal('%0_');
     });
@@ -45,11 +74,11 @@ describe('compiler', function () {
             { endblock: true, endprefix: true },
             { label: 'two' },
         ];
-        prog.symbols = prog.getSymbols();
-        expect(prog.symbols).to.eql({
-            one: null,
-            three: null,
-            two: null,
+        prog.getSymbols();
+        expect(definitions(prog)).to.eql({
+            one: 'label',
+            three: 'label',
+            two: 'label',
         });
     });
     it('should not allow symbol to repeat at top level', function () {
@@ -78,12 +107,12 @@ describe('compiler', function () {
             { endblock: true, endprefix: true },
             { label: 'two' },
         ];
-        prog.symbols = prog.getSymbols();
-        expect(prog.symbols).to.eql({
-            one: null,
-            '%0_one': null,
-            '%1_one': null,
-            two: null,
+        prog.getSymbols();
+        expect(definitions(prog)).to.eql({
+            one: 'label',
+            '%0_one': 'label',
+            '%1_one': 'label',
+            two: 'label',
         });
         expect(prog.ast[1].prefix).to.equal('%0_');
         expect(prog.ast[4].prefix).to.equal('%1_');
@@ -99,12 +128,12 @@ describe('compiler', function () {
             { endblock: true, endprefix: true },
             { label: 'two' },
         ];
-        prog.symbols = prog.getSymbols();
-        expect(prog.symbols).to.eql({
-            one: null,
-            '%0_one': null,
-            '%1_%0_one': null,
-            two: null,
+        prog.getSymbols();
+        expect(definitions(prog)).to.eql({
+            one: 'label',
+            '%0_one': 'label',
+            '%1_%0_one': 'label',
+            two: 'label',
         });
         expect(prog.ast[1].prefix).to.equal('%0_');
         expect(prog.ast[3].prefix).to.equal('%1_%0_');
@@ -126,14 +155,14 @@ describe('compiler', function () {
             { endblock: true, endprefix: true },
             { label: 'two' },
         ];
-        prog.symbols = prog.getSymbols();
-        expect(prog.symbols).to.eql({
-            one: null,
-            '%0_one': null,
-            '%1_%0_one': null,
-            '%3_%2_one': null,
-            '%2_one': null,
-            two: null,
+        prog.getSymbols();
+        expect(definitions(prog)).to.eql({
+            one: 'label',
+            '%0_one': 'label',
+            '%1_%0_one': 'label',
+            '%3_%2_one': 'label',
+            '%2_one': 'label',
+            two: 'label',
         });
         expect(prog.ast[1].prefix).to.equal('%0_');
         expect(prog.ast[3].prefix).to.equal('%1_%0_');
@@ -142,23 +171,21 @@ describe('compiler', function () {
     });
     it('should get symbols of EQUs', function () {
         prog.ast = [{ label: 'one' }, { equ: 5 }];
-        prog.symbols = prog.getSymbols();
-        expect(prog.symbols).to.eql({
+        prog.getSymbols();
+        expect(definitions(prog)).to.eql({
+            one: { equ: 5 },
+        });
+    });
+    it('should give EQUs their value, not an address', function () {
+        prog.ast = [{ bytes: [0] }, { label: 'one' }, { equ: 5 }];
+        assemble(prog);
+        expect(values(prog)).to.eql({
             one: 5,
         });
     });
-    it('should not reset already assigned symbols', function () {
-        prog.ast = [{ label: 'one' }, { equ: 5 }];
-        prog.symbols = {
-            one: 5,
-        };
-        prog.assignPCandEQU();
-        expect(prog.symbols).to.eql({
-            one: 5,
-        });
-    });
-    it('should add address to EQSs with expressions', function () {
+    it('should evaluate $ in EQUs as the address of the EQU', function () {
         prog.ast = [
+            { bytes: [0, 0] },
             { label: 'one' },
             {
                 equ: {
@@ -167,20 +194,11 @@ describe('compiler', function () {
                 },
             },
         ];
-        prog.symbols = {
-            one: null,
-        };
-        prog.assignPCandEQU();
-        expect(prog.ast).to.eql([
-            { label: 'one' },
-            {
-                equ: {
-                    expression: '$',
-                    vars: ['$'],
-                    address: 0,
-                },
-            },
-        ]);
+        const ast = copy(prog.ast);
+        assemble(prog);
+        expect(values(prog)).to.eql({ one: 2 });
+        // assembling doesn't change the ast
+        expect(prog.ast).to.eql(ast);
     });
     it('should assign PC', function () {
         prog.ast = [
@@ -210,69 +228,58 @@ describe('compiler', function () {
             { bytes: [0, 0, 0] },
             { label: 'eight' },
         ];
-        prog.symbols = {
-            one: null,
-            two: null,
-            three: null,
-            four: null,
-            five: null,
-            six: null,
-            seven: null,
-            eight: null,
-        };
-        prog.assignPCandEQU();
-        expect(prog.symbols.one).to.equal(0);
-        expect(prog.symbols.two).to.equal(3);
-        expect(prog.symbols.three).to.equal(6);
-        expect(prog.symbols.four).to.equal(126);
-        expect(prog.symbols.five).to.equal(203);
-        expect(prog.symbols.six).to.equal(303);
-        expect(prog.symbols.seven).to.equal(144);
-        expect(prog.symbols.eight).to.equal(150);
-        expect(prog.ast).to.eql([
-            { label: 'one' },
-            { bytes: [0, 0, 0], address: 0, out: 0 },
-            { label: 'two' },
-            { bytes: [0, 0, 0], address: 3, out: 3 },
-            { label: 'three' },
-            { bytes: [0, 0, 0], address: 6, out: 6 },
-            { org: 123 },
-            { bytes: [0, 0, 0], address: 123, out: 123 },
-            { label: 'four' },
-            { bytes: [0, 0, 0], address: 126, out: 126 },
-            { phase: 200 },
-            { bytes: [0, 0, 0], address: 200, out: 129 },
-            { label: 'five' },
-            { bytes: [0, 0, 0], address: 203, out: 132 },
-            { phase: 300 },
-            { bytes: [0, 0, 0], address: 300, out: 135 },
-            { label: 'six' },
-            { bytes: [0, 0, 0], address: 303, out: 138 },
-            { endphase: true },
-            { bytes: [0, 0, 0], address: 141, out: 141 },
-            { label: 'seven' },
-            { bytes: [0, 0, 0], address: 144, out: 144 },
-            { endphase: true },
-            { bytes: [0, 0, 0], address: 147, out: 147 },
-            { label: 'eight' },
+        const ast = copy(prog.ast);
+        assemble(prog);
+        expect(values(prog)).to.eql({
+            one: 0,
+            two: 3,
+            three: 6,
+            four: 126,
+            five: 203,
+            six: 303,
+            seven: 144,
+            eight: 150,
+        });
+        const placements = [];
+        prog.ast.forEach((el, i) => {
+            if (el.bytes) {
+                const { address, out } = placement(prog, i);
+                placements.push({ address, out });
+            }
+        });
+        expect(placements).to.eql([
+            { address: 0, out: 0 },
+            { address: 3, out: 3 },
+            { address: 6, out: 6 },
+            { address: 123, out: 123 },
+            { address: 126, out: 126 },
+            { address: 200, out: 129 },
+            { address: 203, out: 132 },
+            { address: 300, out: 135 },
+            { address: 303, out: 138 },
+            { address: 141, out: 141 },
+            { address: 144, out: 144 },
+            { address: 147, out: 147 },
         ]);
+        expect(prog.ast).to.eql(ast);
     });
     it('should evaluate ORG expressions where possible', function () {
         prog.ast = [
             { label: 'one' },
+            { bytes: [0] },
             {
                 org: {
-                    expression: 'one',
+                    expression: 'one + 5',
                     vars: ['one'],
                 },
             },
+            { bytes: [0] },
         ];
-        prog.symbols = {
-            one: null,
-        };
-        prog.assignPCandEQU();
-        expect(prog.symbols.one).to.equal(0);
-        expect(prog.ast).to.eql([{ label: 'one' }, { org: 0 }]);
+        const ast = copy(prog.ast);
+        assemble(prog);
+        expect(prog.errors).to.eql([]);
+        expect(placement(prog, 3).out).to.equal(5);
+        expect(prog.ast).to.eql(ast);
     });
     it('should not evaluate ORG expressions where not possible', function () {
         prog.ast = [
@@ -285,14 +292,10 @@ describe('compiler', function () {
             },
             { label: 'two' },
         ];
-        prog.symbols = {
-            one: null,
-            two: null,
-        };
-        prog.assignPCandEQU();
+        assemble(prog);
         expect(prog.errors.length).to.equal(1);
     });
-    it('should evaluate ORG expressions where possible', function () {
+    it('should evaluate ORG expressions using EQUs defined later', function () {
         prog.ast = [
             {
                 org: {
@@ -300,31 +303,29 @@ describe('compiler', function () {
                     vars: ['one'],
                 },
             },
+            { bytes: [0] },
             { label: 'one' },
             { equ: 5 },
         ];
-        prog.symbols = {
-            one: 5,
-        };
-        prog.assignPCandEQU();
-        expect(prog.ast).to.eql([{ org: 5 }, { label: 'one' }, { equ: 5 }]);
+        assemble(prog);
+        expect(prog.errors).to.eql([]);
+        expect(placement(prog, 1).out).to.equal(5);
     });
     it('should evaluate PHASE expressions where possible', function () {
         prog.ast = [
             { label: 'one' },
+            { bytes: [0] },
             {
                 phase: {
-                    expression: 'one',
+                    expression: 'one + 5',
                     vars: ['one'],
                 },
             },
+            { bytes: [0] },
         ];
-        prog.symbols = {
-            one: null,
-        };
-        prog.assignPCandEQU();
-        expect(prog.symbols.one).to.equal(0);
-        expect(prog.ast).to.eql([{ label: 'one' }, { phase: 0 }]);
+        assemble(prog);
+        expect(prog.errors).to.eql([]);
+        expect(placement(prog, 3)).to.eql({ address: 5, out: 1, bytes: [0] });
     });
     it('should not evaluate PHASE expressions where not possible', function () {
         prog.ast = [
@@ -337,14 +338,10 @@ describe('compiler', function () {
             },
             { label: 'two' },
         ];
-        prog.symbols = {
-            one: null,
-            two: null,
-        };
-        prog.assignPCandEQU();
+        assemble(prog);
         expect(prog.errors.length).to.equal(1);
     });
-    it('should evaluate PHASE expressions where possible', function () {
+    it('should evaluate PHASE expressions using EQUs defined later', function () {
         prog.ast = [
             {
                 phase: {
@@ -352,31 +349,29 @@ describe('compiler', function () {
                     vars: ['one'],
                 },
             },
+            { bytes: [0] },
             { label: 'one' },
             { equ: 5 },
         ];
-        prog.symbols = {
-            one: 5,
-        };
-        prog.assignPCandEQU();
-        expect(prog.ast).to.eql([{ phase: 5 }, { label: 'one' }, { equ: 5 }]);
+        assemble(prog);
+        expect(prog.errors).to.eql([]);
+        expect(placement(prog, 1)).to.eql({ address: 5, out: 0, bytes: [0] });
     });
     it('should evaluate ALIGN expressions where possible', function () {
         prog.ast = [
+            { bytes: [0] },
             { label: 'one' },
             {
                 align: {
-                    expression: 'one',
+                    expression: 'one * 4',
                     vars: ['one'],
                 },
             },
+            { bytes: [0] },
         ];
-        prog.symbols = {
-            one: null,
-        };
-        prog.assignPCandEQU();
-        expect(prog.symbols.one).to.equal(0);
-        expect(prog.ast).to.eql([{ label: 'one' }, { align: 0 }]);
+        assemble(prog);
+        expect(prog.errors).to.eql([]);
+        expect(placement(prog, 3).out).to.equal(4);
     });
     it('should not evaluate ALIGN expressions where not possible', function () {
         prog.ast = [
@@ -389,29 +384,25 @@ describe('compiler', function () {
             },
             { label: 'two' },
         ];
-        prog.symbols = {
-            one: null,
-            two: null,
-        };
-        prog.assignPCandEQU();
+        assemble(prog);
         expect(prog.errors.length).to.equal(1);
     });
-    it('should evaluate ALIGN expressions where possible', function () {
+    it('should evaluate ALIGN expressions using EQUs defined later', function () {
         prog.ast = [
+            { bytes: [0] },
             {
                 align: {
                     expression: 'one',
                     vars: ['one'],
                 },
             },
+            { bytes: [0] },
             { label: 'one' },
             { equ: 5 },
         ];
-        prog.symbols = {
-            one: 5,
-        };
-        prog.assignPCandEQU();
-        expect(prog.ast).to.eql([{ align: 5 }, { label: 'one' }, { equ: 5 }]);
+        assemble(prog);
+        expect(prog.errors).to.eql([]);
+        expect(placement(prog, 2).out).to.equal(5);
     });
     it('should get EQU', function () {
         prog.ast = [
@@ -425,43 +416,63 @@ describe('compiler', function () {
                 },
             },
         ];
-        prog.symbols = prog.getSymbols();
-        expect(prog.symbols.one).to.equal(5);
-        expect(prog.symbols.two).to.equal(5);
-        expect(prog.symbols.three).to.eql({ expr: 'one' });
+        prog.getSymbols();
+        expect(definitions(prog)).to.eql({
+            one: { equ: 5 },
+            two: { equ: 5 },
+            three: { equ: { expr: 'one' } },
+        });
     });
     it('should evaluate symbols', function () {
-        prog.symbols = {
-            one: 1,
-            two: { expression: 'three', vars: ['three'] },
-            three: { expression: 'one', vars: ['one'] },
-        };
-        prog.evaluateSymbols();
-        expect(prog.symbols).to.eql({
+        prog.ast = [
+            { label: 'one' },
+            { equ: 1 },
+            { label: 'two' },
+            { equ: { expression: 'three', vars: ['three'] } },
+            { label: 'three' },
+            { equ: { expression: 'one', vars: ['one'] } },
+        ];
+        assemble(prog);
+        expect(values(prog)).to.eql({
             one: 1,
             two: 1,
             three: 1,
         });
     });
     it('should evaluate symbols and detect circular references', function () {
-        prog.symbols = {
+        prog.ast = [
+            { label: 'one' },
+            { equ: 1 },
+            { label: 'two' },
+            { equ: { expression: 'three', vars: ['three'] } },
+            { label: 'three' },
+            { equ: { expression: 'two', vars: ['two'] } },
+        ];
+        assemble(prog);
+        expect(prog.errors.map((e) => e.error)).to.eql([
+            'Circular definition: two -> three -> two',
+        ]);
+        expect(values(prog)).to.eql({
             one: 1,
-            two: { expression: 'three', vars: ['three'] },
-            three: { expression: 'two', vars: ['two'] },
-        };
-        prog.evaluateSymbols();
-        expect(prog.errors.length).to.equal(1);
+            two: undefined,
+            three: undefined,
+        });
     });
     it('should evaluate symbols with scope', function () {
-        prog.symbols = {
-            '%1_two': { expression: 'three', vars: ['three'] },
-            three: 3,
-            '%1_three': 4,
-            '%2_%1_three': 5,
-            '%2_%1_bob': { expression: 'three + two', vars: ['three', 'two'] },
-        };
-        prog.evaluateSymbols();
-        expect(prog.symbols).to.eql({
+        prog.ast = [];
+        const equ = (value) => ({ kind: 'equ', index: 0, value });
+        prog.definitions = new Map([
+            ['%1_two', equ({ expression: 'three', vars: ['three'] })],
+            ['three', equ(3)],
+            ['%1_three', equ(4)],
+            ['%2_%1_three', equ(5)],
+            [
+                '%2_%1_bob',
+                equ({ expression: 'three + two', vars: ['three', 'two'] }),
+            ],
+        ]);
+        prog.assemble();
+        expect(values(prog)).to.eql({
             '%1_two': 4,
             three: 3,
             '%1_three': 4,
@@ -476,129 +487,101 @@ describe('compiler', function () {
         expect(compiler.getReducedPrefix('%2_%3_%4_')).to.equal('%3_%4_');
     });
     it('should find variable', function () {
-        prog.symbols = {
-            '%2_%1_%0_a': 0,
-            '%2_%1_%0_b': 1,
-            '%1_%0_c': 2,
-            '%0_d': 4,
-            e: 8,
-            d: 16,
-            c: 32,
-            '%0_c': 64,
-            b: 128,
-            '%0_b': 256,
-            '%1_%0_b': 512,
-        };
-        expect(prog.findVariable('%2_%1_%0_', 'a')).to.equal('%2_%1_%0_a');
-        expect(prog.findVariable('%2_%1_%0_', 'b')).to.equal('%2_%1_%0_b');
-        expect(prog.findVariable('%2_%1_%0_', 'c')).to.equal('%1_%0_c');
-        expect(prog.findVariable('%2_%1_%0_', 'd')).to.equal('%0_d');
-        expect(prog.findVariable('%2_%1_%0_', 'e')).to.equal('e');
+        const definitions = new Map();
+        for (const name of [
+            '%2_%1_%0_a',
+            '%2_%1_%0_b',
+            '%1_%0_c',
+            '%0_d',
+            'e',
+            'd',
+            'c',
+            '%0_c',
+            'b',
+            '%0_b',
+            '%1_%0_b',
+        ]) {
+            definitions.set(name, { kind: 'equ', index: 0, value: 0 });
+        }
+        const evaluator = new compiler.Evaluator(
+            definitions,
+            new compiler.Pass(),
+            undefined,
+            () => {}
+        );
+        const resolve = (prefix, name) => evaluator.resolve(prefix, name);
+        expect(resolve('%2_%1_%0_', 'a')).to.equal('%2_%1_%0_a');
+        expect(resolve('%2_%1_%0_', 'b')).to.equal('%2_%1_%0_b');
+        expect(resolve('%2_%1_%0_', 'c')).to.equal('%1_%0_c');
+        expect(resolve('%2_%1_%0_', 'd')).to.equal('%0_d');
+        expect(resolve('%2_%1_%0_', 'e')).to.equal('e');
 
-        expect(prog.findVariable('%1_%0_', 'b')).to.equal('%1_%0_b');
-        expect(prog.findVariable('%1_%0_', 'c')).to.equal('%1_%0_c');
-        expect(prog.findVariable('%1_%0_', 'd')).to.equal('%0_d');
-        expect(prog.findVariable('%1_%0_', 'e')).to.equal('e');
+        expect(resolve('%1_%0_', 'b')).to.equal('%1_%0_b');
+        expect(resolve('%1_%0_', 'c')).to.equal('%1_%0_c');
+        expect(resolve('%1_%0_', 'd')).to.equal('%0_d');
+        expect(resolve('%1_%0_', 'e')).to.equal('e');
 
-        expect(prog.findVariable('%0_', 'c')).to.equal('%0_c');
-        expect(prog.findVariable('%0_', 'd')).to.equal('%0_d');
-        expect(prog.findVariable('%0_', 'e')).to.equal('e');
+        expect(resolve('%0_', 'c')).to.equal('%0_c');
+        expect(resolve('%0_', 'd')).to.equal('%0_d');
+        expect(resolve('%0_', 'e')).to.equal('e');
 
-        expect(prog.findVariable('', 'd')).to.equal('d');
-        expect(prog.findVariable('', 'e')).to.equal('e');
+        expect(resolve('', 'd')).to.equal('d');
+        expect(resolve('', 'e')).to.equal('e');
+        expect(resolve('', 'f')).to.equal(undefined);
     });
-    it('should update bytes', function () {
+    it('should assemble bytes', function () {
+        const three = { expression: 'three', vars: ['three'] };
+        const abc = { expression: '"abc"', vars: [] };
         prog.ast = [
-            {
-                references: true,
-                bytes: [0, { expression: 'three', vars: ['three'] }],
-            },
-            {
-                references: true,
-                bytes: [0, { expression: 'three', vars: ['three'] }, null],
-            },
-            {
-                references: true,
-                bytes: [0, { expression: '$', vars: ['$'] }],
-                address: 5,
-            },
-            {
-                references: true,
-                defb: true,
-                bytes: [0, { expression: 'three', vars: ['three'] }, null, 0],
-            },
-            {
-                references: true,
-                defw: true,
-                bytes: [0, { expression: 'three', vars: ['three'] }, 0],
-            },
-            {
-                references: true,
-                defb: true,
-                bytes: [0, { expression: '"abc"', vars: [] }, 0],
-            },
-            {
-                references: true,
-                defw: true,
-                bytes: [0, { expression: '"abc"', vars: [] }, 0],
-            },
-            {
-                references: true,
-                bytes: [0, { expression: '"abc"', vars: [] }, 0],
-            },
-            {
-                references: true,
-                bytes: [0, { expression: '"abc"', vars: [] }, null, 0],
-            },
+            { label: 'three' },
+            { equ: 0x1234 },
+            { references: true, bytes: [0, three] },
+            { references: true, bytes: [0, three, null] },
+            { references: true, bytes: [0, { expression: '$', vars: ['$'] }] },
+            { references: true, defb: true, bytes: [0, three, 0] },
+            { references: true, defw: true, bytes: [0, three, 0] },
+            { references: true, defb: true, bytes: [0, abc, 0] },
+            { references: true, defw: true, bytes: [0, abc, 0] },
+            { references: true, bytes: [0, abc, 0] },
+            { references: true, bytes: [0, abc, null, 0] },
         ];
-        prog.symbols = {
-            three: 0x1234,
-        };
-        prog.updateBytes();
-        expect(prog.ast).to.eql([
-            { references: true, bytes: [0, 0x34] },
-            { references: true, bytes: [0, 0x34, 0x12] },
-            { references: true, bytes: [0, 5], address: 5 },
-            { references: true, defb: true, bytes: [0, 0x34, null, 0] },
-            { references: true, defw: true, bytes: [0, 0x34, 0x12, 0] },
-            { references: true, defb: true, bytes: [0, 97, 98, 99, 0] },
-            { references: true, defw: true, bytes: [0, 97, 98, 99, 0, 0] },
-            { references: true, bytes: [0, 97, 0] },
-            { references: true, bytes: [0, 97, 98, 0] },
+        const ast = copy(prog.ast);
+        assemble(prog);
+        expect(
+            prog.ast.slice(2).map((el, i) => placement(prog, i + 2).bytes)
+        ).to.eql([
+            [0, 0x34],
+            [0, 0x34, 0x12],
+            [0, 5],
+            [0, 0x34, 0],
+            [0, 0x34, 0x12, 0],
+            [0, 97, 98, 99, 0],
+            [0, 97, 98, 99, 0, 0],
+            [0, 97, 0],
+            [0, 97, 98, 0],
         ]);
+        expect(prog.ast).to.eql(ast);
     });
-    it('should update bytes with scope', function () {
+    it('should assemble bytes with scope', function () {
         prog.ast = [
             { label: 'one' },
             { equ: 1 },
-            { block: true, prefix: '%0_' },
-            { label: '%0_one' },
+            { block: true },
+            { label: 'one' },
             { equ: 2 },
             {
                 bytes: [{ expression: 'one', vars: ['one'] }],
-                references: ['one'],
+                references: true,
             },
             { endblock: true, endprefix: true },
             {
                 bytes: [{ expression: 'one', vars: ['one'] }],
-                references: ['one'],
+                references: true,
             },
         ];
-        prog.symbols = {
-            one: 1,
-            '%0_one': 2,
-        };
-        prog.updateBytes();
-        expect(prog.ast).to.eql([
-            { label: 'one' },
-            { equ: 1 },
-            { block: true, prefix: '%0_' },
-            { label: '%0_one' },
-            { equ: 2 },
-            { bytes: [2], references: ['one'] },
-            { endblock: true, endprefix: true },
-            { bytes: [1], references: ['one'] },
-        ]);
+        assemble(prog);
+        expect(placement(prog, 5).bytes).to.eql([2]);
+        expect(placement(prog, 7).bytes).to.eql([1]);
     });
     it('should find macros', function () {
         prog.ast = [{ macrodef: 'thing' }, { endmacro: true }];
@@ -793,38 +776,57 @@ describe('compiler', function () {
             { endmacrocall: true },
             { bytes: [4] },
         ];
-        prog.symbols = prog.getSymbols();
-        expect(prog.symbols).to.eql({
-            '%0_a': 1,
-            '%0_b': 'hello',
+        prog.getSymbols();
+        expect(definitions(prog)).to.eql({
+            '%0_a': { arg: 1 },
+            '%0_b': { arg: 'hello' },
         });
     });
     it('should get bytes with org', function () {
         prog.ast = [
-            { bytes: [1, 2, 3], out: 0 },
-            { bytes: [4, 5, 6], out: 10 },
-            { bytes: [7, 8, 9], out: 2 },
+            { bytes: [1, 2, 3] },
+            { org: 10 },
+            { bytes: [4, 5, 6] },
+            { org: 2 },
+            { bytes: [7, 8, 9] },
         ];
-        const bytes = prog.getBytes();
-        expect(bytes).to.eql([1, 2, 7, 8, 9, 0, 0, 0, 0, 0, 4, 5, 6]);
+        assemble(prog);
+        expect(prog.getBytes()).to.eql([1, 2, 7, 8, 9, 0, 0, 0, 0, 0, 4, 5, 6]);
+        expect(prog.getSegments()).to.eql([
+            { address: 0, bytes: [1, 2, 7, 8, 9] },
+            { address: 10, bytes: [4, 5, 6] },
+        ]);
     });
     it('should get bytes with org, non-zero start', function () {
         prog.ast = [
-            { bytes: [1, 2, 3], out: 5 },
-            { bytes: [4, 5, 6], out: 15 },
-            { bytes: [7, 8, 9], out: 7 },
+            { org: 5 },
+            { bytes: [1, 2, 3] },
+            { org: 15 },
+            { bytes: [4, 5, 6] },
+            { org: 7 },
+            { bytes: [7, 8, 9] },
         ];
-        const bytes = prog.getBytes();
-        expect(bytes).to.eql([1, 2, 7, 8, 9, 0, 0, 0, 0, 0, 4, 5, 6]);
+        assemble(prog);
+        expect(prog.getBytes()).to.eql([1, 2, 7, 8, 9, 0, 0, 0, 0, 0, 4, 5, 6]);
+        expect(prog.getSegments()).to.eql([
+            { address: 5, bytes: [1, 2, 7, 8, 9] },
+            { address: 15, bytes: [4, 5, 6] },
+        ]);
     });
     it('should not allow ORG less than first ORG', function () {
         prog.ast = [
-            { bytes: [1, 2, 3], out: 5 },
-            { bytes: [4, 5, 6], out: 0 },
-            { bytes: [7, 8, 9], out: 7 },
+            { org: 5 },
+            { bytes: [1, 2, 3] },
+            { org: 0 },
+            { bytes: [4, 5, 6] },
+            { org: 7 },
+            { bytes: [7, 8, 9] },
         ];
-        const bytes = prog.getBytes();
-        expect(prog.errors.length).to.equal(1);
+        assemble(prog);
+        expect(prog.errors.map((e) => e.error)).to.eql([
+            'Cannot ORG to earlier address than first ORG',
+        ]);
+        expect(prog.getBytes()).to.eql([1, 2, 7, 8, 9]);
     });
     it('should calculate relative jumps', function () {
         prog.ast = [
@@ -839,13 +841,10 @@ describe('compiler', function () {
                         },
                     },
                 ],
-                address: 0,
             },
         ];
-        const bytes = prog.updateBytes();
-        expect(prog.ast).to.eql([
-            { references: true, address: 0, bytes: [1, 0xfe] },
-        ]);
+        assemble(prog);
+        expect(placement(prog, 0).bytes).to.eql([1, 0xfe]);
     });
     it('should handle macros in blocks', function () {
         const prog = compiler.compile('test', {
@@ -1206,5 +1205,67 @@ describe('compiler', function () {
         const prog = compileLines(['   ld hl,(ix)', 'ix: nop']);
         expect(prog.errors).to.eql([]);
         expect(prog.getBytes()).to.eql([0x2a, 0x03, 0x00, 0x00]);
+    });
+    describe('output', function () {
+        const lines = [
+            'org 100h',
+            'start: ld a,1',
+            'macro two x',
+            '  ld b,x',
+            '  db x',
+            'endm',
+            '  two 5',
+            'msg: db "hi"',
+            '  ds 3',
+            '  .phase 200h',
+            'moved: jp moved',
+            '  .dephase',
+            '.block',
+            'local: nop',
+            '.endblock',
+            'size: equ $ - start',
+        ];
+        it('should list the lines which produced bytes', function () {
+            const prog = compileLines(lines);
+            expect(prog.errors).to.eql([]);
+            const line = (line, address, out, length, source, data) => ({
+                file: 'test',
+                line,
+                address,
+                out,
+                length,
+                source,
+                data,
+            });
+            expect(prog.getLines()).to.eql([
+                line(2, 0x100, 0x100, 2, 'start: ld a,1', false),
+                // bytes from a macro come from the line which calls it
+                line(7, 0x102, 0x102, 3, '  two 5', false),
+                line(8, 0x105, 0x105, 2, 'msg: db "hi"', true),
+                line(9, 0x107, 0x107, 3, '  ds 3', true),
+                line(11, 0x200, 0x10a, 3, 'moved: jp moved', false),
+                line(14, 0x10d, 0x10d, 1, 'local: nop', false),
+            ]);
+        });
+        it('should give the bytes as segments', function () {
+            const prog = compileLines(lines);
+            // ds doesn't output any bytes, so starts a new segment
+            expect(prog.getSegments()).to.eql([
+                {
+                    address: 0x100,
+                    bytes: [0x3e, 1, 0x06, 5, 5, 0x68, 0x69],
+                },
+                { address: 0x10a, bytes: [0xc3, 0x00, 0x02, 0] },
+            ]);
+        });
+        it('should give the values of symbols which are not in blocks', function () {
+            const prog = compileLines(lines);
+            expect(prog.symbols).to.eql({
+                start: 0x100,
+                msg: 0x105,
+                moved: 0x200,
+                size: 14,
+            });
+        });
     });
 });

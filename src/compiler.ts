@@ -184,10 +184,7 @@ export function compile(filename, options) {
     prog.expandMacros();
     prog.getSymbols();
     // no evaluation up to here
-    prog.assignPCandEQU();
-    prog.evaluateSymbols();
-    prog.checkSymbols();
-    prog.updateBytes();
+    prog.assemble();
     if (options.warnUndocumented) {
         prog.warnUndocumented();
     }
@@ -199,19 +196,304 @@ export interface Source {
     source: string[];
 }
 
+export type Value = number | string;
+
+/**
+ * Where a symbol is defined. Labels get their value from the address of
+ * the element; equs and macro arguments from their expression.
+ */
+export interface SymbolDefinition {
+    kind: 'label' | 'equ' | 'arg';
+    // index in the ast of the element which defines it
+    index: number;
+    value?: Value | els.Expression;
+    location?: els.Location;
+}
+
+/**
+ * Where an element ended up in one pass, and the bytes it produced
+ */
+export interface Placement {
+    address: number;
+    out: number;
+    bytes?: number[];
+    size?: number;
+}
+
+/**
+ * A contiguous block of assembled bytes
+ */
+export interface Segment {
+    address: number;
+    bytes: number[];
+}
+
+/**
+ * A source line which produced some bytes. Bytes produced by a macro are
+ * counted as coming from the line which calls the macro.
+ */
+export interface Line {
+    file: string;
+    line: number;
+    // the address the code runs at, which is different to out when phased
+    address: number;
+    out: number;
+    length: number;
+    source: string;
+    // whether the line is data (db, dw, ds or incbin) rather than code
+    data: boolean;
+}
+
+/**
+ * The results of one pass of assigning addresses and assembling bytes.
+ * Nothing in the ast is changed by a pass, so passes can be repeated until
+ * the addresses stop changing.
+ */
+export class Pass {
+    public labels = new Map<string, number>();
+    // indexed by the element's index in the ast
+    public placements: Placement[] = [];
+    public errors: els.Error[] = [];
+    private errorKeys = new Set<string>();
+
+    public addError(error: els.Error) {
+        const location = error.location;
+        const key = `${error.error}|${
+            location
+                ? `${location.source}:${location.line}:${location.column}`
+                : ''
+        }`;
+        if (!this.errorKeys.has(key)) {
+            this.errorKeys.add(key);
+            this.errors.push(error);
+        }
+    }
+
+    public sameAs(other: Pass) {
+        if (this.labels.size !== other.labels.size) {
+            return false;
+        }
+        for (const [label, value] of this.labels) {
+            if (!Object.is(value, other.labels.get(label))) {
+                return false;
+            }
+        }
+        if (this.placements.length !== other.placements.length) {
+            return false;
+        }
+        for (let i = 0; i < this.placements.length; i++) {
+            const a = this.placements[i];
+            const b = other.placements[i];
+            if (
+                (a === undefined) !== (b === undefined) ||
+                (a &&
+                    (!Object.is(a.address, b.address) ||
+                        !Object.is(a.out, b.out)))
+            ) {
+                return false;
+            }
+        }
+        return true;
+    }
+}
+
+/**
+ * Evaluates expressions for one pass. Labels which haven't been reached
+ * yet in this pass can use their value from the previous pass, but only
+ * when allowForward is true, which is for things which can't change the
+ * size of the code in a way which stops it settling (db, dw and
+ * instruction operands). Equs are evaluated when they are used.
+ */
+export class Evaluator {
+    // how many circular definitions have been found
+    private cycles = 0;
+    // how many forward references have been found to labels which don't
+    // have a value yet, in the first pass
+    private unknowns = 0;
+
+    constructor(
+        private definitions: Map<string, SymbolDefinition>,
+        private pass: Pass,
+        private previous: Pass | undefined,
+        private error: (message: string, location?: els.Location) => void
+    ) {}
+
+    /**
+     * Evaluates an expression. address is the value of $. Returns
+     * undefined if it can't be evaluated, after reporting an error.
+     */
+    public evaluate(
+        expr: Value | els.Expression,
+        prefix: string,
+        address: number | undefined,
+        allowForward: boolean,
+        evaluating: string[] = []
+    ): Value | undefined {
+        if (expr === undefined || expr === null || !els.isExpression(expr)) {
+            return expr as Value;
+        }
+        const unknowns = this.unknowns;
+        const variables = {};
+        for (const variable of expr.vars) {
+            let value: Value | undefined;
+            if (variable === '$') {
+                value = address;
+                if (value === undefined) {
+                    this.error(`Symbol '$' not found`, expr.location);
+                }
+            } else {
+                value = this.lookup(
+                    variable,
+                    prefix,
+                    allowForward,
+                    evaluating,
+                    expr.location
+                );
+            }
+            variables[variable] = value === undefined ? 0 : value;
+        }
+        if (this.unknowns > unknowns) {
+            // it can't be worked out until the next pass
+            return undefined;
+        }
+        try {
+            return Expr.parse(expr.expression, { variables });
+        } catch (e) {
+            this.error(e, expr.location);
+            return undefined;
+        }
+    }
+
+    /**
+     * Gets the value of a symbol, given its full name
+     */
+    public symbolValue(
+        name: string,
+        allowForward: boolean,
+        evaluating: string[] = []
+    ): Value | undefined {
+        const definition = this.definitions.get(name);
+        if (definition.kind === 'label') {
+            if (this.pass.labels.has(name)) {
+                return this.pass.labels.get(name);
+            }
+            if (allowForward) {
+                if (this.previous?.labels.has(name)) {
+                    return this.previous.labels.get(name);
+                }
+                if (!this.previous) {
+                    this.unknowns++;
+                }
+            }
+            return undefined;
+        }
+        if (evaluating.includes(name)) {
+            this.circularError(evaluating.slice(evaluating.indexOf(name)));
+            return undefined;
+        }
+        // $ in an equ is the address of the equ
+        const placement =
+            this.pass.placements[definition.index] ??
+            (allowForward
+                ? this.previous?.placements[definition.index]
+                : undefined);
+        const cycles = this.cycles;
+        const value = this.evaluate(
+            definition.value,
+            getWholePrefix(name),
+            placement?.address,
+            allowForward,
+            [...evaluating, name]
+        );
+        // a symbol which depends on a circular definition has no value
+        return this.cycles > cycles ? undefined : value;
+    }
+
+    private lookup(
+        variable: string,
+        prefix: string,
+        allowForward: boolean,
+        evaluating: string[],
+        location: els.Location
+    ): Value | undefined {
+        const name = this.resolve(prefix, variable);
+        if (name === undefined) {
+            if (REGISTERS.has(variable.toLowerCase())) {
+                // most likely an instruction which doesn't exist,
+                // e.g. ld hl,(ix), which is parsed as ld hl,(nn)
+                this.error(
+                    `Register '${variable}' can't be used here`,
+                    location
+                );
+            } else {
+                this.error(`Symbol '${variable}' not found`, location);
+            }
+            return undefined;
+        }
+        const value = this.symbolValue(name, allowForward, evaluating);
+        if (
+            value === undefined &&
+            this.definitions.get(name).kind === 'label'
+        ) {
+            // a label which hasn't been reached yet
+            this.error(`Symbol '${variable}' not found`, location);
+        }
+        return value;
+    }
+
+    /**
+     * Finds the full name of a symbol, looking in the current block, then
+     * the blocks containing it
+     */
+    public resolve(prefix: string, variable: string): string | undefined {
+        while (true) {
+            if (this.definitions.has(prefix + variable)) {
+                return prefix + variable;
+            }
+            if (prefix === '') {
+                return undefined;
+            }
+            prefix = getReducedPrefix(prefix);
+        }
+    }
+
+    private circularError(cycle: string[]) {
+        // start the cycle with the first definition, so it's reported the
+        // same way whichever symbol it was found from
+        let first = 0;
+        for (let i = 1; i < cycle.length; i++) {
+            if (
+                this.definitions.get(cycle[i]).index <
+                this.definitions.get(cycle[first]).index
+            ) {
+                first = i;
+            }
+        }
+        const ordered = [...cycle.slice(first), ...cycle.slice(0, first)];
+        this.cycles++;
+        this.error(
+            `Circular definition: ${[...ordered, ordered[0]]
+                .map(displayName)
+                .join(' -> ')}`,
+            this.definitions.get(ordered[0]).location
+        );
+    }
+}
+
 export class Programme {
     public ast: els.Element[];
-    public symbols = {};
+    // the final values of the symbols, not including ones local to blocks
+    public symbols: { [symbol: string]: Value } = {};
     public sources: Source[] = [];
     public macros = {};
     public errors = [];
     private fileResolver: FileResolver;
-    private originalBytes = new WeakMap<els.Bytes, els.Bytes['bytes']>();
-    private originalValues = new WeakMap<els.Element, any>();
-    private deferredErrors: (els.Error | string)[] | undefined;
-    // label values from the previous pass, used for forward references
-    private forwardLabels: { [label: string]: number } | undefined;
-    private allowForwardLabels = false;
+    private definitions = new Map<string, SymbolDefinition>();
+    // the final values of all the symbols
+    private values = new Map<string, Value | undefined>();
+    private finalPass: Pass | undefined;
+    // errors found while this pass is running are kept with it
+    private currentPass: Pass | undefined;
 
     constructor(private options) {
         if (options && options.fileResolver) {
@@ -352,9 +634,11 @@ export class Programme {
                 // and isn't evaluated
                 const parentTrue = ifStack[ifStack.length - 1];
                 if (parentTrue && els.isExpression(el.if)) {
-                    el.if = this.evaluateExpression(
-                        prefixes[prefixes.length - 1],
-                        el.if
+                    el.if = this.evaluator(new Pass(), undefined).evaluate(
+                        el.if,
+                        prefixes[prefixes.length - 1] || '',
+                        undefined,
+                        false
                     );
                 }
                 ifStack.push(parentTrue && el.if !== 0);
@@ -529,51 +813,46 @@ export class Programme {
     }
 
     /**
-     * Gets a map of symbols, and updates the parsed objects
+     * Records where each symbol is defined, and updates the parsed objects
      * so the block and endblock objects have prefixes
      *
      * Labels
      *  - don't allow label to redefined in the same block
-     *  - don't allow public label to be defined
-     *  - relabel labels in blocks with %n_n_n... for blocks
-     *  - symbol is stored with value of null
+     *  - relabel labels in blocks with %n_n_n... for blocks, unless they
+     *    are public
      * Blocks / EndBlocks
      *  - count the block depth
      * Macrocall
-     *  - add prefixes to parameter names and
-     *    set their values to whatever they are being called with
+     *  - add prefixes to parameter names, and define them as whatever
+     *    they are being called with
      * Equ
      *  - must have a label
-     *  - this symbol is set to the equ expression
+     *  - the labels are defined as the equ's expression
      */
     public getSymbols() {
         let nextBlock = 0;
         let blocks = [];
         this.iterateAst((el, i, prefix, inMacroDef) => {
             if (els.isLabel(el) && !inMacroDef) {
+                let name = el.label;
                 if (blocks.length > 0 && !el.public) {
-                    if (
-                        typeof this.symbols[labelName(blocks, el.label)] !==
-                        'undefined'
-                    ) {
-                        this.error(
-                            `Label '${el.label}' already defined at in this block`,
-                            el.location
-                        );
-                        return;
-                    }
-                    this.symbols[labelName(blocks, el.label)] = null;
-                    el.label = labelName(blocks, el.label);
-                } else {
-                    if (typeof this.symbols[el.label] !== 'undefined') {
-                        this.error(
-                            `Label '${el.label}' already defined`,
-                            el.location
-                        );
-                        return;
-                    }
-                    this.symbols[el.label] = null;
+                    name = labelName(blocks, el.label);
                 }
+                if (this.definitions.has(name)) {
+                    this.error(
+                        blocks.length > 0 && !el.public
+                            ? `Label '${el.label}' already defined at in this block`
+                            : `Label '${el.label}' already defined`,
+                        el.location
+                    );
+                    return;
+                }
+                el.label = name;
+                this.definitions.set(name, {
+                    kind: 'label',
+                    index: i,
+                    location: el.location,
+                });
             } else if (els.isBlock(el)) {
                 blocks.push(nextBlock);
                 el.prefix = labelPrefix(blocks);
@@ -585,12 +864,15 @@ export class Programme {
                 el.prefix = labelPrefix(blocks);
                 nextBlock++;
                 for (let j = 0; j < el.params.length; j++) {
-                    const param = el.params[j];
-                    if (blocks.length > 0) {
-                        this.symbols[labelName(blocks, param)] = el.args[j];
-                        el.params[j] = labelName(blocks, param);
-                    } else {
-                        this.symbols[param] = null;
+                    const param = labelName(blocks, el.params[j]);
+                    el.params[j] = param;
+                    if (el.args && el.args[j] !== undefined) {
+                        this.definitions.set(param, {
+                            kind: 'arg',
+                            index: i,
+                            value: el.args[j],
+                            location: el.location,
+                        });
                     }
                 }
             } else if (els.isEqu(el)) {
@@ -598,7 +880,12 @@ export class Programme {
                     let ii = i - 1;
                     let el2;
                     while ((el2 = this.ast[ii]) && els.isLabel(el2)) {
-                        this.symbols[el2.label] = el.equ;
+                        this.definitions.set(el2.label, {
+                            kind: 'equ',
+                            index: i,
+                            value: el.equ,
+                            location: el.location,
+                        });
                         ii--;
                     }
                 } else {
@@ -610,25 +897,29 @@ export class Programme {
         if (blocks.length !== 0) {
             this.error('Mismatch between .block and .endblock statements');
         }
-        return this.symbols;
+        return this.definitions;
     }
 
     private error(message, location?) {
+        let error: els.Error;
         if (location !== undefined) {
-            const error = {
+            error = {
                 error: message,
                 location: location,
                 source: this.sources[location.source].source[location.line - 1],
                 filename: this.sources[location.source].name,
             };
-            this.logError(error);
         } else {
-            const error = {
+            error = {
                 error: message,
                 location: undefined,
                 source: undefined,
                 filename: undefined,
             };
+        }
+        if (this.currentPass) {
+            this.currentPass.addError(error);
+        } else {
             this.logError(error);
         }
     }
@@ -668,426 +959,226 @@ export class Programme {
     }
 
     /**
-     * Assign correct value to labels, based on PC. Starts at
-     * 0, increments by bytes in ast or set by org.
-     * Assign correct value to equs, although it does not
-     * evaluate expressions, it simply put the expression into
-     * the symbol
+     * Assigns addresses to labels and assembles the bytes. The size of
+     * some elements (e.g. defw cat(label, "x")) can depend on the value of
+     * labels defined later, so this is repeated, using the label values
+     * from the previous pass for forward references, until the addresses
+     * stop changing. Only errors from the last pass are reported, as
+     * earlier passes may not have known the values of all the labels.
      */
-    public assignPCandEQU() {
-        // labels whose value comes from the pc (rather than from an equ)
-        const pcLabels = new Set<string>();
-        for (const symbol in this.symbols) {
-            if (this.symbols[symbol] === null) {
-                pcLabels.add(symbol);
-            }
-        }
-
-        // symbols (equs and macro arguments) which are expressions. These
-        // get replaced by their values when evaluated, so keep the originals
-        const symbolExpressions = {};
-        for (const symbol in this.symbols) {
-            if (this.symbols[symbol] && this.symbols[symbol].expression) {
-                symbolExpressions[symbol] = this.symbols[symbol];
-            }
-        }
-
-        // The size of some elements (e.g. defw cat(label, "x")) can depend
-        // on the value of labels defined later, so keep assigning addresses
-        // until the labels stop moving. Each pass lets defb and defw use the
-        // label values from the previous pass for forward references; other
-        // things which affect the pc (org, align, etc.) can't use forward
-        // references. Only errors from the last pass are reported, as
-        // earlier passes may not have known the values of all the labels.
-        let changed: string[] = [];
-        for (let pass = 0; pass < MAX_PASSES; pass++) {
-            const previous = {};
-            for (const label of pcLabels) {
-                previous[label] = this.symbols[label];
-                this.symbols[label] = null;
-            }
-            this.forwardLabels = previous;
-            Object.assign(this.symbols, symbolExpressions);
-            this.restoreExpressions();
-            this.deferredErrors = [];
-            this.assignPCandEQUPass(pcLabels);
-            changed = [...pcLabels].filter(
-                (label) => !Object.is(this.symbols[label], previous[label])
-            );
-            if (changed.length === 0) {
+    public assemble() {
+        let previous: Pass | undefined;
+        let pass: Pass;
+        let settled = false;
+        for (let n = 0; n < MAX_PASSES; n++) {
+            pass = this.layoutPass(previous);
+            if (previous && pass.sameAs(previous)) {
+                settled = true;
                 break;
             }
+            previous = pass;
         }
-        const errors = this.deferredErrors;
-        this.deferredErrors = undefined;
-        this.forwardLabels = undefined;
-        for (const error of errors) {
-            this.logError(error);
+
+        // work out the final values of all the symbols, which reports
+        // errors in any which aren't used
+        this.currentPass = pass;
+        const evaluator = this.evaluator(pass, previous);
+        for (const name of this.definitions.keys()) {
+            this.values.set(name, evaluator.symbolValue(name, true));
         }
-        if (changed.length !== 0) {
+        if (!settled) {
+            const changed = [...pass.labels.keys()].filter(
+                (label) =>
+                    !Object.is(
+                        pass.labels.get(label),
+                        previous.labels.get(label)
+                    )
+            );
             this.error(
-                `Could not resolve address of '${changed[0]}' - ` +
-                    'forward references keep changing the size of the code'
+                changed.length > 0
+                    ? `Could not resolve address of '${displayName(
+                          changed[0]
+                      )}' - forward references keep changing the size of the code`
+                    : 'Could not resolve addresses - forward references keep changing the size of the code'
             );
         }
+        this.currentPass = undefined;
+        this.finalPass = pass;
+
+        for (const error of pass.errors) {
+            this.logError(error);
+        }
+        this.symbols = {};
+        for (const [name, value] of this.values) {
+            if (!name.startsWith('%') && value !== undefined) {
+                this.symbols[name] = value;
+            }
+        }
+    }
+
+    private evaluator(pass: Pass, previous: Pass | undefined) {
+        return new Evaluator(
+            this.definitions,
+            pass,
+            previous,
+            (message, location) => this.error(message, location)
+        );
     }
 
     /**
-     * Put back any expressions which were replaced by their values
-     * in a previous pass, so they can be evaluated again
+     * One pass of assigning addresses and assembling bytes
      */
-    private restoreExpressions() {
-        for (const el of this.ast) {
-            if (els.isBytes(el)) {
-                if (!this.originalBytes.has(el)) {
-                    this.originalBytes.set(el, el.bytes.slice());
-                } else {
-                    el.bytes = this.originalBytes.get(el).slice();
-                }
-                continue;
+    private layoutPass(previous: Pass | undefined): Pass {
+        const pass = new Pass();
+        this.currentPass = pass;
+        const evaluator = this.evaluator(pass, previous);
+        // things which change the pc can't use forward references
+        const pcValue = (value, prefix: string, pc: number) => {
+            let result = evaluator.evaluate(value, prefix, pc, false);
+            if (typeof result === 'string') {
+                result = toUtf8(result).charCodeAt(0); // TODO test this
             }
-            let key: string;
-            if (els.isOrg(el)) {
-                key = 'org';
-            } else if (els.isPhase(el)) {
-                key = 'phase';
-            } else if (els.isAlign(el)) {
-                key = 'align';
-            } else {
-                continue;
-            }
-            if (!this.originalValues.has(el)) {
-                this.originalValues.set(el, el[key]);
-            } else {
-                el[key] = this.originalValues.get(el);
-            }
-        }
-    }
-
-    private assignPCandEQUPass(pcLabels: Set<string>) {
+            return result;
+        };
         // pc starts at 0 unless org or phase changes it
         let pc = 0;
         let out = 0;
+        let origin: number | undefined;
         this.iterateAst((el, i, prefix, inMacroDef) => {
-            // console.log("in: " + JSON.stringify(el, undefined, 2));
             if (inMacroDef) {
-                // don't need to update things in the macro defs
+                // macro definitions are assembled where they're called
                 return;
             }
             if (els.isLabel(el)) {
-                // label - just set the value to the pc
-                if (this.symbols[el.label] === null) {
-                    this.symbols[el.label] = pc;
+                const definition = this.definitions.get(el.label);
+                if (definition?.kind === 'label' && definition.index === i) {
+                    pass.labels.set(el.label, pc);
                 }
-                return;
-            } else if (els.isEqu(el)) {
-                // if the equ is an expression, store the address in it
-                // for later evaluation
-                if (el.equ.expression) {
-                    el.equ.address = pc;
-                }
+            } else if (els.isEqu(el) || els.isMacroCall(el)) {
+                // so $ can be evaluated in the equ or macro arguments
+                pass.placements[i] = { address: pc, out };
             } else if (els.isDefs(el)) {
-                let size: string | number | els.Expression = el.defs;
-                if (els.isExpression(size)) {
-                    size = this.evaluateExpression(prefix, size);
-                    // TODO what if size can't be evaluated
-                }
-                if (typeof size === 'string') {
-                    const utf8 = toUtf8(size);
-                    size = utf8.charCodeAt(0); // TODO test this
-                }
-                el.address = pc;
-                el.out = out;
+                const size = pcValue(el.defs, prefix, pc);
+                // TODO what if size can't be evaluated
+                pass.placements[i] = { address: pc, out, size };
                 pc += size;
                 out += size;
             } else if (els.isOrg(el)) {
-                if (els.isExpression(el.org)) {
-                    el.org = this.evaluateExpression(prefix, el.org);
-                }
-                if (typeof el.org === 'string') {
-                    const utf8 = toUtf8(el.org);
-                    el.org = utf8.charCodeAt(0); // TODO test this
-                }
-                pc = el.org;
-                out = el.org;
+                pc = pcValue(el.org, prefix, pc);
+                out = pc;
             } else if (els.isPhase(el)) {
-                if (els.isExpression(el.phase)) {
-                    el.phase = this.evaluateExpression(prefix, el.phase);
-                }
-                if (typeof el.phase === 'string') {
-                    const utf8 = toUtf8(el.phase);
-                    el.phase = utf8.charCodeAt(0); // TODO test this
-                }
-                pc = el.phase;
+                pc = pcValue(el.phase, prefix, pc);
             } else if (els.isEndPhase(el)) {
                 pc = out;
             } else if (els.isAlign(el)) {
-                if (els.isExpression(el.align)) {
-                    el.align = this.evaluateExpression(prefix, el.align);
-                }
-                if (typeof el.align === 'string') {
-                    const utf8 = toUtf8(el.align);
-                    el.align = utf8.charCodeAt(0); // TODO test this
-                }
-                let add = el.align - (pc % el.align);
-                if (add !== el.align) {
+                const align = pcValue(el.align, prefix, pc);
+                const add = align - (pc % align);
+                if (add !== align) {
                     pc += add;
                     out += add;
                 }
             } else if (els.isBytes(el)) {
-                el.address = pc;
-                el.out = out;
-
-                if (els.isDefb(el) || els.isDefw(el)) {
-                    this.allowForwardLabels = true;
-                    this.updateByte(el, prefix, inMacroDef, true);
-                    this.allowForwardLabels = false;
-                }
-
-                let elementLength = els.isDefw(el) ? 2 : 1;
-                let length = 0;
-                for (const byte of el.bytes) {
-                    // this is assuming all expressions return a single byte/word
-                    // but cat and repeat, etc, may not
-                    if (byte && els.isExpression(byte)) {
-                        // todo: maybe make a method to get unevaluated
-                        // expression length, and throw error if it can't
-                        // be worked out at this time
-                        length += elementLength;
-                    } else {
-                        length += 1;
+                const bytes = this.encode(evaluator, el, prefix, pc);
+                if (bytes.length > 0) {
+                    if (origin === undefined) {
+                        origin = out;
+                    } else if (out < origin) {
+                        this.error(
+                            'Cannot ORG to earlier address than first ORG',
+                            el.location
+                        );
                     }
                 }
-                pc += length;
-                out += length;
+                pass.placements[i] = { address: pc, out, bytes };
+                pc += bytes.length;
+                out += bytes.length;
             }
-            // console.log("out: " + JSON.stringify(el, undefined, 2));
         });
+        this.currentPass = undefined;
+        return pass;
     }
 
-    private evaluateExpression(
-        prefix = '',
-        expr,
-        evaluated = [],
-        ignoreErrors: boolean = false
-    ): number | string {
-        const variables = expr.vars;
-        const subVars = {}; // substitute variables
-        if (expr.address !== undefined) {
-            this.symbols['$'] = expr.address;
+    /**
+     * Works out the bytes for an instruction, db or dw
+     */
+    private encode(
+        evaluator: Evaluator,
+        el: els.Bytes,
+        prefix: string,
+        address: number
+    ): number[] {
+        if (!el.references) {
+            return el.bytes as number[];
         }
-        for (const variable of variables) {
-            const subVar = this.findVariable(prefix, variable);
-
-            if (
-                this.symbols[subVar] === null &&
-                this.allowForwardLabels &&
-                this.forwardLabels[subVar] !== null
-            ) {
-                subVars[variable] = this.forwardLabels[subVar];
-            } else if (
-                this.symbols[subVar] === undefined ||
-                this.symbols[subVar] === null
-            ) {
-                if (!ignoreErrors) {
-                    if (
-                        this.symbols[subVar] === undefined &&
-                        REGISTERS.has(variable.toLowerCase())
-                    ) {
-                        // most likely an instruction which doesn't exist,
-                        // e.g. ld hl,(ix), which is parsed as ld hl,(nn)
-                        this.error(
-                            `Register '${variable}' can't be used here`,
-                            expr.location
-                        );
+        const bytes: number[] = [];
+        for (let i = 0; i < el.bytes.length; i++) {
+            const byte = el.bytes[i];
+            if (byte && els.isRelative(byte)) {
+                let value = evaluator.evaluate(
+                    byte.relative,
+                    prefix,
+                    address,
+                    true
+                );
+                if (typeof value === 'string') {
+                    const utf8 = toUtf8(value);
+                    value = utf8.charCodeAt(0); // TODO test this - treat as signed value??
+                }
+                const relative = value - (address + 2);
+                if (relative > 127) {
+                    this.error(
+                        `Relative jump is out of range (${relative} > 127)`,
+                        el.location
+                    );
+                } else if (relative < -128) {
+                    this.error(
+                        `Relative jump is out of range (${relative} < -128)`,
+                        el.location
+                    );
+                }
+                bytes.push(relative & 0xff);
+            } else if (byte && els.isExpression(byte)) {
+                // a 16 bit value is followed by a null for its high byte
+                const word = el.bytes[i + 1] === null;
+                if (word) {
+                    i++;
+                }
+                const value = evaluator.evaluate(byte, prefix, address, true);
+                if (typeof value === 'string') {
+                    const utf8 = toUtf8(value);
+                    if (els.isDefb(el) || els.isDefw(el)) {
+                        for (let j = 0; j < utf8.length; j++) {
+                            bytes.push(utf8.charCodeAt(j));
+                        }
+                        if (els.isDefw(el) && utf8.length % 2 === 1) {
+                            bytes.push(0);
+                        }
                     } else {
-                        this.error(
-                            `Symbol '${variable}' not found`,
-                            expr.location
-                        );
+                        bytes.push(utf8.charCodeAt(0));
+                        if (word) {
+                            bytes.push(utf8.charCodeAt(1));
+                        }
                     }
-                    subVars[variable] = 0;
+                } else if (els.isDefb(el)) {
+                    bytes.push(value & 0xff);
+                } else if (els.isDefw(el)) {
+                    bytes.push(value & 0xff, (value >> 8) & 0xff);
+                } else {
+                    this.checkRange(
+                        value,
+                        byte.offset ? 'offset' : word ? 'word' : 'byte',
+                        byte.location || el.location
+                    );
+                    bytes.push(value & 0xff);
+                    if (word) {
+                        bytes.push((value >> 8) & 0xff);
+                    }
                 }
             } else {
-                if (this.symbols[subVar].expression) {
-                    this.evaluateSymbol(subVar, evaluated);
-                }
-                subVars[variable] = this.symbols[subVar];
+                bytes.push(byte as number);
             }
         }
-        try {
-            return Expr.parse(expr.expression, { variables: subVars });
-        } catch (e) {
-            if (!ignoreErrors) {
-                this.error(e, expr.location);
-            }
-        }
-    }
-
-    private evaluateSymbol(symbol, evaluated) {
-        if (evaluated.indexOf(symbol) !== -1) {
-            this.error(
-                `Circular symbol dependency while evaluating '${symbol}'`,
-                this.symbols[symbol].location
-            );
-            return;
-        }
-        evaluated.push(symbol);
-        const prefix = getWholePrefix(symbol);
-        this.symbols[symbol] = this.evaluateExpression(
-            prefix,
-            this.symbols[symbol],
-            evaluated
-        );
-    }
-
-    private findVariable(prefix, variable) {
-        while (true) {
-            const subVar = this.symbols[prefix + variable];
-            if (subVar !== undefined) {
-                return prefix + variable;
-            }
-            if (prefix === '') {
-                break;
-            }
-            prefix = getReducedPrefix(prefix);
-        }
-    }
-
-    public evaluateSymbols() {
-        // console.log(`eval symbols ${JSON.stringify(symbols, undefined, 2)}`);
-        const evaluated = [];
-        for (const symbol in this.symbols) {
-            if (this.symbols[symbol].expression) {
-                // console.log('evaluate ' + symbol);
-                if (evaluated.indexOf(symbol) !== -1) {
-                    continue;
-                }
-                this.evaluateSymbol(symbol, evaluated);
-            }
-        }
-    }
-
-    public checkSymbols() {
-        for (const symbol in this.symbols) {
-            if (this.symbols[symbol].expression) {
-                this.error(`Symbol '${symbol}' cannot be calculated`);
-            }
-        }
-    }
-
-    public updateBytes() {
-        this.iterateAst((el, i, prefix, inMacroDef) => {
-            this.updateByte(el, prefix, inMacroDef);
-        });
-    }
-
-    public updateByte(
-        el: els.Element,
-        prefix: string,
-        inMacroDef: boolean,
-        ignoreErrors: boolean = false
-    ) {
-        let allEvaluated = true;
-        if (els.isBytes(el) && el.references && !inMacroDef) {
-            this.symbols['$'] = el.address;
-            for (let i = 0; i < el.bytes.length; i++) {
-                const byte = el.bytes[i];
-                if (byte && els.isRelative(byte)) {
-                    let value = byte.relative;
-                    if (els.isExpression(value)) {
-                        value = this.evaluateExpression(
-                            prefix,
-                            value,
-                            [],
-                            ignoreErrors
-                        );
-                    }
-                    if (typeof value === 'string') {
-                        const utf8 = toUtf8(value);
-                        value = utf8.charCodeAt(0); // TODO test this - treat as signed value??
-                    }
-
-                    const relative = value - (el.address + 2);
-                    if (!ignoreErrors) {
-                        if (relative > 127) {
-                            this.error(
-                                `Relative jump is out of range (${relative} > 127)`,
-                                el.location
-                            );
-                        } else if (relative < -128) {
-                            this.error(
-                                `Relative jump is out of range (${relative} < -128)`,
-                                el.location
-                            );
-                        }
-                    }
-                    el.bytes[i] = relative & 0xff;
-                }
-                if (byte && els.isExpression(byte)) {
-                    const value = this.evaluateExpression(
-                        prefix,
-                        byte,
-                        [],
-                        ignoreErrors
-                    );
-
-                    if (ignoreErrors && value === undefined) {
-                        allEvaluated = false;
-                        continue;
-                    }
-
-                    if (typeof value === 'string') {
-                        const utf8 = toUtf8(value);
-                        if (els.isDefb(el)) {
-                            let bytes = [];
-                            for (let i = 0; i < utf8.length; i++) {
-                                bytes.push(utf8.charCodeAt(i));
-                            }
-                            el.bytes.splice(i, 1, ...bytes);
-                        } else if (els.isDefw(el)) {
-                            let bytes = [];
-                            for (let i = 0; i < utf8.length; i++) {
-                                bytes.push(utf8.charCodeAt(i));
-                            }
-                            if (utf8.length % 2 === 1) {
-                                bytes.push(0);
-                            }
-                            el.bytes.splice(i, 1, ...bytes);
-                        } else {
-                            el.bytes[i] = utf8.charCodeAt(0);
-                            if (el.bytes[i + 1] === null) {
-                                el.bytes[i + 1] = utf8.charCodeAt(1);
-                            }
-                        }
-                    } else {
-                        if (els.isDefb(el)) {
-                            el.bytes[i] = value & 0xff;
-                        } else if (els.isDefw(el)) {
-                            el.bytes[i] = value & 0xff;
-                            el.bytes.splice(i + 1, 0, (value >> 8) & 0xff);
-                        } else {
-                            if (!ignoreErrors) {
-                                this.checkRange(
-                                    value,
-                                    byte.offset
-                                        ? 'offset'
-                                        : el.bytes[i + 1] === null
-                                        ? 'word'
-                                        : 'byte',
-                                    byte.location || el.location
-                                );
-                            }
-                            el.bytes[i] = value & 0xff;
-                            if (el.bytes[i + 1] === null) {
-                                el.bytes[i + 1] = (value >> 8) & 0xff;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        return allEvaluated;
+        return bytes;
     }
 
     private checkRange(
@@ -1114,8 +1205,13 @@ export class Programme {
         }
     }
 
+    /**
+     * Groups the elements into source lines for the listing, with the
+     * addresses and bytes from the final pass
+     */
     public collectAst() {
         const collectedAst = [];
+        const placements = this.finalPass ? this.finalPass.placements : [];
         let line = 0;
         let source = 0;
         let ast: any = {};
@@ -1130,9 +1226,27 @@ export class Programme {
                 }
                 line = el.location.line;
                 source = el.location.source;
+                ast.location = el.location;
             }
-
-            Object.assign(ast, el);
+            for (const key of [
+                'macrocall',
+                'endinclude',
+                'endmacrocall',
+                'undoc',
+                'error',
+            ]) {
+                if (key in el) {
+                    ast[key] = el[key];
+                }
+            }
+            const placement = placements[i];
+            if (els.isBytes(el)) {
+                ast.bytes = placement ? placement.bytes : el.bytes;
+            }
+            if ((els.isBytes(el) || els.isDefs(el)) && placement) {
+                ast.address = placement.address;
+                ast.out = placement.out;
+            }
             if (inMacroDef) {
                 ast.inMacroDef = true;
             }
@@ -1240,10 +1354,9 @@ export class Programme {
             list.push('');
         }
 
-        for (const symbol in this.symbols) {
+        for (const [symbol, value] of this.values) {
             if (!symbol.startsWith('%')) {
-                const value = this.symbols[symbol];
-                if (value.expression) {
+                if (value === undefined) {
                     list.push(`${padr(symbol, 20)} unknown value`);
                 } else if (typeof value === 'string') {
                     list.push(`${padr(symbol, 20)} "${value}"`);
@@ -1307,10 +1420,6 @@ export class Programme {
     }
 
     public logError(e: els.Error | string) {
-        if (this.deferredErrors) {
-            this.deferredErrors.push(e);
-            return;
-        }
         this.errors.push(e);
         if (typeof e === 'string') {
             console.log(chalk.red(e));
@@ -1348,46 +1457,147 @@ export class Programme {
         }
     }
 
+    /**
+     * The assembled bytes, from the first byte output to the last. Gaps
+     * (e.g. from org or ds) are filled with zeros.
+     */
     public getBytes() {
-        let bytes = [];
-        let startOut = null;
-        let out = null;
+        const bytes = [];
+        const segments = this.getSegments();
+        if (segments.length === 0) {
+            return bytes;
+        }
+        const origin = segments[0].address;
+        for (const segment of segments) {
+            while (origin + bytes.length < segment.address) {
+                bytes.push(0);
+            }
+            // not using concat or push(...), as they are slow or
+            // can overflow the stack with large arrays
+            for (const byte of segment.bytes) {
+                bytes.push(byte);
+            }
+        }
+        return bytes;
+    }
 
-        this.iterateAst((el, i, prefix, inMacroDef) => {
-            if (els.isBytes(el) && !inMacroDef) {
-                const end = bytes.length + startOut;
-                if (out === null || el.out === end) {
-                    if (startOut === null) {
-                        startOut = el.out;
-                    }
-                    out = el.bytes.length + el.out;
-                    // not using concat or push(...), as they are slow or
-                    // can overflow the stack with large arrays
-                    for (const byte of el.bytes) {
-                        bytes.push(byte);
-                    }
-                } else if (el.out > end) {
-                    for (let i = end; i < el.out; i++) {
-                        bytes.push(0);
-                    }
-                    for (const byte of el.bytes) {
-                        bytes.push(byte);
-                    }
-                    out = el.bytes.length + el.out;
-                } else if (el.out < startOut) {
-                    this.error(
-                        'Cannot ORG to earlier address than first ORG',
-                        el.location
-                    );
-                } else if (el.out < end) {
-                    for (let i = 0; i < el.bytes.length; i++) {
-                        bytes[el.out - startOut + i] = el.bytes[i];
-                    }
-                    out = el.bytes.length + el.out;
-                }
+    /**
+     * The assembled bytes, as contiguous blocks with the address they are
+     * output at. ds doesn't output any bytes, so it separates blocks.
+     */
+    public getSegments(): Segment[] {
+        // bytes by output address. Later bytes overwrite earlier ones,
+        // when org goes back to an earlier address.
+        const memory = new Map<number, number>();
+        let origin: number | undefined;
+        this.forEachPlacement((el, placement) => {
+            if (!placement.bytes || placement.bytes.length === 0) {
+                return;
+            }
+            if (origin === undefined) {
+                origin = placement.out;
+            } else if (placement.out < origin) {
+                // reported as an error when assembling
+                return;
+            }
+            for (let i = 0; i < placement.bytes.length; i++) {
+                memory.set(placement.out + i, placement.bytes[i]);
             }
         });
-        return bytes;
+        const addresses = [...memory.keys()].sort((a, b) => a - b);
+        const segments: Segment[] = [];
+        let segment: Segment | undefined;
+        for (const address of addresses) {
+            if (
+                !segment ||
+                address !== segment.address + segment.bytes.length
+            ) {
+                segment = { address, bytes: [] };
+                segments.push(segment);
+            }
+            segment.bytes.push(memory.get(address));
+        }
+        return segments;
+    }
+
+    /**
+     * The source lines which produced bytes, in the order they were
+     * assembled
+     */
+    public getLines(): Line[] {
+        const lines: Line[] = [];
+        // bytes from a macro are counted as coming from the line which
+        // called it (the outermost one, if macros call macros)
+        let macroCall: els.Location | undefined;
+        let macroDepth = 0;
+        let last: Line | undefined;
+        let lastLocation: els.Location | undefined;
+        this.forEachPlacement((el, placement) => {
+            if (els.isMacroCall(el)) {
+                if (macroDepth === 0) {
+                    macroCall = el.location;
+                }
+                macroDepth++;
+                return;
+            }
+            if (els.isEndMacroCall(el)) {
+                macroDepth--;
+                return;
+            }
+            const length = placement.bytes
+                ? placement.bytes.length
+                : placement.size;
+            if (!(length > 0)) {
+                return;
+            }
+            const location = macroDepth > 0 ? macroCall : el.location;
+            const data = els.isDefb(el) || els.isDefw(el) || els.isDefs(el);
+            if (
+                last &&
+                lastLocation.source === location.source &&
+                lastLocation.line === location.line
+            ) {
+                last.length += length;
+                last.data = last.data && data;
+                return;
+            }
+            last = {
+                file: this.sources[location.source].name,
+                line: location.line,
+                address: placement.address,
+                out: placement.out,
+                length,
+                source: this.sources[location.source].source[location.line - 1],
+                data,
+            };
+            lastLocation = location;
+            lines.push(last);
+        });
+        return lines;
+    }
+
+    /**
+     * Calls func for each element which was assembled, with where it was
+     * placed in the final pass. Macro calls and their ends are included,
+     * with an empty placement for the ends.
+     */
+    private forEachPlacement(
+        func: (el: els.Element, placement: Placement) => void
+    ) {
+        if (!this.finalPass) {
+            return;
+        }
+        const placements = this.finalPass.placements;
+        this.iterateAst((el, i, prefix, inMacroDef) => {
+            if (inMacroDef) {
+                return;
+            }
+            if (placements[i]) {
+                func(el, placements[i]);
+            } else if (els.isEndMacroCall(el)) {
+                func(el, { address: undefined, out: undefined });
+            }
+        });
     }
 }
 
@@ -1427,6 +1637,13 @@ export function getWholePrefix(symbol) {
         return match[1];
     }
     return '';
+}
+
+/**
+ * The name of a symbol without the prefix for the block it's in
+ */
+function displayName(symbol: string) {
+    return symbol.replace(/^(%[0-9]+_)+/, '');
 }
 
 function toUtf8(s) {

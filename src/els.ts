@@ -7,7 +7,6 @@ export interface Expression {
     expression: string;
     vars: string[];
     location: Location;
-    address: number;
     // true if this is an index register offset, e.g. the d in (ix+d)
     offset?: boolean;
 }
@@ -67,8 +66,6 @@ export interface EndBlock extends Element, EndPrefix {
 export interface Bytes extends Element {
     bytes: (Expression | Relative | number)[];
     references: boolean;
-    address: number;
-    out: number;
 }
 export interface EndMacroCall extends Element, EndPrefix {
     endmacrocall: true;
@@ -88,18 +85,12 @@ export interface Equ extends Element {
 }
 export interface Defs extends Element {
     defs: Expression;
-    address: number;
-    out: number;
 }
 export interface Defb extends Bytes {
     defb: true;
-    address: number;
-    out: number;
 }
 export interface Defw extends Bytes {
     defw: true;
-    address: number;
-    out: number;
 }
 export interface Label extends Element {
     label: string;
