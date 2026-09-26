@@ -1,6 +1,6 @@
 {
   "name": "maz",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Macro Assembler for Z80",
   "main": "lib/compiler.js",
   "bin": {
