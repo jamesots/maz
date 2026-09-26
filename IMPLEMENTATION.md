@@ -65,3 +65,17 @@ assembled.
 
 The output (getBytes, getSegments, getLines, getList and symbols) comes
 from the final pass.
+
+
+Tests
+-----
+
+`pnpm test` builds maz, then runs the tests. test/opcodes.ts lists every
+instruction and the bytes it should be assembled to. If z88dk is installed
+(z88dk-z80asm, or z88dk.z88dk-z80asm from the snap, or set MAZ_Z80ASM),
+test/z88dk.spec.ts also checks that z88dk's assembler produces the same
+bytes for them, and that maz can assemble every instruction z88dk's
+disassembler knows about. Otherwise those tests are skipped.
+
+The examples are assembled and compared with snapshots in test/snapshots.
+Run with UPDATE_SNAPSHOTS=1 to update them, after checking the differences.

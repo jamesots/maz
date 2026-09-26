@@ -527,9 +527,9 @@ code = ldir
     / ld_bcdehlsp_nn
     / ld_ixyaddr_bcdehla
     / ld_ixyaddr_n
-    / ld_ix_ix
-    / ld_iy_iy
-    / ld_ixyhl_bcdehla
+    / add_ixy_ixy
+    / ld_ixyhl_bcdea
+    / ld_ixyhl_ixyhl
     / ld_ixyh_n
     / ld_ixyl_n
     / ld_ixy_addr
@@ -718,11 +718,8 @@ pop_ixy = 'pop'i ws xy:ixiy {
 ex_sp_ixy = 'ex'i ws '(' ws? 'sp'i ws? ')' ws? ',' xy:ixiy {
     return res([xy, 0xe3]);
 }
-ld_ix_ix = 'ld'i ws 'ix'i ws? ',' ws? 'ix'i {
-    return res([0xdd, 0x29]);
-}
-ld_iy_iy = 'ld'i ws 'iy'i ws? ',' ws? 'iy'i {
-    return res([0xfd, 0x29]);
+add_ixy_ixy = 'add'i ws xy:ixiy ws? ',' ws? xy2:ixiy &{ return xy === xy2; } {
+    return res([xy, 0x29]);
 }
 ld_ixy_addr = 'ld'i ws xy:ixiy ws? ',' ws? '(' ws? expr:expr ws? ')' {
     return res([xy, 0x2a].concat(expr16(expr)));
@@ -835,8 +832,13 @@ ld_bd_ixyhl = 'ld'i ws reg:bd ws? ',' ws? xy:ixyhl {
 ld_cea_ixyhl = 'ld'i ws reg:cea ws? ',' ws? xy:ixyhl {
     return res([xy[0], 0x4c + xy[1] + (reg << 4)], true);
 }
-ld_ixyhl_bcdehla = 'ld'i ws xy:ixyhl ws? ',' ws? reg:bcdehla {
+// h and l can't be used with ixh, ixl, iyh or iyl, as the prefix which
+// selects ix or iy applies to the whole instruction
+ld_ixyhl_bcdea = 'ld'i ws xy:ixyhl ws? ',' ws? reg:bcdea {
     return res([xy[0], 0x60 + reg + (xy[1] << 3)], true);
+}
+ld_ixyhl_ixyhl = 'ld'i ws xy:ixyhl ws? ',' ws? xy2:ixyhl &{ return xy[0] === xy2[0]; } {
+    return res([xy[0], 0x64 + (xy[1] << 3) + xy2[1]], true);
 }
 ld_ixyaddr_bcdehla = 'ld'i ws '(' ws? xy:ixiy ws? expr:ixoffset? ws? ')' ws? ',' ws? reg:bcdehla {
     return res([xy, 0x70 + reg].concat(offset8(expr)));
@@ -1415,6 +1417,12 @@ bdhhl = 'b'i ![a-z0-9_]i { return 0; }
     / 'd'i ![a-z0-9_]i { return 1; }
     / 'h'i ![a-z0-9_]i { return 2; }
     / '(hl)'i { return 3; }
+
+bcdea = 'b'i ![a-z0-9_]i { return 0; }
+    / 'c'i ![a-z0-9_]i { return 1; }
+    / 'd'i ![a-z0-9_]i { return 2; }
+    / 'e'i ![a-z0-9_]i { return 3; }
+    / 'a'i ![a-z0-9_]i { return 7; }
 
 bdh = 'b'i ![a-z0-9_]i { return 0; }
     / 'd'i ![a-z0-9_]i { return 1; }
