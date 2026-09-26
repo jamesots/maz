@@ -13,6 +13,7 @@ const examples = [
     { file: 'broke.z80' },
     { file: 'broke2.z80' },
     { file: 'incbin.z80' },
+    { file: 'library.z80' },
     {
         file: 'search.z80',
         searchPaths: ['examples/another_dir', 'examples/search_dir_2'],

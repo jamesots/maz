@@ -1,0 +1,9 @@
+; Uses a routine from a library. square uses mul8, so both are assembled,
+; but negate isn't used, so it isn't.
+
+    org 100h
+    ld h,12
+    call square
+    halt
+
+.library "libs/maths.z80"

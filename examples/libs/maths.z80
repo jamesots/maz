@@ -1,0 +1,27 @@
+; Maths routines. Only the ones which are used are assembled.
+
+.routine mul8
+; hl = h * e
+    ld d,0
+    ld l,d
+    ld b,8
+loop:
+    add hl,hl
+    jr nc,skip
+    add hl,de
+skip:
+    djnz loop
+    ret
+.endroutine
+
+.routine square
+; hl = h * h
+    ld e,h
+    jp mul8
+.endroutine
+
+.routine negate
+; a = -a
+    neg
+    ret
+.endroutine

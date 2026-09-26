@@ -38,6 +38,18 @@ export interface Include extends Element {
     include: string;
     included?: true;
 }
+export interface Library extends Element {
+    library: string;
+    included?: true;
+}
+// a routine in a library, which is only assembled if it's used
+export interface Routine extends Element {
+    routine: string;
+    prefix?: string;
+}
+export interface EndRoutine extends Element {
+    endroutine: true;
+}
 export interface EndInclude extends Element {
     endinclude: number;
 }
@@ -169,6 +181,18 @@ export function isEndPrefix(el: Element): el is EndPrefix {
 }
 export function isInclude(el: Element): el is Include {
     return (el as Include).include !== undefined;
+}
+export function isComment(el: Element): el is Comment {
+    return (el as Comment).comment !== undefined;
+}
+export function isLibrary(el: Element): el is Library {
+    return (el as Library).library !== undefined;
+}
+export function isRoutine(el: Element): el is Routine {
+    return (el as Routine).routine !== undefined;
+}
+export function isEndRoutine(el: Element): el is EndRoutine {
+    return (el as EndRoutine).endroutine === true;
 }
 export function isEndInclude(el: Element): el is EndInclude {
     return (el as EndInclude).endinclude !== undefined;

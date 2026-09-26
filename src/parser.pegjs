@@ -127,6 +127,7 @@ separator = [ \t]* [\r\n] [ \t]*
 statement = labelled_statement
     / include
     / incbin
+    / library
     / labeldef
     / unlabelled_statement
 
@@ -154,6 +155,8 @@ directive = org
     / endm
     / block
     / endblock
+    / routine
+    / endroutine
     / if
     / endif
     / else
@@ -198,6 +201,13 @@ incbin = '.incbin' ws path: string {
 include = '.include' ws path:string {
     return {
         include: path,
+        location: loc()
+    };
+}
+
+library = '.library'i ws path:string {
+    return {
+        library: path,
         location: loc()
     };
 }
@@ -453,6 +463,20 @@ endblock = '.endblock'i {
     return {
         endblock: true,
         endprefix: true,
+        location: loc()
+    };
+}
+
+routine = '.routine'i ws name:label {
+    return {
+        routine: name,
+        location: loc()
+    };
+}
+
+endroutine = '.endroutine'i {
+    return {
+        endroutine: true,
         location: loc()
     };
 }

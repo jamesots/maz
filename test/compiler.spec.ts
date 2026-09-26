@@ -1352,6 +1352,161 @@ describe('compiler', function () {
             ]);
         });
     });
+    describe('libraries', function () {
+        function compileFiles(files, searchPaths = []) {
+            const fileResolver = new compiler.StringFileResolvers(files);
+            fileResolver.searchPaths = searchPaths;
+            return compiler.compile('test', { fileResolver });
+        }
+        const maths = [
+            '; maths routines',
+            'SIZE: equ 2',
+            '.routine mul8',
+            'loop: nop',
+            '   djnz loop',
+            '   ret',
+            '.endroutine',
+            '.routine mul16',
+            '   call mul8',
+            'loop: ret',
+            '.endroutine',
+            '.routine unused',
+            '   halt',
+            '.endroutine',
+        ];
+        it('should only assemble routines which are used, where the library is', function () {
+            const prog = compileFiles({
+                test: ['   call mul8', '.library "maths"', '   db SIZE'],
+                maths,
+            });
+            expect(prog.errors).to.eql([]);
+            expect(prog.getBytes()).to.eql([
+                0xcd,
+                0x03,
+                0x00, // call mul8
+                0x00,
+                0x10,
+                0xfd,
+                0xc9, // mul8
+                2,
+            ]);
+            // labels in routines are local to them
+            expect(prog.symbols).to.eql({ SIZE: 2, mul8: 3 });
+        });
+        it('should assemble routines used by routines which are used', function () {
+            const prog = compileFiles({
+                test: ['   call mul16', '.library "maths"'],
+                maths,
+            });
+            expect(prog.errors).to.eql([]);
+            expect(prog.getBytes()).to.eql([
+                0xcd,
+                0x07,
+                0x00, // call mul16
+                0x00,
+                0x10,
+                0xfd,
+                0xc9, // mul8
+                0xcd,
+                0x03,
+                0x00,
+                0xc9, // mul16
+            ]);
+        });
+        it('should allow libraries to use libraries, which are only loaded once', function () {
+            const prog = compileFiles({
+                test: [
+                    '   call first',
+                    '.library "lib/one"',
+                    '.library "lib/two"',
+                ],
+                'lib/one': [
+                    '.library "common"',
+                    '.routine first',
+                    '   call shared',
+                    '.endroutine',
+                ],
+                'lib/two': ['.library "common"'],
+                'lib/common': ['.routine shared', '   ret', '.endroutine'],
+            });
+            expect(prog.errors).to.eql([]);
+            expect(prog.getBytes()).to.eql([
+                0xcd,
+                0x04,
+                0x00, // call first
+                0xc9, // shared, where lib/one uses common
+                0xcd,
+                0x03,
+                0x00, // first
+            ]);
+        });
+        it('should find libraries in the search path', function () {
+            const prog = compileFiles(
+                {
+                    test: ['   call mul8', '.library "maths"'],
+                    'libs/maths': maths,
+                },
+                ['libs']
+            );
+            expect(prog.errors).to.eql([]);
+            expect(prog.getBytes().length).to.equal(7);
+        });
+        it('should list routines which are not used as not assembled', function () {
+            const prog = compileFiles({
+                test: ['   call mul8', '.library "maths"'],
+                maths,
+            });
+            const list = prog.getList(false);
+            expect(list).to.include('   13 xxxx 76                    halt');
+            expect(list).to.include('    4 0003 00                 loop: nop');
+        });
+        it('should only allow routines, equs, macros and libraries in libraries', function () {
+            const prog = compileFiles({
+                test: ['.library "lib"'],
+                lib: [
+                    'macro m',
+                    '   nop',
+                    'endm',
+                    'x: equ 1',
+                    '   nop',
+                    'y: nop',
+                ],
+            });
+            expect(errorMessages(prog)).to.eql([
+                'Code in a library must be inside a .routine',
+                'Code in a library must be inside a .routine',
+                'Code in a library must be inside a .routine',
+            ]);
+        });
+        it('should only allow routines in libraries', function () {
+            const prog = compileLines(['.routine x', '   ret', '.endroutine']);
+            expect(errorMessages(prog)).to.eql([
+                '.routine can only be used in a library',
+            ]);
+        });
+        it('should not allow routines to be nested', function () {
+            const prog = compileFiles({
+                test: ['.library "lib"'],
+                lib: ['.routine a', '.routine b', '.endroutine', '.endroutine'],
+            });
+            expect(errorMessages(prog)).to.include("Routines can't be nested");
+        });
+        it('should not allow a routine with the same name as another symbol', function () {
+            const prog = compileFiles({
+                test: ['mul8: call mul8', '.library "maths"'],
+                maths,
+            });
+            expect(errorMessages(prog)).to.eql([
+                "Routine 'mul8' has the same name as another symbol",
+            ]);
+        });
+        it('should report a library which does not exist', function () {
+            const prog = compileFiles({ test: ['.library "nothere"'] });
+            expect(errorMessages(prog)).to.eql([
+                'File does not exist: nothere',
+            ]);
+        });
+    });
     describe('output', function () {
         const lines = [
             'org 100h',

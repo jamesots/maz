@@ -4,6 +4,7 @@
 
 New:
 
+- Libraries of routines: `.library "file"` assembles only the routines in the file which are used, defined with `.routine name` and `.endroutine`. Libraries can use other libraries, and are found using the search paths.
 - `.if` can use symbols: equs defined anywhere, and labels defined before the `.if`. A symbol can be defined in more than one branch of such an `.if`. `.include`, `.incbin` and macro definitions can't be inside one.
 - `(ix-d)` and `(ix)` index register addressing, as well as `(ix+d)`. The same goes for `iy`.
 - Instruction operands are checked for range: 8 bit values must be -128 to 255, 16 bit values -32768 to 65535, and index offsets -128 to 127.
@@ -21,6 +22,7 @@ Fixed:
 - `ld hl,(ix)`, and other instructions which don't exist, reported "Symbol 'ix' not found". They now report "Register 'ix' can't be used here".
 - A circular equ is reported as one error showing the cycle, instead of several.
 - The CLI showed the wrong version number.
+- The listing showed "undefined" or an extra line at the end of some included files.
 
 Changed:
 

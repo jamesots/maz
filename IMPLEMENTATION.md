@@ -36,8 +36,11 @@ Compiler
 --------
 
 The compiler (compiler.ts) first changes the structure of the AST: it
-parses included files and inserts them, expands macros, and gives labels in
-blocks and macro calls a prefix (e.g. %0_label). getSymbols then records
+parses included files and libraries and inserts them, expands macros, and
+gives labels in blocks, routines and macro calls a prefix (e.g. %0_label).
+selectRoutines works out which routines in libraries are used, by following
+the symbol names in expressions from the code outside routines. Routines
+which aren't used are then skipped, like code in a false .if. getSymbols then records
 where each symbol is defined: a label, an equ, or a macro argument.
 
 After that the AST isn't changed. assemble() runs passes over it, each of

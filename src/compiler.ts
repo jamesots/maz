@@ -182,6 +182,7 @@ export function compile(filename, options) {
     prog.checkConditionals();
     prog.getMacros();
     prog.expandMacros();
+    prog.selectRoutines();
     prog.getSymbols();
     // no evaluation up to here
     prog.assemble();
@@ -545,12 +546,17 @@ export class Programme {
     public macros = {};
     public errors = [];
     private fileResolver: FileResolver;
+    // the libraries which have been loaded, by real filename
+    private libraries = new Set<string>();
     // a symbol can have more than one definition, if they are in
     // different branches of an .if which uses symbols
     private definitions = new Map<string, SymbolDefinition[]>();
     // the final values of all the symbols
     private values = new Map<string, Value | undefined>();
     private finalPass: Pass | undefined;
+    // routines in libraries which are used, so are assembled. Until this
+    // is worked out, all routines are treated as being used.
+    private usedRoutines: Set<string> | undefined;
     // errors found while this pass is running are kept with it
     private currentPass: Pass | undefined;
 
@@ -688,9 +694,13 @@ export class Programme {
                 : parent === 'both' || condition === 'both'
                 ? 'both'
                 : true;
-        const ifStack: { state: IfState; condition: IfState }[] = [
-            { state: true, condition: true },
-        ];
+        const ifStack: {
+            state: IfState;
+            condition: IfState;
+            routine?: boolean;
+        }[] = [{ state: true, condition: true }];
+        // whether each routine being iterated has pushed a prefix
+        const routinePrefixes: boolean[] = [];
         for (let i = 0; i < this.ast.length; i++) {
             const el = this.ast[i];
             const prefix = prefixes[prefixes.length - 1] || '';
@@ -740,6 +750,21 @@ export class Programme {
             if (els.isEndIf(el) && ifStack.length > 1) {
                 ifStack.pop();
             }
+            // a routine which isn't used isn't assembled, like a false .if
+            if (els.isRoutine(el)) {
+                const parent = ifStack[ifStack.length - 1].state;
+                const used =
+                    !this.usedRoutines || this.usedRoutines.has(el.routine);
+                ifStack.push({
+                    state: combine(parent, used),
+                    condition: used,
+                    routine: true,
+                });
+                routinePrefixes.push(els.isPrefixed(el));
+            }
+            if (els.isEndRoutine(el) && ifStack[ifStack.length - 1].routine) {
+                ifStack.pop();
+            }
 
             const state = ifStack[ifStack.length - 1].state;
             if (ignoreIf || state !== false) {
@@ -759,6 +784,9 @@ export class Programme {
             }
             if (els.isEndMacroCall(el)) {
                 inMacroCall = false;
+            }
+            if (els.isEndRoutine(el) && routinePrefixes.pop()) {
+                prefixes.pop();
             }
         }
     }
@@ -800,7 +828,9 @@ export class Programme {
         this.iterateAst(
             (el, i, prefix, inMacroDef, ifTrue, inMacroCall, conditional) => {
                 if (
-                    (els.isInclude(el) || els.isIncbin(el)) &&
+                    (els.isInclude(el) ||
+                        els.isIncbin(el) ||
+                        els.isLibrary(el)) &&
                     !el.included &&
                     conditional
                 ) {
@@ -808,24 +838,42 @@ export class Programme {
                     // evaluated
                     this.error(
                         `${
-                            els.isInclude(el) ? '.include' : '.incbin'
+                            els.isInclude(el)
+                                ? '.include'
+                                : els.isIncbin(el)
+                                ? '.incbin'
+                                : '.library'
                         } can't be used inside an .if which uses symbols`,
                         el.location
                     );
                     el.included = true;
                     return;
                 }
-                if (els.isInclude(el) && !el.included) {
-                    if (!this.fileResolver.fileExists(el.include)) {
+                if ((els.isInclude(el) || els.isLibrary(el)) && !el.included) {
+                    const filename = els.isInclude(el)
+                        ? el.include
+                        : el.library;
+                    if (!this.fileResolver.fileExists(filename)) {
                         this.error(
                             'File does not exist: ' +
-                                this.fileResolver.getRealFilename(el.include),
+                                this.fileResolver.getRealFilename(filename),
                             el.location
                         );
                         el.included = true;
                         return;
                     }
-                    const source = this.readSource(el.include);
+                    if (els.isLibrary(el)) {
+                        // a library is only loaded once, and its routines
+                        // are assembled where it's first used
+                        const realFilename =
+                            this.fileResolver.getRealFilename(filename);
+                        el.included = true;
+                        if (this.libraries.has(realFilename)) {
+                            return;
+                        }
+                        this.libraries.add(realFilename);
+                    }
+                    const source = this.readSource(filename);
                     sourceIndices.push(sourceIndex);
                     sourceIndex = this.sources.length - 1;
                     const includeAst = this.parseLines(source, sourceIndex);
@@ -833,7 +881,12 @@ export class Programme {
                     this.ast.splice(i + 1 + includeAst.length, 0, {
                         endinclude: sourceIndex,
                         location: {
-                            line: includeAst.length + 1,
+                            // the line after the end of the file, not
+                            // counting the empty string after a final newline
+                            line:
+                                source.length -
+                                (source[source.length - 1] === '' ? 1 : 0) +
+                                1,
                             column: 0,
                             source: sourceIndex,
                         },
@@ -955,6 +1008,121 @@ export class Programme {
     }
 
     /**
+     * Works out which routines in libraries are used. A routine is used if
+     * its name is in an expression which is assembled: outside a routine,
+     * or in a routine which is used. Also checks that libraries only
+     * contain routines, equs, macro definitions and other libraries
+     * outside their routines, and that routines are only in libraries.
+     */
+    public selectRoutines() {
+        // the names used in expressions in each routine, and outside them
+        const routines = new Map<string, Set<string>>();
+        const used = new Set<string>();
+        let routine: Set<string> | undefined;
+        // whether each file being included is a library
+        const inLibrary: boolean[] = [false];
+        this.iterateAst((el, i, prefix, inMacroDef) => {
+            const library = inLibrary[inLibrary.length - 1];
+            if (els.isInclude(el) && el.included) {
+                // an included file is part of whatever included it
+                inLibrary.push(library);
+            } else if (els.isLibrary(el) && el.included) {
+                if (routine) {
+                    this.error(
+                        ".library can't be used inside a .routine",
+                        el.location
+                    );
+                }
+                inLibrary.push(true);
+            } else if (els.isEndInclude(el)) {
+                inLibrary.pop();
+            }
+            if (inMacroDef) {
+                // macro definitions are expanded where they're called
+                return;
+            }
+            if (els.isRoutine(el)) {
+                if (!library) {
+                    this.error(
+                        '.routine can only be used in a library',
+                        el.location
+                    );
+                } else if (routine) {
+                    this.error("Routines can't be nested", el.location);
+                }
+                routine = new Set<string>();
+                if (routines.has(el.routine)) {
+                    this.error(
+                        `Routine '${el.routine}' already defined`,
+                        el.location
+                    );
+                } else {
+                    routines.set(el.routine, routine);
+                }
+                return;
+            }
+            if (els.isEndRoutine(el)) {
+                if (!routine) {
+                    this.error('.endroutine without .routine', el.location);
+                }
+                routine = undefined;
+                return;
+            }
+            if (library && !routine && !this.allowedInLibrary(el, i)) {
+                this.error(
+                    'Code in a library must be inside a .routine',
+                    el.location
+                );
+            }
+            // the names this element uses
+            for (const name of expressionVars(el)) {
+                (routine || used).add(name);
+            }
+        });
+        if (routine) {
+            this.error('.routine without .endroutine');
+        }
+
+        // follow the routines which are used to the ones they use
+        this.usedRoutines = new Set<string>();
+        const names = [...used];
+        while (names.length > 0) {
+            const name = names.pop();
+            if (routines.has(name) && !this.usedRoutines.has(name)) {
+                this.usedRoutines.add(name);
+                names.push(...routines.get(name));
+            }
+        }
+    }
+
+    /**
+     * Whether an element can be outside a routine in a library
+     */
+    private allowedInLibrary(el: els.Element, index: number) {
+        if (els.isLabel(el)) {
+            // only if it's the label of an equ
+            let next = index + 1;
+            while (next < this.ast.length && els.isLabel(this.ast[next])) {
+                next++;
+            }
+            return next < this.ast.length && els.isEqu(this.ast[next]);
+        }
+        return (
+            els.isEqu(el) ||
+            els.isComment(el) ||
+            els.isError(el) ||
+            els.isMacroDef(el) ||
+            els.isEndMacro(el) ||
+            els.isLibrary(el) ||
+            els.isInclude(el) ||
+            els.isEndInclude(el) ||
+            els.isIf(el) ||
+            els.isElse(el) ||
+            els.isEndIf(el)
+        );
+    }
+
+    /**
      * Records where each symbol is defined, and updates the parsed objects
      * so the block and endblock objects have prefixes
      *
@@ -1009,6 +1177,27 @@ export class Programme {
                         location: el.location,
                         conditional,
                     });
+                } else if (els.isRoutine(el) && !inMacroDef) {
+                    // a routine's name is a label, and it's a block, so
+                    // labels in it are local to it
+                    if (this.definitions.has(el.routine)) {
+                        this.error(
+                            `Routine '${el.routine}' has the same name as another symbol`,
+                            el.location
+                        );
+                    } else {
+                        define(el.routine, {
+                            kind: 'label',
+                            index: i,
+                            location: el.location,
+                            conditional,
+                        });
+                    }
+                    blocks.push(nextBlock);
+                    el.prefix = labelPrefix(blocks);
+                    nextBlock++;
+                } else if (els.isEndRoutine(el) && !inMacroDef) {
+                    blocks.pop();
                 } else if (els.isBlock(el)) {
                     blocks.push(nextBlock);
                     el.prefix = labelPrefix(blocks);
@@ -1232,9 +1421,11 @@ export class Programme {
                     // macro definitions are assembled where they're called
                     return;
                 }
-                if (els.isLabel(el)) {
+                if (els.isLabel(el) || els.isRoutine(el)) {
+                    // a routine's name is a label
+                    const name = els.isLabel(el) ? el.label : el.routine;
                     const definition = this.definitions
-                        .get(el.label)
+                        .get(name)
                         ?.find(
                             (d) =>
                                 (d.kind === 'equ' ? d.labelIndex : d.index) ===
@@ -1244,17 +1435,17 @@ export class Programme {
                         // an error was reported when getting the symbols
                         return;
                     }
-                    if (defined.has(el.label)) {
+                    if (defined.has(name)) {
                         // defined in more than one .if branch which is assembled
                         this.error(
-                            `Label '${displayName(el.label)}' already defined`,
+                            `Label '${displayName(name)}' already defined`,
                             el.location
                         );
                         return;
                     }
-                    defined.add(el.label);
+                    defined.add(name);
                     if (definition.kind === 'label') {
-                        pass.labels.set(el.label, pc);
+                        pass.labels.set(name, pc);
                         pass.placements[i] = { address: pc, out };
                     }
                 } else if (els.isEqu(el) || els.isMacroCall(el)) {
@@ -1525,18 +1716,22 @@ export class Programme {
             undoc = undoc || el.undoc;
             error = error || el.error;
 
-            this.dumpLine(
-                list,
-                this.sources[el.location.source].source,
-                el.location.line,
-                el.out,
-                el.address,
-                el.bytes,
-                el.inMacroDef,
-                el.inMacroCall,
-                el.ifTrue,
-                warnUndoc && el.undoc ? 'U' : el.error ? 'E' : ' '
-            );
+            // the end of an include is after the last line of the file,
+            // so it isn't a line of source
+            if (!el.endinclude) {
+                this.dumpLine(
+                    list,
+                    this.sources[el.location.source].source,
+                    el.location.line,
+                    el.out,
+                    el.address,
+                    el.bytes,
+                    el.inMacroDef,
+                    el.inMacroCall,
+                    el.ifTrue,
+                    warnUndoc && el.undoc ? 'U' : el.error ? 'E' : ' '
+                );
+            }
 
             // if (el.macrocall && !el.inMacroDef) {
             //     list.push('           ' + ' '.repeat(BYTELEN * 2) + '  *UNROLL MACRO')
@@ -1545,7 +1740,7 @@ export class Programme {
             if (el.endinclude) {
                 list.push(
                     ` ${pad(
-                        el.location.line + 1,
+                        el.location.line,
                         4
                     )}                        *END INCLUDE ${
                         this.sources[el.location.source].name
@@ -1857,6 +2052,29 @@ export function getWholePrefix(symbol) {
         return match[1];
     }
     return '';
+}
+
+/**
+ * The names of all the symbols used in expressions in an element
+ */
+function expressionVars(value: any, names = new Set<string>()): Set<string> {
+    if (Array.isArray(value)) {
+        for (const item of value) {
+            expressionVars(item, names);
+        }
+    } else if (value && typeof value === 'object') {
+        if (els.isExpression(value) && Array.isArray(value.vars)) {
+            for (const name of value.vars) {
+                names.add(name);
+            }
+        }
+        for (const key of Object.keys(value)) {
+            if (key !== 'location' && key !== 'vars') {
+                expressionVars(value[key], names);
+            }
+        }
+    }
+    return names;
 }
 
 /**

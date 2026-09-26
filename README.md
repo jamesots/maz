@@ -154,6 +154,29 @@ Words are stored low-byte first. If the string has an odd length, an extra zero 
 </dd>
 <dt>.incbin <i>filename</i></dt>
 <dd>Include a file and process it as binary data inserted at that point of the programme. The filename is realtive to the current file.</dd>
+<dt>.library <i>filename</i></dt>
+<dd>Use a library of routines. Only the routines which are used are assembled, where the .library statement is. A routine is used if its name is used by the programme, or by another routine which is used. The filename is found in the same way as for .include, including the search paths given with -p.
+
+    ld h,12
+    call square
+    halt
+
+    .library "libs/maths.z80"
+
+A library can use other libraries. Each library is only loaded once, so if more than one file uses the same library, its routines are assembled where it's first used.
+
+Outside its routines, a library can only contain EQUs, macro definitions, .library and comments.
+</dd>
+<dt>.routine <i>name</i></dt>
+<dt>.endroutine</dt>
+<dd>Define a routine in a library. The name is a label for the start of the routine. Labels in the routine are local to it, as if it were in a .block, unless they are made public with @.
+
+    .routine square
+    ; hl = h * h
+        ld e,h
+        jp mul8
+    .endroutine
+</dd>
 <dt>.if <i>expression</i></dt>
 <dd>Assembles the code following the .if statement if the expression evaluates to true, up the next .endif or .else statement.
 
