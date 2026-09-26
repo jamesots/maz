@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v0.6.1
+
+New:
+
+- The `quiet` option of `compile()` stops errors and warnings being logged to the console, for tools which use maz as a library. Errors are still in the programme's `errors`.
+
 ## v0.6.0
 
 New:

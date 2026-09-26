@@ -1945,6 +1945,25 @@ describe('compiler', function () {
                 'Undocumented instructions used on lines 1, 3',
             ]);
         });
+        it('should not log anything when quiet', function () {
+            let prog: compiler.Programme | undefined;
+            const output = captureLog(() => {
+                prog = compiler.compile('test', {
+                    quiet: true,
+                    warnUndocumented: true,
+                    fileResolver: new compiler.StringFileResolver('test', [
+                        '   sll b',
+                        '   ld a,nothere',
+                        '   bad',
+                    ]),
+                });
+            });
+            expect(output).to.eql([]);
+            expect(errorMessages(prog!)).to.eql([
+                "Unknown macro 'bad'",
+                "Symbol 'nothere' not found",
+            ]);
+        });
         it('should list includes, macros and phased code, lined up', function () {
             const prog = compileFiles({
                 test: [

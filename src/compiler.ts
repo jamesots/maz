@@ -179,6 +179,9 @@ export interface CompileOptions {
     warnUndocumented?: boolean;
     // show errors on one line each
     brief?: boolean;
+    // don't log errors or warnings to the console. Errors are still in
+    // the programme's errors.
+    quiet?: boolean;
     trace?: boolean;
 }
 
@@ -2114,6 +2117,9 @@ export class Programme {
 
     public logError(e: els.Error) {
         this.errors.push(e);
+        if (this.options.quiet) {
+            return;
+        }
         if (e.location) {
             if (this.options.brief) {
                 console.log(
@@ -2137,7 +2143,7 @@ export class Programme {
                 lines.push(el.location.line);
             }
         });
-        if (lines.length > 0) {
+        if (lines.length > 0 && !this.options.quiet) {
             console.log(
                 'Undocumented instructions used on line' +
                     (lines.length > 1 ? 's' : '') +
