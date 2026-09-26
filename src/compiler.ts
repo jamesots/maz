@@ -1541,7 +1541,26 @@ export class Programme {
                     i++;
                 }
                 const value = evaluator.evaluate(byte, prefix, address, true);
-                if (typeof value === 'string') {
+                if (byte.rst) {
+                    // the address is part of the opcode
+                    const rst =
+                        typeof value === 'string'
+                            ? toUtf8(value).charCodeAt(0)
+                            : value;
+                    if (
+                        rst !== undefined &&
+                        !(Number.isInteger(rst) && (rst & ~0x38) === 0)
+                    ) {
+                        const shown = Number.isInteger(rst)
+                            ? `${rst.toString(16)}h`
+                            : `${rst}`;
+                        this.error(
+                            `Invalid address for rst: ${shown} (it can be 0, 8, 10h, 18h, 20h, 28h, 30h or 38h)`,
+                            byte.location || el.location
+                        );
+                    }
+                    bytes.push(0xc7 | (rst & 0x38));
+                } else if (typeof value === 'string') {
                     const utf8 = toUtf8(value);
                     if (els.isDefb(el) || els.isDefw(el)) {
                         for (let j = 0; j < utf8.length; j++) {

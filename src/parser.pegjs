@@ -675,8 +675,7 @@ code = ldir
     / cp_a_n
     / cp_reg
     / cp_n
-    / rst_rst0
-    / rst_rst8
+    / rst
     / retn
     / reti
     / ret_zcpem
@@ -1378,11 +1377,21 @@ jr_nznc = 'jr'i ws cond:nznc ws? ',' ws? expr:expr {
 jr_zc = 'jr'i ws cond:zc ws? ',' ws? expr:expr {
     return res([0x28 | (cond << 4)].concat(rel(expr)));
 }
-rst_rst0 = 'rst'i ws rst:rst0 {
-    return res([0xc7 | rst << 4]);
-}
-rst_rst8 = 'rst'i ws rst:rst8 {
-    return res([0xcf | rst << 4]);
+
+// the address can be 0, 8, 10h, 18h, 20h, 28h, 30h or 38h
+rst = 'rst'i ws expr:expr {
+    if (!expr.expression) {
+        if (typeof expr === 'string') {
+            expr = toUtf8(expr).charCodeAt(0);
+        }
+        if (Number.isInteger(expr) && (expr & ~0x38) === 0) {
+            return res([0xc7 | expr]);
+        }
+        // an invalid address is reported by the compiler
+        expr = constExpr(expr);
+    }
+    expr.rst = true;
+    return res([expr]);
 }
 
 reg = 'b'i ![a-z0-9_]i { return 0; }
@@ -1458,24 +1467,6 @@ zcpem = 'z'i ![a-z0-9_]i { return 0; }
 
 hla = 'hl'i ![a-z0-9_]i { return 0; }
     / 'a'i ![a-z0-9_]i { return 1; }
-
-rst0 = '00h'i { return 0; }
-    / '$00' { return 0; }
-    / '10h'i { return 1; }
-    / '$10' { return 1; }
-    / '20h'i { return 2; }
-    / '$20' { return 2; }
-    / '30h'i { return 3; }
-    / '$30' { return 3; }
-
-rst8 = '08h'i { return 0; }
-    / '$08' { return 0; }
-    / '18h'i { return 1; }
-    / '$18' { return 1; }
-    / '28h'i { return 2; }
-    / '$28' { return 2; }
-    / '38h'i { return 3; }
-    / '$38' { return 3; }
 
 n0246 = '0' { return 0; }
     / '2' { return 1; }

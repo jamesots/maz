@@ -1352,6 +1352,36 @@ describe('compiler', function () {
             ]);
         });
     });
+    it('should allow rst addresses in any form', function () {
+        const prog = compileLines([
+            '   rst 0',
+            '   rst 8',
+            '   rst 10h',
+            '   rst $18',
+            '   rst 20H',
+            '   rst 28h',
+            '   rst vector',
+            '   RST 38h',
+            'vector: equ 30h',
+        ]);
+        expect(prog.errors).to.eql([]);
+        expect(prog.getBytes()).to.eql([
+            0xc7, 0xcf, 0xd7, 0xdf, 0xe7, 0xef, 0xf7, 0xff,
+        ]);
+    });
+    it('should report invalid rst addresses', function () {
+        const prog = compileLines([
+            '   rst 9',
+            '   rst 40h',
+            '   rst vector',
+            'vector: equ 3',
+        ]);
+        expect(errorMessages(prog)).to.eql([
+            'Invalid address for rst: 9h (it can be 0, 8, 10h, 18h, 20h, 28h, 30h or 38h)',
+            'Invalid address for rst: 40h (it can be 0, 8, 10h, 18h, 20h, 28h, 30h or 38h)',
+            'Invalid address for rst: 3h (it can be 0, 8, 10h, 18h, 20h, 28h, 30h or 38h)',
+        ]);
+    });
     describe('libraries', function () {
         function compileFiles(files, searchPaths = []) {
             const fileResolver = new compiler.StringFileResolvers(files);

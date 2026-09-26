@@ -9,6 +9,8 @@ export interface Expression {
     location: Location;
     // true if this is an index register offset, e.g. the d in (ix+d)
     offset?: boolean;
+    // true if this is the address for rst, which is encoded in the opcode
+    rst?: boolean;
 }
 export interface Relative {
     relative: Expression | number | string;

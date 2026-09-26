@@ -23,6 +23,7 @@ Fixed:
 - A circular equ is reported as one error showing the cycle, instead of several.
 - The CLI showed the wrong version number.
 - The listing showed "undefined" or an extra line at the end of some included files.
+- `rst` only accepted addresses written as e.g. `08h` or `$08`, so `rst 8` or `rst 0` was treated as a call to a macro. It now accepts any expression, and reports an invalid address.
 
 Changed:
 
