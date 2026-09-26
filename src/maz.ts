@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import * as compiler from './compiler';
-import * as commandLineArgs from 'command-line-args';
-import * as commandLineUsage from 'command-line-usage';
+import commandLineArgs from 'command-line-args';
+import commandLineUsage from 'command-line-usage';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as sourceMapSupport from 'source-map-support';

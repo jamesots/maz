@@ -70,7 +70,8 @@ from the final pass.
 Tests
 -----
 
-`pnpm test` builds maz, then runs the tests. test/opcodes.ts lists every
+`pnpm test` builds maz, compiles the tests (in test/) into buildtest/, then
+runs them with mocha. test/opcodes.ts lists every
 instruction and the bytes it should be assembled to. If z88dk is installed
 (z88dk-z80asm, or z88dk.z88dk-z80asm from the snap, or set MAZ_Z80ASM),
 test/z88dk.spec.ts also checks that z88dk's assembler produces the same

@@ -1,5 +1,5 @@
 import * as parser from '../lib/parser';
-import * as Tracer from 'pegjs-backtrace';
+import Tracer from 'pegjs-backtrace';
 import * as sourceMapSupport from 'source-map-support';
 import * as mocha from 'mocha';
 import * as chai from 'chai';

@@ -1,4 +1,5 @@
 build
+buildtest
 lib
 src/*.js
 node_modules

@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as parser from './parser';
 // import * as Tracer from 'pegjs-backtrace';
 import * as Expr from './expr';
-import * as chalk from 'chalk';
+import chalk from 'chalk';
 import * as els from './els';
 
 declare function unescape(s: string): string;
@@ -146,7 +146,10 @@ export class StringFileResolvers implements FileResolver {
 }
 
 export class StringFileResolver implements FileResolver {
-    public constructor(private _filename: string, private code: string[]) {}
+    public constructor(
+        private _filename: string,
+        private code: string[]
+    ) {}
     public fileExists(filename: string): boolean {
         return filename === this._filename;
     }
@@ -726,8 +729,8 @@ export class Programme {
             parent === false || condition === false
                 ? false
                 : parent === 'both' || condition === 'both'
-                ? 'both'
-                : true;
+                  ? 'both'
+                  : true;
         const ifStack: {
             state: IfState;
             condition: IfState;
@@ -875,8 +878,8 @@ export class Programme {
                             els.isInclude(el)
                                 ? '.include'
                                 : els.isIncbin(el)
-                                ? '.incbin'
-                                : '.library'
+                                  ? '.incbin'
+                                  : '.library'
                         } can't be used inside an .if which uses symbols`,
                         el.location
                     );
@@ -2249,7 +2252,7 @@ export class Programme {
             }
             const length = placement.bytes
                 ? placement.bytes.length
-                : placement.size ?? 0;
+                : (placement.size ?? 0);
             if (!(length > 0)) {
                 return;
             }

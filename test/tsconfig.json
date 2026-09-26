@@ -1,16 +1,15 @@
 {
   "compilerOptions": {
-    "target": "es6",
+    "target": "es2022",
     "module": "commonjs",
+    "rootDir": ".",
     "outDir": "../buildtest",
-    "strict": true
+    "sourceMap": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "types": ["node", "mocha"]
   },
   "include": [
-    "../lib/*.d.ts",
-    "*.d.ts"
-  ],
-  "ts-node": {
-    // so ts-node reads types.d.ts
-    "files": true
-  }
+    "*.ts"
+  ]
 }
