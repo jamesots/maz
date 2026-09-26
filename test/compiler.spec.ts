@@ -484,6 +484,8 @@ describe('compiler', function () {
     });
     it('should get reduced prefix', function () {
         expect(compiler.getReducedPrefix('%2_%3_%4_')).to.equal('%3_%4_');
+        expect(compiler.getReducedPrefix('%4_')).to.equal('');
+        expect(compiler.getReducedPrefix('')).to.equal('');
     });
     it('should find variable', function () {
         const definitions = new Map();
@@ -1759,6 +1761,318 @@ describe('compiler', function () {
                 msg: 0x105,
                 moved: 0x200,
                 size: 14,
+            });
+        });
+    });
+    describe('errors and less common cases', function () {
+        // captures what's logged while running func
+        function captureLog(func: () => void) {
+            const output: string[] = [];
+            const log = console.log;
+            console.log = (...items: any[]) => output.push(items.join(' '));
+            try {
+                func();
+            } finally {
+                console.log = log;
+            }
+            return output;
+        }
+        function compileFiles(files: { [filename: string]: string[] }) {
+            return compiler.compile('test', {
+                fileResolver: new compiler.StringFileResolvers(files),
+            });
+        }
+
+        it('should report errors from evaluating expressions', function () {
+            // repeating a string a negative number of times is an error
+            const prog = compileLines([
+                '   db rpt("a", -1)',
+                '   db rpt("a", n)',
+                'n: equ -1',
+            ]);
+            expect(errorMessages(prog)).to.eql([
+                'RangeError: Invalid count value: -1',
+                'RangeError: Invalid count value: -1',
+            ]);
+        });
+        it('should include binary files from a string file resolver', function () {
+            const resolver = new compiler.StringFileResolver('test', [
+                '.incbin "test"',
+            ]);
+            const prog = compiler.compile('test', { fileResolver: resolver });
+            expect(prog.errors).to.eql([]);
+            // it includes itself, as it's the only file
+            expect(Buffer.from(prog.getBytes()).toString()).to.equal(
+                '.incbin "test"'
+            );
+            expect(() => resolver.readFile('other')).to.throw(
+                'File not found: other'
+            );
+        });
+        it('should report binary files which do not exist', function () {
+            const prog = compileLines(['.incbin "nothere"']);
+            expect(errorMessages(prog)).to.eql([
+                'File does not exist: nothere',
+            ]);
+        });
+        it('should report an equ without a label, and unbalanced blocks', function () {
+            const prog = compileLines(['   equ 5', '.block', '   nop']);
+            expect(errorMessages(prog)).to.eql([
+                'EQU has no label',
+                'Mismatch between .block and .endblock statements',
+            ]);
+        });
+        it('should report unknown macros', function () {
+            const prog = compileLines(['   nothing 1, 2', '   nop']);
+            expect(errorMessages(prog)).to.eql(["Unknown macro 'nothing'"]);
+            expect(prog.getBytes()).to.eql([0]);
+        });
+        it('should allow macros to be called without all their arguments', function () {
+            const prog = compileLines([
+                'macro m a, b',
+                '   db 1',
+                'endm',
+                '   m',
+                '   m 2',
+            ]);
+            expect(prog.errors).to.eql([]);
+            expect(prog.getBytes()).to.eql([1, 1]);
+        });
+        it('should report a .rept count which cannot be evaluated', function () {
+            const prog = compileLines([
+                'n: equ -1',
+                '.rept rpt("a", n)',
+                '.endr',
+            ]);
+            expect(errorMessages(prog)).to.eql([
+                'The count for .rept must be a constant, or only use equs defined before it',
+            ]);
+        });
+        it('should report a .reptc value which is not a string', function () {
+            const prog = compileLines(['.reptc c, 5', '   db c', '.endr']);
+            expect(errorMessages(prog)).to.eql([
+                'The value for .reptc must be a string',
+            ]);
+        });
+        it('should repeat lines with a label and an instruction once each', function () {
+            const prog = compileLines(['.repti x, 1, 2', 'l: db x', '.endr']);
+            expect(prog.errors).to.eql([]);
+            expect(prog.getBytes()).to.eql([1, 2]);
+        });
+        it('should split .repti items with quotes and escapes', function () {
+            const prog = compileLines([
+                '.repti s, "a\\"b", \'c,d\'',
+                '   db s',
+                '.endr',
+            ]);
+            expect(prog.errors).to.eql([]);
+            expect(Buffer.from(prog.getBytes()).toString()).to.equal('a"bc,d');
+        });
+        it('should not replace names in escaped strings or binary numbers', function () {
+            const prog = compileLines([
+                '.repti x, 3',
+                '   db "\\"x", %10, x',
+                '.endr',
+            ]);
+            expect(prog.errors).to.eql([]);
+            expect(prog.getBytes()).to.eql([0x22, 0x78, 2, 3]);
+        });
+        it('should use the first character of strings for addresses', function () {
+            const prog = compileLines([
+                '   org "A"',
+                '   nop',
+                '   rst "8"',
+                'x: jr "C"',
+            ]);
+            expect(prog.errors).to.eql([]);
+            // org 41h, rst 38h, and jr to 43h, where the jr is
+            expect(prog.getSegments()).to.eql([
+                { address: 0x41, bytes: [0, 0xff, 0x18, 0xfe] },
+            ]);
+        });
+        it('should report relative jumps which are too far back', function () {
+            const prog = compileLines(['x: ds 200', '   jr x']);
+            expect(errorMessages(prog)).to.eql([
+                'Relative jump is out of range (-202 < -128)',
+            ]);
+        });
+        it('should have no bytes before assembling, or with no code', function () {
+            const prog = new compiler.Programme({});
+            expect(prog.getBytes()).to.eql([]);
+            expect(prog.getLines()).to.eql([]);
+            expect(compileLines(['; nothing']).getBytes()).to.eql([]);
+        });
+        it('should log errors on one line each when brief', function () {
+            const output = captureLog(() => {
+                compiler.compile('test', {
+                    brief: true,
+                    fileResolver: new compiler.StringFileResolver('test', [
+                        '   ld a,nothere',
+                        '.block',
+                    ]),
+                });
+            });
+            expect(output).to.eql([
+                // an error which isn't about one line, found before
+                // assembling
+                'Mismatch between .block and .endblock statements',
+                "test:1,9: Symbol 'nothere' not found",
+            ]);
+        });
+        it('should log errors with the line they are on', function () {
+            const output = captureLog(() => {
+                compileLines(['   ld a,nothere']);
+            });
+            expect(output).to.eql([
+                "Symbol 'nothere' not found",
+                '  test:1',
+                '  >    ld a,nothere',
+                '  >         ^',
+            ]);
+        });
+        it('should warn about undocumented instructions', function () {
+            const output = captureLog(() => {
+                compiler.compile('test', {
+                    warnUndocumented: true,
+                    fileResolver: new compiler.StringFileResolver('test', [
+                        '   sll b',
+                        '   nop',
+                        '   sll c',
+                    ]),
+                });
+            });
+            expect(output).to.eql([
+                'Undocumented instructions used on lines 1, 3',
+            ]);
+        });
+        it('should list includes, macros and phased code', function () {
+            const prog = compileFiles({
+                test: [
+                    'macro two',
+                    '   nop',
+                    '   nop',
+                    'endm',
+                    '.include "other"',
+                    '.phase 100h',
+                    '   two',
+                    '.dephase',
+                    '   halt',
+                ],
+                other: ['   db 1'],
+            });
+            expect(prog.errors).to.eql([]);
+            expect(prog.getList(false).slice(0, 14)).to.eql([
+                '    1                         macro two',
+                '    2                            nop',
+                '    3                            nop',
+                '    4                         endm',
+                '    5                         .include "other"',
+                '    1 0000 01                    db 1',
+                '    2                        *END INCLUDE other',
+                '    6                         .phase 100h',
+                '    7                       M    two',
+                '    2 0100@0001 00               M    nop',
+                '    3 0101@0002 00               M    nop',
+                '    8                         .dephase',
+                '    9 0003 76                    halt',
+                '',
+            ]);
+        });
+        it('should use a symbol from an .if before the .if', function () {
+            const assemble = (big: number) =>
+                compileLines([
+                    '   db size',
+                    `BIG: equ ${big}`,
+                    '.if BIG',
+                    'size: equ 100',
+                    '.else',
+                    'size: equ 10',
+                    '.endif',
+                ]);
+            expect(assemble(1).getBytes()).to.eql([100]);
+            expect(assemble(0).getBytes()).to.eql([10]);
+        });
+        it('should compare passes', function () {
+            const pass = () => {
+                const p = new compiler.Pass();
+                p.labels.set('a', 1);
+                p.conditions.set(0, true);
+                p.placements[1] = { address: 0, out: 0 };
+                return p;
+            };
+            const same = pass();
+            expect(pass().sameAs(same)).to.equal(true);
+            const moreLabels = pass();
+            moreLabels.labels.set('b', 2);
+            expect(moreLabels.sameAs(same)).to.equal(false);
+            const differentLabel = pass();
+            differentLabel.labels.set('a', 2);
+            expect(differentLabel.sameAs(same)).to.equal(false);
+            const moreConditions = pass();
+            moreConditions.conditions.set(1, true);
+            expect(moreConditions.sameAs(same)).to.equal(false);
+            const differentCondition = pass();
+            differentCondition.conditions.set(0, false);
+            expect(differentCondition.sameAs(same)).to.equal(false);
+            const morePlacements = pass();
+            morePlacements.placements[2] = { address: 0, out: 0 };
+            expect(morePlacements.sameAs(same)).to.equal(false);
+            const differentPlacements = pass();
+            differentPlacements.placements[0] = { address: 0, out: 0 };
+            differentPlacements.placements.length = 2;
+            delete differentPlacements.placements[1];
+            expect(differentPlacements.sameAs(same)).to.equal(false);
+            const moved = pass();
+            moved.placements[1] = { address: 0, out: 1 };
+            expect(moved.sameAs(same)).to.equal(false);
+        });
+        it('should not find the value of a symbol which is not defined', function () {
+            const evaluator = new compiler.Evaluator(
+                new Map(),
+                new compiler.Pass(),
+                undefined,
+                () => {}
+            );
+            expect(evaluator.symbolValue('nothere', true)).to.equal(undefined);
+            expect(evaluator.missing).to.equal(1);
+        });
+        describe('libraries', function () {
+            it('should not allow a library inside a routine', function () {
+                const prog = compileFiles({
+                    test: ['   call a', '.library "lib"'],
+                    lib: ['.routine a', '.library "other"', '.endroutine'],
+                    other: ['.routine b', '.endroutine'],
+                });
+                expect(errorMessages(prog)).to.include(
+                    ".library can't be used inside a .routine"
+                );
+            });
+            it('should not allow a routine to be defined twice', function () {
+                const prog = compileFiles({
+                    test: ['   call a', '.library "one"', '.library "two"'],
+                    one: ['.routine a', '   ret', '.endroutine'],
+                    two: ['.routine a', '   ret', '.endroutine'],
+                });
+                expect(errorMessages(prog)).to.include(
+                    "Routine 'a' already defined"
+                );
+            });
+            it('should report a routine without .endroutine', function () {
+                const prog = compileFiles({
+                    test: ['.library "lib"'],
+                    lib: ['.routine a', '   ret'],
+                });
+                expect(errorMessages(prog)).to.include(
+                    '.routine without .endroutine'
+                );
+            });
+            it('should allow equs with more than one label in libraries', function () {
+                const prog = compileFiles({
+                    test: ['.library "lib"', '   db a, b'],
+                    lib: ['a:', 'b: equ 5'],
+                });
+                expect(prog.errors).to.eql([]);
+                expect(prog.getBytes()).to.eql([5, 5]);
             });
         });
     });

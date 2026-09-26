@@ -55,6 +55,15 @@ export default defineConfig({
         silent: 'passed-only',
         coverage: {
             include: ['src/**/*.ts'],
+            // it just runs main() in cli.ts
+            exclude: ['src/maz.ts'],
+            // fail if coverage drops much below what it is now
+            thresholds: {
+                lines: 99,
+                statements: 99,
+                functions: 99,
+                branches: 95,
+            },
         },
     },
 });

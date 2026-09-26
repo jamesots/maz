@@ -66,6 +66,9 @@ assembled.
 The output (getBytes, getSegments, getLines, getList and symbols) comes
 from the final pass.
 
+The command line program is main() in cli.ts, which maz.ts runs, so it can
+be tested.
+
 
 Tests
 -----
@@ -76,7 +79,7 @@ in src/, which the tests need), type checks the tests, then runs them.
 `npx vitest` runs them whenever a file changes, including the examples'
 .z80 files, and regenerates the parsers when a .pegjs grammar changes (see
 vitest.config.mts). `pnpm run coverage` shows how much of the source they
-cover.
+cover, and fails if that drops below the thresholds in vitest.config.mts.
 
 test/opcodes.ts lists every instruction and the bytes it should be
 assembled to. If z88dk is installed (z88dk-z80asm, or z88dk.z88dk-z80asm

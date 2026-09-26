@@ -598,26 +598,6 @@ export class Programme {
     public parse(filename: string) {
         const code = this.readSource(filename);
         this.ast = this.parseLines(code, 0);
-        // this.debug();
-    }
-
-    private debug() {
-        console.log(
-            JSON.stringify(
-                this.ast,
-                function (name, value) {
-                    if (name === 'location') {
-                        return `${value.source}:${value.line}:${value.column}`;
-                    }
-                    if (typeof value === 'number') {
-                        return '>> $' + value.toString(16);
-                    }
-                    return value;
-                },
-                2
-            )
-        );
-        console.log(JSON.stringify(this.symbols, undefined, 2));
     }
 
     private parseLines(lines: string[], sourceIndex: number) {
