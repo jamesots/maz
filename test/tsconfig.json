@@ -1,13 +1,13 @@
 {
+  // only used to type check the tests, which vitest runs
   "compilerOptions": {
     "target": "es2022",
-    "module": "commonjs",
-    "rootDir": ".",
-    "outDir": "../buildtest",
-    "sourceMap": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "noEmit": true,
     "strict": true,
     "esModuleInterop": true,
-    "types": ["node", "mocha"]
+    "types": ["node"]
   },
   "include": [
     "*.ts"

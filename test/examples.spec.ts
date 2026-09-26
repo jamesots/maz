@@ -1,12 +1,10 @@
-import * as compiler from '../lib/compiler';
-import * as chai from 'chai';
-import * as fs from 'fs';
+import * as compiler from '../src/compiler';
+import { describe, it, expect } from 'vitest';
 import * as path from 'path';
-const expect = chai.expect;
 
 // Assembles each example and compares the output, errors and listing with
-// a saved snapshot. Run with UPDATE_SNAPSHOTS=1 to save new snapshots, after
-// checking that any differences are expected.
+// a saved snapshot in test/snapshots. Run vitest with -u to update the
+// snapshots, after checking that any differences are expected.
 
 const examples = [
     { file: 'all.z80' },
@@ -60,24 +58,13 @@ function assemble(file: string, searchPaths?: string[]) {
 
 describe('examples', function () {
     for (const example of examples) {
-        it(`should assemble ${example.file} the same as before`, function () {
-            const snapshotFile = path.join(
-                'test',
-                'snapshots',
-                example.file.replace(/\.z80$/, '.json')
-            );
+        it(`should assemble ${example.file} the same as before`, async function () {
             const actual = assemble(example.file, example.searchPaths);
-            if (process.env.UPDATE_SNAPSHOTS) {
-                fs.mkdirSync(path.dirname(snapshotFile), { recursive: true });
-                fs.writeFileSync(
-                    snapshotFile,
-                    JSON.stringify(actual, undefined, 2) + '\n'
-                );
-            }
-            const expected = JSON.parse(
-                fs.readFileSync(snapshotFile).toString()
+            await expect(
+                JSON.stringify(actual, undefined, 2) + '\n'
+            ).toMatchFileSnapshot(
+                path.join('snapshots', example.file.replace(/\.z80$/, '.json'))
             );
-            expect(actual).to.eql(expected);
         });
     }
 });

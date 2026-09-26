@@ -1,10 +1,9 @@
-import * as compiler from '../lib/compiler';
+import * as compiler from '../src/compiler';
 import { opcodes } from './opcodes';
-import * as chai from 'chai';
+import { describe, it, expect, beforeAll } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import { execFileSync } from 'child_process';
-const expect = chai.expect;
 
 // Checks maz's instructions against z88dk: that z88dk's assembler (z80asm)
 // assembles the instructions in opcodes.ts to the same bytes, and that
@@ -131,13 +130,8 @@ function toMazSyntax(text: string) {
     return text;
 }
 
-describe('z88dk', function () {
-    this.timeout(60000);
-
-    before(function () {
-        if (!z80asm) {
-            this.skip();
-        }
+describe.skipIf(!z80asm)('z88dk', { timeout: 60000 }, function () {
+    beforeAll(function () {
         fs.mkdirSync(dir, { recursive: true });
     });
 

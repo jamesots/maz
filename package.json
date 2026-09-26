@@ -12,17 +12,17 @@
     "node": ">=22.12"
   },
   "scripts": {
-    "build-parser": "peggy -o lib/parser.js src/parser.pegjs && cp src/parser.d.ts lib/",
-    "build-expr": "peggy -o lib/expr.js src/expr.pegjs && cp src/expr.d.ts lib/",
-    "trace-parser": "peggy --trace -o lib/parser.js src/parser.pegjs",
-    "trace-expr": "peggy --trace -o lib/expr.js src/expr.pegjs",
+    "build-parser": "peggy -o src/parser.js src/parser.pegjs && mkdir -p lib && cp src/parser.js src/parser.d.ts lib/",
+    "build-expr": "peggy -o src/expr.js src/expr.pegjs && mkdir -p lib && cp src/expr.js src/expr.d.ts lib/",
+    "trace-parser": "peggy --trace -o src/parser.js src/parser.pegjs && cp src/parser.js lib/",
+    "trace-expr": "peggy --trace -o src/expr.js src/expr.pegjs && cp src/expr.js lib/",
     "build-tsc": "tsc",
     "lint-staged": "lint-staged",
     "prepare": "husky",
     "build": "npm run build-tsc && npm run build-parser && npm run build-expr",
     "prepublish": "npm run build",
-    "build-test": "tsc -p test",
-    "test": "npm run build && npm run build-test && mocha 'buildtest/**/*.spec.js'",
+    "test": "npm run build && tsc -p test && vitest run",
+    "coverage": "npm run build && vitest run --coverage",
     "start": "node lib/maz.js",
     "test-z80": "node lib/maz.js -s examples/z80monitor.z80 -o /tmp/z80monitor.bin -l /tmp/z80monitor.lst",
     "test-incbin": "node lib/maz.js -s examples/incbin.z80 -o /tmp/incbin.bin -l /tmp/incbin.lst",
@@ -38,20 +38,18 @@
     ]
   },
   "devDependencies": {
-    "@types/chai": "^5.2.3",
     "@types/command-line-args": "5.2.3",
     "@types/command-line-usage": "^5.0.4",
-    "@types/mocha": "^10.0.10",
     "@types/node": "^26.6.2",
     "@types/source-map-support": "^0.5.10",
-    "chai": "6.2.2",
+    "@vitest/coverage-v8": "^5.0.2",
     "husky": "^9.1.7",
     "lint-staged": "^17.5.1",
-    "mocha": "^12.0.2",
     "peggy": "^5.1.0",
     "pegjs-backtrace": "^0.2.1",
     "prettier": "^3.9.9",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.1"
   },
   "dependencies": {
     "chalk": "^6.0.0",

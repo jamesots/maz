@@ -1,10 +1,5 @@
-import * as compiler from '../lib/compiler';
-import * as sourceMapSupport from 'source-map-support';
-import * as mocha from 'mocha';
-import * as chai from 'chai';
-const expect = chai.expect;
-
-sourceMapSupport.install();
+import * as compiler from '../src/compiler';
+import { describe, it, expect, beforeEach } from 'vitest';
 
 describe('compiler', function () {
     // the unit tests look at the private parts of Programme

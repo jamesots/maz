@@ -1,10 +1,5 @@
-import * as expr from '../lib/expr';
-import * as sourceMapSupport from 'source-map-support';
-import * as mocha from 'mocha';
-import * as chai from 'chai';
-const expect = chai.expect;
-
-sourceMapSupport.install();
+import * as expr from '../src/expr';
+import { describe, it, expect } from 'vitest';
 
 describe('expr', function () {
     it('should parse number', function () {

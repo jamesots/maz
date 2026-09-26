@@ -1,11 +1,7 @@
-import * as parser from '../lib/parser';
+import * as parser from '../src/parser';
 import Tracer from 'pegjs-backtrace';
-import * as sourceMapSupport from 'source-map-support';
-import * as mocha from 'mocha';
-import * as chai from 'chai';
+import { describe, it, expect } from 'vitest';
 import { opcodes } from './opcodes';
-const expect = chai.expect;
-sourceMapSupport.install();
 
 describe('parser', function () {
     // the tests look at whichever fields the elements have
@@ -176,7 +172,7 @@ nop`);
     });
     it('should parse db complex escaping', function () {
         const result = parse('db "\\"Hey \\0\\r\\n\\x13" ');
-        expect(String.fromCharCode.apply(this, result[0].bytes)).to.equal(
+        expect(String.fromCharCode(...result[0].bytes)).to.equal(
             '"Hey \0\r\n\x13'
         );
     });

@@ -70,13 +70,18 @@ from the final pass.
 Tests
 -----
 
-`pnpm test` builds maz, compiles the tests (in test/) into buildtest/, then
-runs them with mocha. test/opcodes.ts lists every
-instruction and the bytes it should be assembled to. If z88dk is installed
-(z88dk-z80asm, or z88dk.z88dk-z80asm from the snap, or set MAZ_Z80ASM),
-test/z88dk.spec.ts also checks that z88dk's assembler produces the same
-bytes for them, and that maz can assemble every instruction z88dk's
-disassembler knows about. Otherwise those tests are skipped.
+The tests are in test/, and use vitest, which runs them straight from the
+TypeScript source. `pnpm test` builds maz (which also generates the parsers
+in src/, which the tests need), type checks the tests, then runs them.
+`npx vitest` runs them whenever a file changes, and `pnpm run coverage`
+shows how much of the source they cover.
+
+test/opcodes.ts lists every instruction and the bytes it should be
+assembled to. If z88dk is installed (z88dk-z80asm, or z88dk.z88dk-z80asm
+from the snap, or set MAZ_Z80ASM), test/z88dk.spec.ts also checks that
+z88dk's assembler produces the same bytes for them, and that maz can
+assemble every instruction z88dk's disassembler knows about. Otherwise
+those tests are skipped.
 
 The examples are assembled and compared with snapshots in test/snapshots.
-Run with UPDATE_SNAPSHOTS=1 to update them, after checking the differences.
+Run `npx vitest run -u` to update them, after checking the differences.
