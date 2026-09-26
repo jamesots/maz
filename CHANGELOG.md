@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## v0.6.0 (unreleased)
+## v0.6.0
 
 New:
 
@@ -33,6 +33,7 @@ Changed:
 
 - "Cannot ORG to earlier address than first ORG" is reported when assembling, so no output file is written.
 - `$` is no longer listed in the listing's symbol table.
+- `require('maz')` gives the compiler (`compile()`, `Programme` and so on), instead of running the command line program.
 - Upgrade all packages to their latest versions. maz now needs Node 22.12 or later, as some of the packages it uses are ES modules.
 - maz is compiled in TypeScript's strict mode, so its type declarations are more precise: e.g. `compile()` takes `CompileOptions`, and `errors` is a list of error objects.
 

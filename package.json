@@ -2,12 +2,12 @@
   "name": "maz",
   "version": "0.6.0",
   "description": "Macro Assembler for Z80",
-  "main": "lib/maz.js",
+  "main": "lib/compiler.js",
   "bin": {
     "maz": "lib/maz.js"
   },
   "repository": "jamesots/maz",
-  "types": "lib/maz.d.ts",
+  "types": "lib/compiler.d.ts",
   "engines": {
     "node": ">=22.12"
   },
@@ -16,11 +16,11 @@
     "build-expr": "peggy -o src/expr.js src/expr.pegjs && mkdir -p lib && cp src/expr.js src/expr.d.ts lib/",
     "trace-parser": "peggy --trace -o src/parser.js src/parser.pegjs && cp src/parser.js lib/",
     "trace-expr": "peggy --trace -o src/expr.js src/expr.pegjs && cp src/expr.js lib/",
-    "build-tsc": "tsc",
+    "build-tsc": "rm -rf lib && tsc",
     "lint-staged": "lint-staged",
     "prepare": "husky",
     "build": "npm run build-tsc && npm run build-parser && npm run build-expr",
-    "prepublish": "npm run build",
+    "prepublishOnly": "npm test",
     "test": "npm run build && tsc -p test && vitest run",
     "coverage": "npm run build && vitest run --coverage",
     "start": "node lib/maz.js",
@@ -37,6 +37,10 @@
       "prettier --write"
     ]
   },
+  "files": [
+    "lib",
+    "CHANGELOG.md"
+  ],
   "devDependencies": {
     "@types/command-line-args": "5.2.3",
     "@types/command-line-usage": "^5.0.4",
