@@ -32,6 +32,7 @@ Changed:
 
 - "Cannot ORG to earlier address than first ORG" is reported when assembling, so no output file is written.
 - `$` is no longer listed in the listing's symbol table.
+- maz is compiled in TypeScript's strict mode, so its type declarations are more precise: e.g. `compile()` takes `CompileOptions`, and `errors` is a list of error objects.
 
 ## v0.5.0
 

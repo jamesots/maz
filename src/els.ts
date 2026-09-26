@@ -25,10 +25,12 @@ export interface Element {
     text?: string;
 }
 
-export interface Error extends Element {
+export interface Error {
     error: string;
-    filename: string;
+    filename?: string;
     source?: string;
+    // not set for errors which aren't about one line
+    location?: Location;
 }
 export interface Org extends Element {
     org: string | number | Expression;
@@ -266,6 +268,6 @@ export function isDefb(el: Element): el is Defb {
 export function isDefw(el: Element): el is Defw {
     return (el as Defw).defw === true;
 }
-export function isError(el: Element): el is Error {
+export function isError(el: Element): el is Element & Error {
     return (el as Error).error !== undefined;
 }

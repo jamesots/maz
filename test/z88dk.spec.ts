@@ -24,8 +24,9 @@ function findCommand(names: string[]) {
 
 const z80asm =
     process.env.MAZ_Z80ASM ||
-    findCommand(['z88dk-z80asm', 'z88dk.z88dk-z80asm']);
-const disassembler = z80asm && z80asm.replace(/z80asm$/, 'dis');
+    findCommand(['z88dk-z80asm', 'z88dk.z88dk-z80asm']) ||
+    '';
+const disassembler = z80asm.replace(/z80asm$/, 'dis');
 // not in /tmp, as the snap version of z88dk has its own /tmp
 const dir = path.join('build', 'z88dk');
 
@@ -61,9 +62,9 @@ function assembleWithMaz(lines: string[]) {
     }
     const bytes: { [line: number]: string } = {};
     for (const line of prog.getLines()) {
-        const lineBytes = [];
+        const lineBytes: number[] = [];
         for (let i = 0; i < line.length; i++) {
-            lineBytes.push(memory.get(line.out + i));
+            lineBytes.push(memory.get(line.out + i) ?? 0);
         }
         bytes[line.line] = hex(lineBytes);
     }
@@ -168,7 +169,7 @@ describe('z88dk', function () {
         }
 
         const maz = assembleWithMaz(instructions.map((text) => `    ${text}`));
-        const differences = [];
+        const differences: string[] = [];
         instructions.forEach((text, i) => {
             const line = i + 1;
             if (maz.bytes[line] !== z88dkBytes[line]) {
@@ -186,7 +187,7 @@ describe('z88dk', function () {
         // every opcode, each in its own 8 byte block: the prefix, the
         // opcode, then operand bytes 12 and 34, which are single byte
         // instructions so they can't run into the next block, then nops
-        const binary = [];
+        const binary: number[] = [];
         for (const prefix of [
             [],
             [0xcb],
@@ -240,15 +241,15 @@ describe('z88dk', function () {
 
         // assemble each instruction at the same address, as relative jumps
         // are disassembled with the address they jump to
-        const source = [];
-        const lines = [];
+        const source: string[] = [];
+        const lines: number[] = [];
         for (const instruction of instructions) {
             source.push(`    org $${instruction.address.toString(16)}`);
             source.push(`    ${toMazSyntax(instruction.text)}`);
             lines.push(source.length);
         }
         const maz = assembleWithMaz(source);
-        const problems = [];
+        const problems: string[] = [];
         instructions.forEach((instruction, i) => {
             const line = lines[i];
             const mazBytes = maz.bytes[line];

@@ -8,7 +8,8 @@ const expect = chai.expect;
 sourceMapSupport.install();
 
 describe('parser', function () {
-    function parse(text) {
+    // the tests look at whichever fields the elements have
+    function parse(text: string): any {
         const tracer = new Tracer(text);
         try {
             return parser.parse(text, {
@@ -23,7 +24,7 @@ describe('parser', function () {
         }
     }
 
-    function testOpcode(opcode, bytes) {
+    function testOpcode(opcode: string, bytes: number[]) {
         const result = parse(opcode);
         expect(result[0].bytes).to.equal(bytes);
     }

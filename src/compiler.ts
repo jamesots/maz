@@ -42,12 +42,13 @@ export abstract class FileResolver {
     public abstract readBinaryFile(filename: string): number[];
     public abstract finishFile(): void;
     public abstract getRealFilename(filename: string): string;
-    public readonly filename: string;
+    // the file being read, if any
+    public abstract get filename(): string | undefined;
 }
 
 export class DefaultFileResolver implements FileResolver {
     private files: string[] = [];
-    private _filename: string;
+    private _filename: string | undefined;
     public searchPaths: string[] = [];
 
     public fileExists(filename: string): boolean {
@@ -86,14 +87,14 @@ export class DefaultFileResolver implements FileResolver {
         return path.join(path.dirname(this._filename), filename);
     }
 
-    public get filename(): string {
+    public get filename(): string | undefined {
         return this._filename;
     }
 }
 
 export class StringFileResolvers implements FileResolver {
     private files: string[] = [];
-    private _filename: string;
+    private _filename: string | undefined;
     public searchPaths: string[] = [];
 
     constructor(private fileContent: { [filename: string]: string[] }) {}
@@ -139,7 +140,7 @@ export class StringFileResolvers implements FileResolver {
         return this._filename.substring(0, index) + '/' + filename;
     }
 
-    public get filename(): string {
+    public get filename(): string | undefined {
         return this._filename;
     }
 }
@@ -162,13 +163,23 @@ export class StringFileResolver implements FileResolver {
     public getRealFilename(filename: string): string {
         return filename;
     }
-    public get filename(): string {
+    public get filename(): string | undefined {
         return this._filename;
     }
 }
 
-export function compile(filename, options) {
-    const parserOptions = { source: 0 } as any;
+export interface CompileOptions {
+    // where to read files from. Defaults to the file system.
+    fileResolver?: FileResolver;
+    // directories to look for included files in, when using the file system
+    searchPaths?: string[];
+    warnUndocumented?: boolean;
+    // show errors on one line each
+    brief?: boolean;
+    trace?: boolean;
+}
+
+export function compile(filename: string, options: CompileOptions) {
     // const tracer = new Tracer(code, {
     //     showTrace: true,
     //     showFullPath: true
@@ -342,7 +353,7 @@ export class Evaluator {
      * undefined if it can't be evaluated, after reporting an error.
      */
     public evaluate(
-        expr: Value | els.Expression,
+        expr: Value | els.Expression | undefined,
         prefix: string,
         address: number | undefined,
         allowForward: boolean,
@@ -352,7 +363,7 @@ export class Evaluator {
             return expr as Value;
         }
         const unknowns = this.unknowns;
-        const variables = {};
+        const variables: { [variable: string]: Value } = {};
         for (const variable of expr.vars) {
             let value: Value | undefined;
             if (variable === '$') {
@@ -378,7 +389,7 @@ export class Evaluator {
         try {
             return Expr.parse(expr.expression, { variables });
         } catch (e) {
-            this.error(e, expr.location);
+            this.error(String(e), expr.location);
             return undefined;
         }
     }
@@ -444,6 +455,10 @@ export class Evaluator {
         allowForward: boolean
     ): SymbolDefinition | undefined {
         const definitions = this.definitions.get(name);
+        if (!definitions) {
+            this.missing++;
+            return undefined;
+        }
         if (definitions.length === 1 && !definitions[0].conditional) {
             return definitions[0];
         }
@@ -454,9 +469,10 @@ export class Evaluator {
         if (current) {
             return current;
         }
-        if (this.previous) {
+        const previousPass = this.previous;
+        if (previousPass) {
             const previous = definitions.find(
-                (d) => this.previous.placements[d.index] !== undefined
+                (d) => previousPass.placements[d.index] !== undefined
             );
             if (previous && (previous.kind !== 'label' || allowForward)) {
                 return previous;
@@ -518,12 +534,11 @@ export class Evaluator {
     private circularError(cycle: string[]) {
         // start the cycle with the first definition, so it's reported the
         // same way whichever symbol it was found from
+        const definition = (name: string) =>
+            (this.definitions.get(name) as SymbolDefinition[])[0];
         let first = 0;
         for (let i = 1; i < cycle.length; i++) {
-            if (
-                this.definitions.get(cycle[i])[0].index <
-                this.definitions.get(cycle[first])[0].index
-            ) {
+            if (definition(cycle[i]).index < definition(cycle[first]).index) {
                 first = i;
             }
         }
@@ -533,18 +548,23 @@ export class Evaluator {
             `Circular definition: ${[...ordered, ordered[0]]
                 .map(displayName)
                 .join(' -> ')}`,
-            this.definitions.get(ordered[0])[0].location
+            definition(ordered[0]).location
         );
     }
 }
 
+interface Macro {
+    ast: els.Element[];
+    params: string[];
+}
+
 export class Programme {
-    public ast: els.Element[];
+    public ast: els.Element[] = [];
     // the final values of the symbols, not including ones local to blocks
     public symbols: { [symbol: string]: Value } = {};
     public sources: Source[] = [];
-    public macros = {};
-    public errors = [];
+    public macros: { [name: string]: Macro } = {};
+    public errors: els.Error[] = [];
     private fileResolver: FileResolver;
     // the libraries which have been loaded, by real filename
     private libraries = new Set<string>();
@@ -560,7 +580,7 @@ export class Programme {
     // errors found while this pass is running are kept with it
     private currentPass: Pass | undefined;
 
-    constructor(private options) {
+    constructor(private options: CompileOptions) {
         if (options && options.fileResolver) {
             this.fileResolver = options.fileResolver;
         } else {
@@ -572,7 +592,7 @@ export class Programme {
         }
     }
 
-    public parse(filename) {
+    public parse(filename: string) {
         const code = this.readSource(filename);
         this.ast = this.parseLines(code, 0);
         // this.debug();
@@ -597,7 +617,7 @@ export class Programme {
         console.log(JSON.stringify(this.symbols, undefined, 2));
     }
 
-    private parseLines(lines, sourceIndex) {
+    private parseLines(lines: string[], sourceIndex: number) {
         let ast: els.Element[] = [];
         for (let i = 0; i < lines.length; i++) {
             ast.push(...this.parseLine(lines[i], sourceIndex, i + 1));
@@ -620,8 +640,16 @@ export class Programme {
                 line: lineNumber,
             });
             return elements !== null ? elements : [];
-        } catch (e) {
-            let error: els.Error;
+        } catch (thrown) {
+            // a peggy SyntaxError, or an error with a location thrown by
+            // the grammar's actions
+            const e = thrown as {
+                name?: string;
+                message?: string;
+                location?: any;
+            };
+            // parse errors are kept in the ast, so the listing can show them
+            let error: els.Element & els.Error;
             if (e.name === 'SyntaxError') {
                 error = {
                     error: 'Syntax Error: ' + e.message,
@@ -635,14 +663,14 @@ export class Programme {
                 };
             } else if (e.location) {
                 error = {
-                    error: e.message,
+                    error: String(e.message),
                     filename: this.sources[sourceIndex].name,
                     location: e.location,
                     source: text,
                 };
             } else {
                 error = {
-                    error: e,
+                    error: String(thrown),
                     filename: this.sources[sourceIndex].name,
                     location: {
                         source: sourceIndex,
@@ -657,10 +685,10 @@ export class Programme {
         }
     }
 
-    private readSource(filename) {
+    private readSource(filename: string) {
         const source = this.fileResolver.readFile(filename);
         this.sources.push({
-            name: this.fileResolver.filename,
+            name: this.fileResolver.filename ?? filename,
             source: source,
         });
         return source;
@@ -744,7 +772,7 @@ export class Programme {
                 ifStack.push({ state: combine(parent, condition), condition });
             }
             if (els.isElse(el) && ifStack.length > 1) {
-                const { condition } = ifStack.pop();
+                const { condition } = ifStack.pop()!;
                 const parent = ifStack[ifStack.length - 1].state;
                 const elseCondition =
                     condition === 'both' ? 'both' : !condition;
@@ -828,7 +856,7 @@ export class Programme {
      * get processed.
      */
     public processIncludes() {
-        const sourceIndices = [];
+        const sourceIndices: number[] = [];
         let sourceIndex = 0;
 
         this.iterateAst(
@@ -919,7 +947,7 @@ export class Programme {
                     el.included = true;
                 } else if (els.isEndInclude(el)) {
                     this.fileResolver.finishFile();
-                    sourceIndex = sourceIndices.pop();
+                    sourceIndex = sourceIndices.pop() ?? 0;
                 }
             }
         );
@@ -977,9 +1005,9 @@ export class Programme {
      * store the macro in the list of macros, indexed by macro name.
      */
     public getMacros() {
-        let macro = undefined;
-        let macroName = undefined;
-        let macroLocation = undefined;
+        let macro: Macro | undefined;
+        let macroName = '';
+        let macroLocation: els.Location | undefined;
         this.iterateAst(
             (el, i, prefix, inMacroDef, ifTrue, inMacroCall, conditional) => {
                 if (els.isMacroDef(el)) {
@@ -1015,7 +1043,7 @@ export class Programme {
                     }
                     this.macros[macroName] = macro;
                     macro = undefined;
-                    macroName = undefined;
+                    macroName = '';
                 }
                 if (macro && !els.isMacroDef(el) && !els.isEndMacro(el)) {
                     macro.ast.push(el);
@@ -1107,11 +1135,12 @@ export class Programme {
         // follow the routines which are used to the ones they use
         this.usedRoutines = new Set<string>();
         const names = [...used];
-        while (names.length > 0) {
-            const name = names.pop();
-            if (routines.has(name) && !this.usedRoutines.has(name)) {
+        let name: string | undefined;
+        while ((name = names.pop()) !== undefined) {
+            const uses = routines.get(name);
+            if (uses && !this.usedRoutines.has(name)) {
                 this.usedRoutines.add(name);
-                names.push(...routines.get(name));
+                names.push(...uses);
             }
         }
     }
@@ -1162,12 +1191,14 @@ export class Programme {
      */
     public getSymbols() {
         let nextBlock = 0;
-        let blocks = [];
+        const blocks: number[] = [];
         const define = (name: string, definition: SymbolDefinition) => {
-            if (!this.definitions.has(name)) {
-                this.definitions.set(name, []);
+            let list = this.definitions.get(name);
+            if (!list) {
+                list = [];
+                this.definitions.set(name, list);
             }
-            this.definitions.get(name).push(definition);
+            list.push(definition);
         };
         this.iterateAst(
             (el, i, prefix, inMacroDef, ifTrue, inMacroCall, conditional) => {
@@ -1252,7 +1283,7 @@ export class Programme {
                             const index = definitions
                                 ? definitions.findIndex((d) => d.index === ii)
                                 : -1;
-                            if (index !== -1) {
+                            if (definitions && index !== -1) {
                                 definitions[index] = {
                                     kind: 'equ',
                                     index: i,
@@ -1277,7 +1308,7 @@ export class Programme {
         return this.definitions;
     }
 
-    private error(message, location?) {
+    private error(message: string, location?: els.Location) {
         let error: els.Error;
         if (location !== undefined) {
             error = {
@@ -1287,12 +1318,7 @@ export class Programme {
                 filename: this.sources[location.source].name,
             };
         } else {
-            error = {
-                error: message,
-                location: undefined,
-                source: undefined,
-                filename: undefined,
-            };
+            error = { error: message };
         }
         if (this.currentPass) {
             this.currentPass.addError(error);
@@ -1321,11 +1347,13 @@ export class Programme {
             }
             return equs.get(name);
         };
-        const constant = (value): Value | undefined => {
-            if (!els.isExpression(value)) {
+        const constant = (
+            value: Value | els.Expression | undefined
+        ): Value | undefined => {
+            if (value === undefined || !els.isExpression(value)) {
                 return value;
             }
-            const variables = {};
+            const variables: { [name: string]: Value } = {};
             for (const name of value.vars) {
                 const found = lookup(name);
                 if (found === undefined) {
@@ -1400,7 +1428,9 @@ export class Programme {
     private expandRepeat(
         el: els.Rept | els.Repti | els.Reptc,
         index: number,
-        constant: (value) => Value | undefined
+        constant: (
+            value: Value | els.Expression | undefined
+        ) => Value | undefined
     ) {
         el.expanded = true;
         let depth = 0;
@@ -1537,16 +1567,13 @@ export class Programme {
      * earlier passes may not have known the values of all the labels.
      */
     public assemble() {
-        let previous: Pass | undefined;
-        let pass: Pass;
-        let settled = false;
-        for (let n = 0; n < MAX_PASSES; n++) {
-            pass = this.layoutPass(previous);
-            if (previous && pass.sameAs(previous)) {
-                settled = true;
-                break;
-            }
+        let previous = this.layoutPass(undefined);
+        let pass = this.layoutPass(previous);
+        let settled = pass.sameAs(previous);
+        for (let n = 2; n < MAX_PASSES && !settled; n++) {
             previous = pass;
+            pass = this.layoutPass(previous);
+            settled = pass.sameAs(previous);
         }
 
         // work out the final values of all the symbols, which reports
@@ -1609,12 +1636,18 @@ export class Programme {
         this.currentPass = pass;
         const evaluator = this.evaluator(pass, previous);
         // things which change the pc can't use forward references
-        const pcValue = (value, prefix: string, pc: number) => {
-            let result = evaluator.evaluate(value, prefix, pc, false);
+        const pcValue = (
+            value: Value | els.Expression,
+            prefix: string,
+            pc: number
+        ): number => {
+            const result = evaluator.evaluate(value, prefix, pc, false);
             if (typeof result === 'string') {
-                result = toUtf8(result).charCodeAt(0); // TODO test this
+                return toUtf8(result).charCodeAt(0); // TODO test this
             }
-            return result;
+            // if it can't be evaluated, an error has been reported, and
+            // the addresses after it don't mean anything
+            return result ?? NaN;
         };
         // pc starts at 0 unless org or phase changes it
         let pc = 0;
@@ -1735,7 +1768,8 @@ export class Programme {
                     const utf8 = toUtf8(value);
                     value = utf8.charCodeAt(0); // TODO test this - treat as signed value??
                 }
-                const relative = value - (address + 2);
+                // NaN if it can't be evaluated, which has been reported
+                const relative = (value ?? NaN) - (address + 2);
                 if (relative > 127) {
                     this.error(
                         `Relative jump is out of range (${relative} > 127)`,
@@ -1754,7 +1788,15 @@ export class Programme {
                 if (word) {
                     i++;
                 }
-                const value = evaluator.evaluate(byte, prefix, address, true);
+                const evaluated = evaluator.evaluate(
+                    byte,
+                    prefix,
+                    address,
+                    true
+                );
+                // 0 if it can't be evaluated, which has been reported, or
+                // will be worked out in the next pass
+                const value = evaluated ?? 0;
                 if (byte.rst) {
                     // the address is part of the opcode
                     const rst =
@@ -1762,7 +1804,7 @@ export class Programme {
                             ? toUtf8(value).charCodeAt(0)
                             : value;
                     if (
-                        rst !== undefined &&
+                        evaluated !== undefined &&
                         !(Number.isInteger(rst) && (rst & ~0x38) === 0)
                     ) {
                         const shown = Number.isInteger(rst)
@@ -1792,7 +1834,7 @@ export class Programme {
                 } else if (els.isDefb(el) || els.isDefw(el)) {
                     // db and dw just use the low byte or word, but
                     // division by zero is still an error
-                    if (value !== undefined && !Number.isFinite(value)) {
+                    if (!Number.isFinite(value)) {
                         this.error(
                             `Invalid value ${value} in ${
                                 els.isDefb(el) ? 'db' : 'dw'
@@ -1806,7 +1848,7 @@ export class Programme {
                     }
                 } else {
                     this.checkRange(
-                        value,
+                        evaluated as number | undefined,
                         byte.offset ? 'offset' : word ? 'word' : 'byte',
                         byte.location || el.location
                     );
@@ -1823,7 +1865,7 @@ export class Programme {
     }
 
     private checkRange(
-        value: number,
+        value: number | undefined,
         size: 'byte' | 'word' | 'offset',
         location: els.Location
     ) {
@@ -1887,7 +1929,7 @@ export class Programme {
                     'error',
                 ]) {
                     if (key in el) {
-                        ast[key] = el[key];
+                        ast[key] = (el as any)[key];
                     }
                 }
                 const placement = placements[i];
@@ -1915,7 +1957,7 @@ export class Programme {
         return collectedAst;
     }
 
-    public collectErrors(ast) {
+    public collectErrors(ast: any[]) {
         for (const el of ast) {
             for (const error of this.errors) {
                 if (
@@ -1930,9 +1972,9 @@ export class Programme {
     }
 
     public getList(warnUndoc: boolean) {
-        const list = [];
-        const lastLines = [];
-        const sources = [];
+        const list: string[] = [];
+        const lastLines: number[] = [];
+        const sources: number[] = [];
         let lastSource = 0;
         let lastLine = 0;
         const ast = this.collectAst();
@@ -1988,11 +2030,11 @@ export class Programme {
                         this.sources[el.location.source].name
                     }`
                 );
-                lastLine = lastLines.pop();
-                lastSource = sources.pop();
+                lastLine = lastLines.pop() ?? 0;
+                lastSource = sources.pop() ?? 0;
             } else if (el.endmacrocall) {
-                lastLine = lastLines.pop() + 1;
-                lastSource = sources.pop();
+                lastLine = (lastLines.pop() ?? 0) + 1;
+                lastSource = sources.pop() ?? 0;
             } else {
                 lastLine = el.location.line;
                 lastSource = el.location.source;
@@ -2029,15 +2071,15 @@ export class Programme {
     }
 
     private dumpLine(
-        list,
-        lines,
-        line,
-        out,
-        address,
-        bytes,
-        inMacroDef,
-        inMacroCall,
-        ifTrue,
+        list: string[],
+        lines: string[],
+        line: number,
+        out: number | undefined,
+        address: number | undefined,
+        bytes: any[] | undefined,
+        inMacroDef: boolean | undefined,
+        inMacroCall: boolean | undefined,
+        ifTrue: boolean,
         letter = ' '
     ) {
         let byteString = '';
@@ -2076,11 +2118,9 @@ export class Programme {
         }
     }
 
-    public logError(e: els.Error | string) {
+    public logError(e: els.Error) {
         this.errors.push(e);
-        if (typeof e === 'string') {
-            console.log(chalk.red(e));
-        } else if (e.location) {
+        if (e.location) {
             if (this.options.brief) {
                 console.log(
                     `${e.filename}:${e.location.line},${e.location.column}: ${e.error}`
@@ -2091,14 +2131,13 @@ export class Programme {
                 console.log('  > ' + e.source);
                 console.log('  > ' + ' '.repeat(e.location.column - 1) + '^');
             }
-        } else if (e.error) {
-            console.log(chalk.red(e.error));
         } else {
+            console.log(chalk.red(e.error));
         }
     }
 
     public warnUndocumented() {
-        let lines = [];
+        const lines: number[] = [];
         this.iterateAssembled((el) => {
             if (els.isUndocumented(el)) {
                 lines.push(el.location.line);
@@ -2119,7 +2158,7 @@ export class Programme {
      * (e.g. from org or ds) are filled with zeros.
      */
     public getBytes() {
-        const bytes = [];
+        const bytes: number[] = [];
         const segments = this.getSegments();
         if (segments.length === 0) {
             return bytes;
@@ -2148,7 +2187,11 @@ export class Programme {
         const memory = new Map<number, number>();
         let origin: number | undefined;
         this.forEachPlacement((el, placement) => {
-            if (!placement.bytes || placement.bytes.length === 0) {
+            if (
+                !placement ||
+                !placement.bytes ||
+                placement.bytes.length === 0
+            ) {
                 return;
             }
             if (origin === undefined) {
@@ -2172,7 +2215,7 @@ export class Programme {
                 segment = { address, bytes: [] };
                 segments.push(segment);
             }
-            segment.bytes.push(memory.get(address));
+            segment.bytes.push(memory.get(address) as number);
         }
         return segments;
     }
@@ -2201,16 +2244,21 @@ export class Programme {
                 macroDepth--;
                 return;
             }
+            if (!placement) {
+                return;
+            }
             const length = placement.bytes
                 ? placement.bytes.length
-                : placement.size;
+                : placement.size ?? 0;
             if (!(length > 0)) {
                 return;
             }
-            const location = macroDepth > 0 ? macroCall : el.location;
+            const location =
+                macroDepth > 0 && macroCall ? macroCall : el.location;
             const data = els.isDefb(el) || els.isDefw(el) || els.isDefs(el);
             if (
                 last &&
+                lastLocation &&
                 lastLocation.source === location.source &&
                 lastLocation.line === location.line
             ) {
@@ -2239,7 +2287,7 @@ export class Programme {
      * with an empty placement for the ends.
      */
     private forEachPlacement(
-        func: (el: els.Element, placement: Placement) => void
+        func: (el: els.Element, placement: Placement | undefined) => void
     ) {
         if (!this.finalPass) {
             return;
@@ -2252,18 +2300,18 @@ export class Programme {
             if (placements[i]) {
                 func(el, placements[i]);
             } else if (els.isEndMacroCall(el)) {
-                func(el, { address: undefined, out: undefined });
+                func(el, undefined);
             }
         });
     }
 }
 
-function pad(num, size, chr = ' ') {
+function pad(num: number | string, size: number, chr = ' ') {
     let result = '' + num;
     return chr.repeat(Math.max(0, size - result.length)) + result;
 }
 
-function padr(num, size, chr = ' ') {
+function padr(num: number | string, size: number, chr = ' ') {
     let result = '' + num;
     return result + chr.repeat(Math.max(0, size - result.length));
 }
@@ -2276,11 +2324,11 @@ function labelPrefix(blocks: number[]) {
     return result;
 }
 
-function labelName(blocks: number[], label) {
+function labelName(blocks: number[], label: string) {
     return labelPrefix(blocks) + label;
 }
 
-export function getReducedPrefix(prefix) {
+export function getReducedPrefix(prefix: string) {
     const match = /%[0-9]+_(.*)/.exec(prefix);
     if (match) {
         return match[1];
@@ -2288,7 +2336,7 @@ export function getReducedPrefix(prefix) {
     return '';
 }
 
-export function getWholePrefix(symbol) {
+export function getWholePrefix(symbol: string) {
     const match = /((%[0-9]+_)+)(.*)/.exec(symbol);
     if (match) {
         return match[1];
@@ -2419,6 +2467,6 @@ function displayName(symbol: string) {
     return symbol.replace(/^(%[0-9]+_)+/, '');
 }
 
-function toUtf8(s) {
+function toUtf8(s: string) {
     return unescape(encodeURIComponent(s));
 }

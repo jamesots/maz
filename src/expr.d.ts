@@ -3,4 +3,4 @@ export function parse(
     options?: {
         variables: { [variable: string]: string | number };
     }
-);
+): string | number;

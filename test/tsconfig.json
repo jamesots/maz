@@ -3,10 +3,14 @@
     "target": "es6",
     "module": "commonjs",
     "outDir": "../buildtest",
-    "strict": false,
-    "noImplicitAny": false
+    "strict": true
   },
   "include": [
-    "../lib/*.d.ts"
-  ]
+    "../lib/*.d.ts",
+    "*.d.ts"
+  ],
+  "ts-node": {
+    // so ts-node reads types.d.ts
+    "files": true
+  }
 }

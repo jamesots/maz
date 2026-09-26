@@ -7,7 +7,8 @@ const expect = chai.expect;
 sourceMapSupport.install();
 
 describe('compiler', function () {
-    let prog;
+    // the unit tests look at the private parts of Programme
+    let prog: any;
 
     beforeEach(function () {
         prog = new compiler.Programme({});
@@ -15,10 +16,10 @@ describe('compiler', function () {
 
     // how each symbol is defined: 'label', { equ: value } or { arg: value },
     // or a list of those if it's defined more than once
-    function definitions(prog) {
-        const result = {};
+    function definitions(prog: any) {
+        const result: { [name: string]: any } = {};
         for (const [name, list] of prog.definitions) {
-            const described = list.map((definition) =>
+            const described = list.map((definition: any) =>
                 definition.kind === 'label'
                     ? 'label'
                     : { [definition.kind]: definition.value }
@@ -27,21 +28,21 @@ describe('compiler', function () {
         }
         return result;
     }
-    function assemble(prog) {
+    function assemble(prog: any) {
         prog.getSymbols();
         prog.assemble();
     }
-    function values(prog) {
-        const result = {};
+    function values(prog: any) {
+        const result: { [name: string]: any } = {};
         for (const [name, value] of prog.values) {
             result[name] = value;
         }
         return result;
     }
-    function placement(prog, index) {
+    function placement(prog: any, index: number) {
         return prog.finalPass.placements[index];
     }
-    function copy(ast) {
+    function copy(ast: any[]) {
         return JSON.parse(JSON.stringify(ast));
     }
 
@@ -243,8 +244,8 @@ describe('compiler', function () {
             seven: 144,
             eight: 150,
         });
-        const placements = [];
-        prog.ast.forEach((el, i) => {
+        const placements: { address: number; out: number }[] = [];
+        prog.ast.forEach((el: any, i: number) => {
             if (el.bytes) {
                 const { address, out } = placement(prog, i);
                 placements.push({ address, out });
@@ -452,7 +453,7 @@ describe('compiler', function () {
             { equ: { expression: 'two', vars: ['two'] } },
         ];
         assemble(prog);
-        expect(prog.errors.map((e) => e.error)).to.eql([
+        expect(prog.errors.map((e: any) => e.error)).to.eql([
             'Circular definition: two -> three -> two',
         ]);
         expect(values(prog)).to.eql({
@@ -463,7 +464,7 @@ describe('compiler', function () {
     });
     it('should evaluate symbols with scope', function () {
         prog.ast = [];
-        const equ = (value) => [{ kind: 'equ', index: 0, value }];
+        const equ = (value: any) => [{ kind: 'equ', index: 0, value }];
         prog.definitions = new Map([
             ['%1_two', equ({ expression: 'three', vars: ['three'] })],
             ['three', equ(3)],
@@ -512,7 +513,8 @@ describe('compiler', function () {
             undefined,
             () => {}
         );
-        const resolve = (prefix, name) => evaluator.resolve(prefix, name);
+        const resolve = (prefix: string, name: string) =>
+            evaluator.resolve(prefix, name);
         expect(resolve('%2_%1_%0_', 'a')).to.equal('%2_%1_%0_a');
         expect(resolve('%2_%1_%0_', 'b')).to.equal('%2_%1_%0_b');
         expect(resolve('%2_%1_%0_', 'c')).to.equal('%1_%0_c');
@@ -551,7 +553,9 @@ describe('compiler', function () {
         const ast = copy(prog.ast);
         assemble(prog);
         expect(
-            prog.ast.slice(2).map((el, i) => placement(prog, i + 2).bytes)
+            prog.ast
+                .slice(2)
+                .map((el: any, i: number) => placement(prog, i + 2).bytes)
         ).to.eql([
             [0, 0x34],
             [0, 0x34, 0x12],
@@ -826,7 +830,7 @@ describe('compiler', function () {
             { bytes: [7, 8, 9] },
         ];
         assemble(prog);
-        expect(prog.errors.map((e) => e.error)).to.eql([
+        expect(prog.errors.map((e: any) => e.error)).to.eql([
             'Cannot ORG to earlier address than first ORG',
         ]);
         expect(prog.getBytes()).to.eql([1, 2, 7, 8, 9]);
@@ -1054,7 +1058,7 @@ describe('compiler', function () {
             fileResolver: new compiler.StringFileResolver('test', lines),
         });
     }
-    function errorMessages(prog) {
+    function errorMessages(prog: compiler.Programme) {
         return prog.errors.map((e) => e.error);
     }
     it('should not assemble an .if nested in a false .if', function () {
@@ -1273,7 +1277,7 @@ describe('compiler', function () {
             expect(prog.getBytes()).to.eql([6, 0, 0, 0, 0, 0, 0]);
         });
         it('should allow symbols to be defined in more than one branch', function () {
-            const assemble = (big) =>
+            const assemble = (big: number) =>
                 compileLines([
                     `BIG: equ ${big}`,
                     '.if BIG',
@@ -1537,7 +1541,10 @@ describe('compiler', function () {
         });
     });
     describe('libraries', function () {
-        function compileFiles(files, searchPaths = []) {
+        function compileFiles(
+            files: { [filename: string]: string[] },
+            searchPaths: string[] = []
+        ) {
             const fileResolver = new compiler.StringFileResolvers(files);
             fileResolver.searchPaths = searchPaths;
             return compiler.compile('test', { fileResolver });
@@ -1713,7 +1720,14 @@ describe('compiler', function () {
         it('should list the lines which produced bytes', function () {
             const prog = compileLines(lines);
             expect(prog.errors).to.eql([]);
-            const line = (line, address, out, length, source, data) => ({
+            const line = (
+                line: number,
+                address: number,
+                out: number,
+                length: number,
+                source: string,
+                data: boolean
+            ) => ({
                 file: 'test',
                 line,
                 address,
