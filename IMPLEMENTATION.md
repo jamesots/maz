@@ -73,8 +73,10 @@ Tests
 The tests are in test/, and use vitest, which runs them straight from the
 TypeScript source. `pnpm test` builds maz (which also generates the parsers
 in src/, which the tests need), type checks the tests, then runs them.
-`npx vitest` runs them whenever a file changes, and `pnpm run coverage`
-shows how much of the source they cover.
+`npx vitest` runs them whenever a file changes, including the examples'
+.z80 files, and regenerates the parsers when a .pegjs grammar changes (see
+vitest.config.mts). `pnpm run coverage` shows how much of the source they
+cover.
 
 test/opcodes.ts lists every instruction and the bytes it should be
 assembled to. If z88dk is installed (z88dk-z80asm, or z88dk.z88dk-z80asm
