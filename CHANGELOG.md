@@ -24,6 +24,7 @@ Fixed:
 - A circular equ is reported as one error showing the cycle, instead of several.
 - The CLI showed the wrong version number.
 - The listing showed "undefined" or an extra line at the end of some included files.
+- The columns in the listing didn't line up for phased code, as it has two addresses. If any code is phased, every line now has room for both.
 - `rst` only accepted addresses written as e.g. `08h` or `$08`, so `rst 8` or `rst 0` was treated as a call to a macro. It now accepts any expression, and reports an invalid address.
 - `add ix,ix` and `add iy,iy` weren't recognised; their opcodes were assembled from `ld ix,ix` and `ld iy,iy`, which aren't real instructions.
 - The undocumented `ld ixh,ixh`, `ld ixh,ixl`, `ld ixl,ixh` and `ld ixl,ixl` (and the `iy` versions) were written as `ld ixh,h`, `ld ixh,l` and so on, which suggested they used `h` and `l`.

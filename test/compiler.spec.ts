@@ -1945,7 +1945,7 @@ describe('compiler', function () {
                 'Undocumented instructions used on lines 1, 3',
             ]);
         });
-        it('should list includes, macros and phased code', function () {
+        it('should list includes, macros and phased code, lined up', function () {
             const prog = compileFiles({
                 test: [
                     'macro two',
@@ -1955,26 +1955,31 @@ describe('compiler', function () {
                     '.include "other"',
                     '.phase 100h',
                     '   two',
+                    '   db "a long string of bytes"',
                     '.dephase',
                     '   halt',
                 ],
                 other: ['   db 1'],
             });
             expect(prog.errors).to.eql([]);
-            expect(prog.getList(false).slice(0, 14)).to.eql([
-                '    1                         macro two',
-                '    2                            nop',
-                '    3                            nop',
-                '    4                         endm',
-                '    5                         .include "other"',
-                '    1 0000 01                    db 1',
-                '    2                        *END INCLUDE other',
-                '    6                         .phase 100h',
-                '    7                       M    two',
+            // as some code is phased, every line has room for both addresses
+            expect(prog.getList(false).slice(0, 17)).to.eql([
+                '    1                              macro two',
+                '    2                                 nop',
+                '    3                                 nop',
+                '    4                              endm',
+                '    5                              .include "other"',
+                '    1      0000 01                    db 1',
+                '    2                             *END INCLUDE other',
+                '    6                              .phase 100h',
+                '    7                            M    two',
                 '    2 0100@0001 00               M    nop',
                 '    3 0101@0002 00               M    nop',
-                '    8                         .dephase',
-                '    9 0003 76                    halt',
+                '    8 0102@0003 61206c6f6e672073      db "a long string of bytes"',
+                '                7472696e67206f66',
+                '                206279746573    ',
+                '    9                              .dephase',
+                '   10      0019 76                    halt',
                 '',
             ]);
         });

@@ -1962,7 +1962,12 @@ export class Programme {
         let lastLine = 0;
         const ast = this.collectAst();
         this.collectErrors(ast);
-        // console.log(JSON.stringify(ast, undefined, 2));
+        // if any code is phased, every line has room for the code address
+        // as well as the output address, so the columns line up
+        const phased = ast.some(
+            (el) => el.address !== undefined && el.address !== el.out
+        );
+        const phaseSpace = phased ? ' '.repeat(5) : '';
         let undoc = false;
         let error = false;
         for (const el of ast) {
@@ -1996,7 +2001,8 @@ export class Programme {
                     el.inMacroDef,
                     el.inMacroCall,
                     el.ifTrue,
-                    warnUndoc && el.undoc ? 'U' : el.error ? 'E' : ' '
+                    warnUndoc && el.undoc ? 'U' : el.error ? 'E' : ' ',
+                    phased
                 );
             }
 
@@ -2009,7 +2015,7 @@ export class Programme {
                     ` ${pad(
                         el.location.line,
                         4
-                    )}                        *END INCLUDE ${
+                    )}${phaseSpace}                        *END INCLUDE ${
                         this.sources[el.location.source].name
                     }`
                 );
@@ -2063,7 +2069,8 @@ export class Programme {
         inMacroDef: boolean | undefined,
         inMacroCall: boolean | undefined,
         ifTrue: boolean,
-        letter = ' '
+        letter = ' ',
+        phased = false
     ) {
         let byteString = '';
         if (bytes && !inMacroDef) {
@@ -2083,17 +2090,21 @@ export class Programme {
             addressString = 'xxxx';
             outString = 'xxxx';
         }
+        // the code address, if it's different to the output address
+        const codeAddress =
+            address !== out ? addressString + '@' : phased ? ' '.repeat(5) : '';
         list.push(
-            `${letter}${pad(line, 4)} ${
-                address !== out ? addressString + '@' : ''
-            }${outString} ${padr(byteString, BYTELEN * 2).substring(
+            `${letter}${pad(line, 4)} ${codeAddress}${outString} ${padr(
+                byteString,
+                BYTELEN * 2
+            ).substring(
                 0,
                 BYTELEN * 2
             )} ${inMacroCall ? 'M' : ' '} ${lines[line - 1]}`
         );
         for (let i = BYTELEN * 2; i < byteString.length; i += BYTELEN * 2) {
             list.push(
-                `           ${padr(
+                `           ${phased ? ' '.repeat(5) : ''}${padr(
                     byteString.substring(i, i + BYTELEN * 2),
                     BYTELEN * 2
                 ).substring(0, BYTELEN * 2)}`
