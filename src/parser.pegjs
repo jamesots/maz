@@ -157,6 +157,10 @@ directive = org
     / endblock
     / routine
     / endroutine
+    / repti
+    / reptc
+    / rept
+    / endr
     / if
     / endif
     / else
@@ -463,6 +467,41 @@ endblock = '.endblock'i {
     return {
         endblock: true,
         endprefix: true,
+        location: loc()
+    };
+}
+
+// repeat the lines up to .endr count times
+rept = '.rept'i ws count:expr {
+    return {
+        rept: count,
+        location: loc()
+    };
+}
+
+// repeat the lines up to .endr for each item, replacing name with the item.
+// The items are text, split by the compiler, so they can be registers.
+repti = '.repti'i ws name:label ws? ',' ws? items:$[^;\r\n]* {
+    return {
+        repti: name,
+        items: items,
+        location: loc()
+    };
+}
+
+// repeat the lines up to .endr for each character in a string, replacing
+// name with the character's value
+reptc = '.reptc'i ws name:label ws? ',' ws? value:expr {
+    return {
+        reptc: name,
+        value: value,
+        location: loc()
+    };
+}
+
+endr = '.endr'i {
+    return {
+        endr: true,
         location: loc()
     };
 }

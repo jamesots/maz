@@ -600,55 +600,61 @@ export class Programme {
     private parseLines(lines, sourceIndex) {
         let ast: els.Element[] = [];
         for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
-            try {
-                const els = parser.parse(line, {
-                    source: sourceIndex,
-                    line: i + 1,
-                });
-                if (els !== null) {
-                    ast.push(...els);
-                }
-            } catch (e) {
-                if (e.name === 'SyntaxError') {
-                    const error = {
-                        error: 'Syntax Error: ' + e.message,
-                        filename: this.sources[sourceIndex].name,
-                        location: {
-                            line: i + 1,
-                            column: e.location.start.column,
-                            source: sourceIndex,
-                        },
-                        source: this.sources[sourceIndex].source[i],
-                    };
-                    ast.push(error);
-                    this.logError(error);
-                } else if (e.location) {
-                    const error = {
-                        error: e.message,
-                        filename: this.sources[sourceIndex].name,
-                        location: e.location,
-                        source: this.sources[sourceIndex].source[i],
-                    } as els.Error;
-                    ast.push(error);
-                    this.logError(error);
-                } else {
-                    const error = {
-                        error: e,
-                        filename: this.sources[sourceIndex].name,
-                        location: {
-                            source: sourceIndex,
-                            line: i + 1,
-                            column: 1,
-                        },
-                        source: this.sources[sourceIndex].source[i],
-                    } as els.Error;
-                    ast.push(error);
-                    this.logError(error);
-                }
-            }
+            ast.push(...this.parseLine(lines[i], sourceIndex, i + 1));
         }
         return ast;
+    }
+
+    /**
+     * Parses one line of source. Errors are logged, and returned as error
+     * elements.
+     */
+    private parseLine(
+        text: string,
+        sourceIndex: number,
+        lineNumber: number
+    ): els.Element[] {
+        try {
+            const elements = parser.parse(text, {
+                source: sourceIndex,
+                line: lineNumber,
+            });
+            return elements !== null ? elements : [];
+        } catch (e) {
+            let error: els.Error;
+            if (e.name === 'SyntaxError') {
+                error = {
+                    error: 'Syntax Error: ' + e.message,
+                    filename: this.sources[sourceIndex].name,
+                    location: {
+                        line: lineNumber,
+                        column: e.location.start.column,
+                        source: sourceIndex,
+                    },
+                    source: text,
+                };
+            } else if (e.location) {
+                error = {
+                    error: e.message,
+                    filename: this.sources[sourceIndex].name,
+                    location: e.location,
+                    source: text,
+                };
+            } else {
+                error = {
+                    error: e,
+                    filename: this.sources[sourceIndex].name,
+                    location: {
+                        source: sourceIndex,
+                        line: lineNumber,
+                        column: 1,
+                    },
+                    source: text,
+                };
+            }
+            this.logError(error);
+            return [error];
+        }
     }
 
     private readSource(filename) {
@@ -924,8 +930,17 @@ export class Programme {
      */
     public checkConditionals() {
         const ifs: { location: els.Location; hadElse: boolean }[] = [];
+        const repeats: els.Element[] = [];
         for (const el of this.ast) {
-            if (els.isIf(el)) {
+            if (els.isRepeat(el)) {
+                repeats.push(el);
+            } else if (els.isEndr(el)) {
+                if (repeats.length === 0) {
+                    this.error('.endr without .rept', el.location);
+                } else {
+                    repeats.pop();
+                }
+            } else if (els.isIf(el)) {
                 ifs.push({ location: el.location, hadElse: false });
             } else if (els.isElse(el)) {
                 if (ifs.length === 0) {
@@ -945,6 +960,12 @@ export class Programme {
         }
         for (const unclosed of ifs) {
             this.error('.if without .endif', unclosed.location);
+        }
+        for (const unclosed of repeats) {
+            this.error(
+                `${repeatName(unclosed)} without .endr`,
+                unclosed.location
+            );
         }
     }
 
@@ -1287,8 +1308,43 @@ export class Programme {
      * endmacrocall element.
      */
     public expandMacros() {
+        // values of equs and macro arguments which are constants, which
+        // can be used for the counts of repeats. Macro arguments are in a
+        // scope for each macro call.
+        const equs = new Map<string, Value>();
+        const scopes: Map<string, Value>[] = [];
+        const lookup = (name: string) => {
+            for (let s = scopes.length - 1; s >= 0; s--) {
+                if (scopes[s].has(name)) {
+                    return scopes[s].get(name);
+                }
+            }
+            return equs.get(name);
+        };
+        const constant = (value): Value | undefined => {
+            if (!els.isExpression(value)) {
+                return value;
+            }
+            const variables = {};
+            for (const name of value.vars) {
+                const found = lookup(name);
+                if (found === undefined) {
+                    return undefined;
+                }
+                variables[name] = found;
+            }
+            try {
+                return Expr.parse(value.expression, { variables });
+            } catch (e) {
+                return undefined;
+            }
+        };
+
         this.iterateAst((el, i, prefix, inMacroDef) => {
-            if (els.isMacroCall(el) && !inMacroDef) {
+            if (inMacroDef) {
+                return;
+            }
+            if (els.isMacroCall(el)) {
                 const macro = this.macros[el.macrocall];
                 if (!macro) {
                     this.error(`Unknown macro '${el.macrocall}'`, el.location);
@@ -1298,6 +1354,7 @@ export class Programme {
                         endmacrocall: true,
                         endprefix: true,
                     } as els.EndMacroCall);
+                    scopes.push(new Map());
                     return;
                 }
                 el.params = JSON.parse(JSON.stringify(macro.params));
@@ -1310,8 +1367,165 @@ export class Programme {
                 this.ast.splice(i + 1 + macro.ast.length, 0, {
                     endmacrocall: true,
                 } as els.EndMacroCall);
+                const scope = new Map<string, Value>();
+                el.params.forEach((param, j) => {
+                    const value = el.args ? constant(el.args[j]) : undefined;
+                    if (value !== undefined) {
+                        scope.set(param, value);
+                    }
+                });
+                scopes.push(scope);
+            } else if (els.isEndMacroCall(el)) {
+                scopes.pop();
+            } else if (els.isEqu(el)) {
+                const value = constant(el.equ);
+                for (let j = i - 1; j >= 0 && els.isLabel(this.ast[j]); j--) {
+                    const label = this.ast[j] as els.Label;
+                    if (value !== undefined) {
+                        equs.set(label.label, value);
+                    }
+                }
+            } else if (els.isRepeat(el) && !el.expanded) {
+                this.expandRepeat(el, i, constant);
             }
         });
+    }
+
+    /**
+     * Replaces the lines between .rept, .repti or .reptc and the matching
+     * .endr with a copy for each repetition. Each copy is a block, so
+     * labels in it are local to it. .repti and .reptc change the lines'
+     * text, so they are parsed again.
+     */
+    private expandRepeat(
+        el: els.Rept | els.Repti | els.Reptc,
+        index: number,
+        constant: (value) => Value | undefined
+    ) {
+        el.expanded = true;
+        let depth = 0;
+        let end = -1;
+        for (let j = index + 1; j < this.ast.length; j++) {
+            if (els.isRepeat(this.ast[j])) {
+                depth++;
+            } else if (els.isEndr(this.ast[j])) {
+                if (depth === 0) {
+                    end = j;
+                    break;
+                }
+                depth--;
+            }
+        }
+        if (end === -1) {
+            // reported by checkConditionals
+            return;
+        }
+        const body = this.ast.slice(index + 1, end);
+        const name = repeatName(el);
+        let copies: els.Element[][] = [];
+        if (
+            body.some(
+                (e) =>
+                    els.isInclude(e) ||
+                    els.isIncbin(e) ||
+                    els.isLibrary(e) ||
+                    els.isMacroDef(e)
+            )
+        ) {
+            this.error(
+                `.include, .incbin, .library and macro definitions can't be used inside ${name}`,
+                el.location
+            );
+        } else if (els.isRept(el)) {
+            const count = constant(el.rept);
+            if (count === undefined) {
+                this.error(
+                    'The count for .rept must be a constant, or only use equs defined before it',
+                    el.location
+                );
+            } else if (
+                typeof count !== 'number' ||
+                !Number.isInteger(count) ||
+                count < 0
+            ) {
+                this.error(`Invalid count for .rept: ${count}`, el.location);
+            } else {
+                for (let n = 0; n < count; n++) {
+                    copies.push(JSON.parse(JSON.stringify(body)));
+                }
+            }
+        } else {
+            let values: string[] = [];
+            if (els.isRepti(el)) {
+                values = splitItems(el.items);
+            } else {
+                const value = constant(el.value);
+                if (typeof value !== 'string') {
+                    this.error(
+                        'The value for .reptc must be a string',
+                        el.location
+                    );
+                } else {
+                    values = [...toUtf8(value)].map((c) =>
+                        String(c.charCodeAt(0))
+                    );
+                }
+            }
+            const variable = els.isRepti(el) ? el.repti : el.reptc;
+            copies = values.map((value) =>
+                this.substituteLines(body, variable, value)
+            );
+        }
+        const expansion: els.Element[] = [];
+        for (const copy of copies) {
+            // no location, so the listing doesn't show extra lines
+            expansion.push(
+                { block: true, repeat: true } as els.Block,
+                ...copy,
+                {
+                    endblock: true,
+                    endprefix: true,
+                    repeat: true,
+                } as els.EndBlock
+            );
+        }
+        this.ast.splice(index + 1, body.length, ...expansion);
+    }
+
+    /**
+     * Parses the lines which elements came from again, after replacing a
+     * name in them with some text
+     */
+    private substituteLines(
+        elements: els.Element[],
+        name: string,
+        value: string
+    ): els.Element[] {
+        const result: els.Element[] = [];
+        const done = new Set<string>();
+        for (const el of elements) {
+            if (!el.location) {
+                result.push(JSON.parse(JSON.stringify(el)));
+                continue;
+            }
+            const { source, line } = el.location;
+            const key = `${source}:${line}`;
+            if (done.has(key)) {
+                continue;
+            }
+            done.add(key);
+            // the text may already have been changed by an outer repeat
+            const text =
+                el.text !== undefined
+                    ? el.text
+                    : this.sources[source].source[line - 1];
+            const changed = substitute(text, name, value);
+            for (const parsed of this.parseLine(changed, source, line)) {
+                parsed.text = changed;
+                result.push(parsed);
+            }
+        }
+        return result;
     }
 
     /**
@@ -1644,6 +1858,15 @@ export class Programme {
         let ast: any = {};
         this.iterateAssembled(
             (el, i, prefix, inMacroDef, ifTrue, inMacroCall) => {
+                if ((els.isBlock(el) || els.isEndBlock(el)) && el.repeat) {
+                    // each repetition's lines are listed separately
+                    if (Object.keys(ast).length !== 0) {
+                        collectedAst.push(ast);
+                        ast = {};
+                    }
+                    line = 0;
+                    return;
+                }
                 if (el.location) {
                     if (
                         (el.location.line !== line && line !== 0) ||
@@ -2071,6 +2294,99 @@ export function getWholePrefix(symbol) {
         return match[1];
     }
     return '';
+}
+
+function repeatName(el: els.Element) {
+    return els.isRept(el) ? '.rept' : els.isRepti(el) ? '.repti' : '.reptc';
+}
+
+/**
+ * Splits the items for .repti at commas, except in brackets or strings
+ */
+function splitItems(text: string): string[] {
+    const items = [];
+    let item = '';
+    let depth = 0;
+    let quote: string | undefined;
+    for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (quote) {
+            if (c === '\\') {
+                item += c + (text[i + 1] ?? '');
+                i++;
+                continue;
+            }
+            if (c === quote) {
+                quote = undefined;
+            }
+        } else if (c === '"' || c === "'") {
+            quote = c;
+        } else if (c === '(') {
+            depth++;
+        } else if (c === ')') {
+            depth--;
+        } else if (c === ',' && depth === 0) {
+            items.push(item.trim());
+            item = '';
+            continue;
+        }
+        item += c;
+    }
+    items.push(item.trim());
+    return items.filter((i) => i !== '');
+}
+
+/**
+ * Replaces a name in a line of source with some text, except in strings
+ * and comments
+ */
+function substitute(text: string, name: string, value: string): string {
+    let result = '';
+    let i = 0;
+    while (i < text.length) {
+        const c = text[i];
+        if (c === ';') {
+            // the rest is a comment
+            return result + text.slice(i);
+        }
+        if (c === '"' || c === "'") {
+            let j = i + 1;
+            while (j < text.length && text[j] !== c) {
+                j += text[j] === '\\' ? 2 : 1;
+            }
+            result += text.slice(i, j + 1);
+            i = j + 1;
+            continue;
+        }
+        if (/[0-9$]/.test(c) || (c === '%' && /[01]/.test(text[i + 1]))) {
+            // a number, e.g. $ab or 0ffh, which isn't a name
+            let j = i + 1;
+            while (j < text.length && /[a-zA-Z0-9_]/.test(text[j])) {
+                j++;
+            }
+            result += text.slice(i, j);
+            i = j;
+            continue;
+        }
+        if (/[a-zA-Z_]/.test(c)) {
+            let j = i;
+            while (j < text.length && /[a-zA-Z0-9_]/.test(text[j])) {
+                j++;
+            }
+            const word = text.slice(i, j);
+            result += word === name ? value : word;
+            // the ' in ex af,af' isn't the start of a string
+            if (word.toLowerCase() === 'af' && text[j] === "'") {
+                result += "'";
+                j++;
+            }
+            i = j;
+            continue;
+        }
+        result += c;
+        i++;
+    }
+    return result;
 }
 
 /**

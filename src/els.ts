@@ -20,6 +20,9 @@ export interface Prefixed {
 }
 export interface Element {
     location: Location;
+    // the text the element was parsed from, if it isn't the source line,
+    // e.g. after .repti has replaced a name
+    text?: string;
 }
 
 export interface Error extends Element {
@@ -52,6 +55,24 @@ export interface Routine extends Element {
 export interface EndRoutine extends Element {
     endroutine: true;
 }
+// .rept, .repti and .reptc
+export interface Rept extends Element {
+    rept: number | string | Expression;
+    expanded?: true;
+}
+export interface Repti extends Element {
+    repti: string;
+    items: string;
+    expanded?: true;
+}
+export interface Reptc extends Element {
+    reptc: string;
+    value: number | string | Expression;
+    expanded?: true;
+}
+export interface Endr extends Element {
+    endr: true;
+}
 export interface EndInclude extends Element {
     endinclude: number;
 }
@@ -73,9 +94,12 @@ export interface MacroCall extends Element, Prefixed {
 }
 export interface Block extends Element, Prefixed {
     block: true;
+    // true if it's for a repetition of .rept, .repti or .reptc
+    repeat?: true;
 }
 export interface EndBlock extends Element, EndPrefix {
     endblock: true;
+    repeat?: true;
 }
 export interface Bytes extends Element {
     bytes: (Expression | Relative | number)[];
@@ -195,6 +219,22 @@ export function isRoutine(el: Element): el is Routine {
 }
 export function isEndRoutine(el: Element): el is EndRoutine {
     return (el as EndRoutine).endroutine === true;
+}
+export function isRept(el: Element): el is Rept {
+    return (el as Rept).rept !== undefined;
+}
+export function isRepti(el: Element): el is Repti {
+    return (el as Repti).repti !== undefined;
+}
+export function isReptc(el: Element): el is Reptc {
+    return (el as Reptc).reptc !== undefined;
+}
+// any of .rept, .repti or .reptc
+export function isRepeat(el: Element): el is Rept | Repti | Reptc {
+    return isRept(el) || isRepti(el) || isReptc(el);
+}
+export function isEndr(el: Element): el is Endr {
+    return (el as Endr).endr === true;
 }
 export function isEndInclude(el: Element): el is EndInclude {
     return (el as EndInclude).endinclude !== undefined;

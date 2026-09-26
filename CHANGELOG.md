@@ -4,6 +4,7 @@
 
 New:
 
+- `.rept`, `.repti` and `.reptc`, ended with `.endr`, like z88dk's `rept`, `repti` and `reptc`. Labels in each repetition are local to it, and repeats can be nested.
 - Libraries of routines: `.library "file"` assembles only the routines in the file which are used, defined with `.routine name` and `.endroutine`. Libraries can use other libraries, and are found using the search paths.
 - `.if` can use symbols: equs defined anywhere, and labels defined before the `.if`. A symbol can be defined in more than one branch of such an `.if`. `.include`, `.incbin` and macro definitions can't be inside one.
 - `(ix-d)` and `(ix)` index register addressing, as well as `(ix+d)`. The same goes for `iy`.

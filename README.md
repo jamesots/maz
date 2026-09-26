@@ -177,6 +177,32 @@ Outside its routines, a library can only contain EQUs, macro definitions, .libra
         jp mul8
     .endroutine
 </dd>
+<dt>.rept <i>count</i></dt>
+<dd>Repeat the lines up to the matching .endr <i>count</i> times. The count must be known before assembling: it can use constants, EQUs defined before the .rept, and macro arguments.
+
+    .rept 3
+        nop
+    .endr
+</dd>
+<dt>.repti <i>name</i>, <i>item</i>, <i>item</i>...</dt>
+<dd>Repeat the lines up to the matching .endr once for each item, with <i>name</i> replaced by the text of the item. The items can be anything, including registers.
+
+    .repti reg, bc, de, hl
+        push reg
+    .endr
+</dd>
+<dt>.reptc <i>name</i>, <i>string</i></dt>
+<dd>Repeat the lines up to the matching .endr once for each character (byte, when encoded as UTF-8) in the string, with <i>name</i> replaced by the character's value.
+
+    .reptc c, "abc"
+        db c + 128
+    .endr
+</dd>
+<dt>.endr</dt>
+<dd>End a .rept, .repti or .reptc.
+
+Each repetition is like a .block, so labels in it are local to it, and the same label can be used in each repetition. Repeats can be nested. Names aren't replaced in strings or comments. .include, .incbin, .library and macro definitions can't be used in a repeat.
+</dd>
 <dt>.if <i>expression</i></dt>
 <dd>Assembles the code following the .if statement if the expression evaluates to true, up the next .endif or .else statement.
 

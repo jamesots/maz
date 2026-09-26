@@ -1382,6 +1382,160 @@ describe('compiler', function () {
             'Invalid address for rst: 3h (it can be 0, 8, 10h, 18h, 20h, 28h, 30h or 38h)',
         ]);
     });
+    describe('repeats', function () {
+        it('should repeat lines with .rept', function () {
+            const prog = compileLines([
+                '.rept 3',
+                '   nop',
+                '.endr',
+                '   halt',
+            ]);
+            expect(prog.errors).to.eql([]);
+            expect(prog.getBytes()).to.eql([0, 0, 0, 0x76]);
+        });
+        it('should use constants, equs defined before, and macro arguments for the count', function () {
+            const prog = compileLines([
+                'N: equ 2',
+                '.rept N * 2 - 3',
+                '   nop',
+                '.endr',
+                'macro m n',
+                '.rept n',
+                '   halt',
+                '.endr',
+                'endm',
+                '   m 2',
+            ]);
+            expect(prog.errors).to.eql([]);
+            expect(prog.getBytes()).to.eql([0, 0x76, 0x76]);
+        });
+        it('should allow a count of 0', function () {
+            const prog = compileLines([
+                '.rept 0',
+                '   nop',
+                '.endr',
+                '   halt',
+            ]);
+            expect(prog.errors).to.eql([]);
+            expect(prog.getBytes()).to.eql([0x76]);
+        });
+        it('should report a count which is not known before assembling', function () {
+            const prog = compileLines([
+                '.rept N',
+                '   nop',
+                '.endr',
+                '.rept -1',
+                '.endr',
+                'N: equ 2',
+            ]);
+            expect(errorMessages(prog)).to.eql([
+                'The count for .rept must be a constant, or only use equs defined before it',
+                'Invalid count for .rept: -1',
+            ]);
+        });
+        it('should repeat lines for each item with .repti, replacing the name', function () {
+            const prog = compileLines([
+                '.repti address, (bc), (de), (ix+2)',
+                '   ld a,address',
+                '.endr',
+                '.repti v, 1, 2+3',
+                '   db v',
+                '.endr',
+            ]);
+            expect(prog.errors).to.eql([]);
+            expect(prog.getBytes()).to.eql([
+                0x0a, 0x1a, 0xdd, 0x7e, 0x02, 1, 5,
+            ]);
+        });
+        it('should use registers as items with .repti', function () {
+            const prog = compileLines([
+                '.repti reg, bc, de, hl',
+                '   push reg',
+                '.endr',
+            ]);
+            expect(prog.errors).to.eql([]);
+            expect(prog.getBytes()).to.eql([0xc5, 0xd5, 0xe5]);
+        });
+        it('should repeat lines for each character with .reptc', function () {
+            const prog = compileLines([
+                '.reptc c, "ab"',
+                '   db c, c+1',
+                '.endr',
+            ]);
+            expect(prog.errors).to.eql([]);
+            expect(prog.getBytes()).to.eql([0x61, 0x62, 0x62, 0x63]);
+        });
+        it('should not replace names in strings, comments or numbers', function () {
+            const prog = compileLines([
+                '.repti ab, 1',
+                '   db "ab", $ab, ab ; ab',
+                "   ex af,af'",
+                '.endr',
+            ]);
+            expect(prog.errors).to.eql([]);
+            expect(prog.getBytes()).to.eql([0x61, 0x62, 0xab, 1, 0x08]);
+        });
+        it('should make labels local to each repetition', function () {
+            const prog = compileLines([
+                'start:',
+                '.rept 2',
+                'loop: djnz loop',
+                '   jp start',
+                '.endr',
+            ]);
+            expect(prog.errors).to.eql([]);
+            expect(prog.getBytes()).to.eql([
+                0x10, 0xfe, 0xc3, 0, 0, 0x10, 0xfe, 0xc3, 0, 0,
+            ]);
+            expect(prog.symbols).to.eql({ start: 0 });
+        });
+        it('should allow repeats to be nested', function () {
+            const prog = compileLines([
+                '.repti a, 1, 2',
+                '.repti b, 10, 20',
+                '   db a + b',
+                '.endr',
+                '.rept 2',
+                '   db a',
+                '.endr',
+                '.endr',
+            ]);
+            expect(prog.errors).to.eql([]);
+            expect(prog.getBytes()).to.eql([11, 21, 1, 1, 12, 22, 2, 2]);
+        });
+        it('should list each repetition', function () {
+            const prog = compileLines([
+                '.repti reg, bc, de',
+                '   push reg',
+                '.endr',
+            ]);
+            const list = prog.getList(false);
+            expect(list.slice(0, 4)).to.eql([
+                '    1                         .repti reg, bc, de',
+                '    2 0000 c5                    push reg',
+                '    2 0001 d5                    push reg',
+                '    3                         .endr',
+            ]);
+        });
+        it('should report unbalanced .endr', function () {
+            const prog = compileLines([
+                '.reptc c, "a"',
+                '   nop',
+                '   nop',
+                '.endr',
+                '.endr',
+            ]);
+            expect(errorMessages(prog)).to.eql(['.endr without .rept']);
+            const prog2 = compileLines(['.repti x, 1', '   nop']);
+            expect(errorMessages(prog2)).to.eql(['.repti without .endr']);
+        });
+        it('should not allow includes or macro definitions in repeats', function () {
+            const prog = compileLines(['.rept 2', 'macro m', 'endm', '.endr']);
+            expect(errorMessages(prog)).to.eql([
+                ".include, .incbin, .library and macro definitions can't be used inside .rept",
+            ]);
+        });
+    });
     describe('libraries', function () {
         function compileFiles(files, searchPaths = []) {
             const fileResolver = new compiler.StringFileResolvers(files);
